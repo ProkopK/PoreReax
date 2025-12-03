@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "porereax"
+version = "0.0.1"
+authors = [
+    {name = "Karl Prokop", email = "st184141@stud.uni-stuttgart.de"}
+]
+description = "A tool for generating and analysing reactive pore simulations using ReaxFF and LAMMPS."
+readme = "README.md"
+license = {text = "GNU General Public License v3.0"}
+keywords = ["pore", "ReaxFF", "LAMMPS", "molecular dynamics", "simulation", "analysis"]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "ovito"
+]
+
+[tool.setuptools.packages.find]
+where = ["./"]

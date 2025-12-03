@@ -1,2 +1,2 @@
 # PoreReax
-Tool for generating and analysing reactive pore simulations
+A tool for generating and analysing reactive pore simulations
