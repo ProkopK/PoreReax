@@ -1,5 +1,4 @@
 import numpy as np
-import itertools
 
 from porereax.utils import BondSampler, AtomSampler
 
@@ -10,35 +9,20 @@ class ChargeSampler(AtomSampler):
         super().__init__(file_name, dimension)
         self.num_bins = parameters.get("bins", 600)
         self.range = parameters.get("range", (-3.0, 3.0))
-        self.input.update({"file_name": file_name})
-        self.input.update({"dimension": dimension})
         self.input.update({"num_bins": self.num_bins})
         self.input.update({"range": self.range})
 
     def add_atom(self, atom, bonds=None):
         super().add_atom(atom, bonds)
 
-    def init_sampling(self, atom_lib):
+    def init_sampling(self, atom_lib, dimension_params={}):
         for identifier, bonds_info in self.molecules.items():
-            atom = bonds_info["atom"]
-            if atom in atom_lib:
-                atom = atom_lib[atom]
-            else:
-                raise ValueError(f"Error in ChargeSampler: Atom {atom} not found in atom library.")
-            bonds = bonds_info["bonds"]
-            bond_types = []
-            for bond in bonds:
-                if bond in atom_lib:
-                    bond_types.append(atom_lib[bond])
-                else:
-                    raise ValueError(f"Error in ChargeSampler: Bonded atom {bond} not found in atom library.")
-            bonds = list(map(list, itertools.permutations(bond_types)))
             if self.dimension == "None":
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"hist": hist, "bin_edges": bin_edges}
-                self.molecules[identifier].update({"atom": atom, "bonds": bonds})
             else:
                 raise ValueError(f"Dimension {self.dimension} not supported in ChargeSampler.")
+        return super().init_sampling(atom_lib, dimension_params)
     
     def sample(self, frame, charges, types, bond_topology, bond_enum):
         for identifier, bonds_info in self.molecules.items():

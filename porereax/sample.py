@@ -5,7 +5,7 @@ from ovito.data import BondsEnumerator
 
 import porereax.utils as utils
 from porereax.charge import ChargeSampler
-from porereax.utils import Sampler
+from porereax.utils import Sampler, AtomSampler, BondSampler
 
 
 class Sample:
@@ -16,6 +16,8 @@ class Sample:
         self.start_frame, self.end_frame = start_end
 
         self.samplers = []
+        self.molecules = {}
+        self.bonds = {}
 
         # Check atom library
         if not isinstance(atom_lib, dict):
@@ -64,9 +66,18 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
+    def _register_molecule(self, molecule, bonds=None):
+        pass
+
     def sample(self):
         for sampler in self.samplers:
-            sampler.init_sampling(self.name_to_type)
+            if isinstance(sampler, AtomSampler):
+                mols = sampler.init_sampling(self.name_to_type)
+                self.molecules.update(mols)
+            if isinstance(sampler, BondSampler):
+                bonds = sampler.init_sampling(self.name_to_type)
+                self.bonds.update(bonds)
+        print(f"Mols: {self.molecules}")
 
         for frame_idx in self.frames:
             frame = self.pipeline.compute(frame_idx)
