@@ -77,7 +77,9 @@ class Sample:
             if isinstance(sampler, BondSampler):
                 bonds = sampler.init_sampling(self.name_to_type)
                 self.bonds.update(bonds)
-        print(f"Mols: {self.molecules}")
+        
+        molecules_per_atom_type = {atom_type: [(self.molecules[identifier]["bonds"], identifier) for identifier in self.molecules if self.molecules[identifier]["atom"]==atom_type] for atom_type in self.type_to_name}
+        molecule_idx = {identifier: np.zeros(self.num_particles, dtype=int) for identifier in self.molecules}
 
         for frame_idx in self.frames:
             frame = self.pipeline.compute(frame_idx)
@@ -88,13 +90,36 @@ class Sample:
             atom_velocities = frame.particles.velocities.array
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
+
+            for mol in molecule_idx:
+                molecule_idx[mol] = np.zeros(self.num_particles, dtype=int)
+
+            for atom_type in self.type_to_name:
+                atoms = np.where(atom_types == atom_type)[0]
+                # No molecules registered for this atom type
+                if molecules_per_atom_type[atom_type] == []:
+                    continue
+                # Only one molecule registered without bond constraints
+                elif len(molecules_per_atom_type[atom_type]) == 1 and molecules_per_atom_type[atom_type][0] == []:
+                    molecule_idx[molecules_per_atom_type[atom_type][1]][atoms] = 1
+                    continue
+                # Atom with bond constraints
+                for atom in atoms:
+                    bonds = list(bond_enum.bonds_of_particle(atom))
+                    particles = bond_topology[bonds].flatten()
+                    other_particles = particles[particles != atom]
+                    other_types = list(atom_types[other_particles])
+                    for bond_permutations, indentifier in molecules_per_atom_type[atom_type]:
+                        if other_types in bond_permutations:
+                            molecule_idx[indentifier][atom] = 1
+            for mol in molecule_idx:
+                molecule_idx[mol] = np.where(molecule_idx[mol]==1)[0]
+
             for sampler in self.samplers:
                 if isinstance(sampler, ChargeSampler):
                     sampler.sample(frame=frame_idx,
                                    charges=atom_charges,
-                                   types=atom_types,
-                                   bond_topology=bond_topology,
-                                   bond_enum=bond_enum)
+                                   mol_index=molecule_idx)
                 else:
                     sampler.sample()
 

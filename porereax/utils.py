@@ -60,14 +60,14 @@ class AtomSampler(Sampler):
             if atom in atom_lib:
                 atom = atom_lib[atom]
             else:
-                raise ValueError(f"Error in ChargeSampler: Atom {atom} not found in atom library.")
+                raise ValueError(f"Error in {self.__class__.__name__}: Atom {atom} not found in atom library.")
             bonds = bonds_info["bonds"]
             bond_types = []
             for bond in bonds:
                 if bond in atom_lib:
                     bond_types.append(atom_lib[bond])
                 else:
-                    raise ValueError(f"Error in ChargeSampler: Bonded atom {bond} not found in atom library.")
+                    raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bond} not found in atom library.")
             bond_permutations = list(map(list, itertools.permutations(bond_types))) # All permutations of bond types
             bond_permutations = [list(x) for x in set(tuple(bond_perm) for bond_perm in bond_permutations)] # Remove duplicates
             self.molecules[identifier].update({"atom": atom, "bonds": bond_permutations})
