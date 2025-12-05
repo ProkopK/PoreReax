@@ -64,6 +64,8 @@ def read_gro_file(file_path):
         
     box_dims = [float(dim) * 10 for dim in lines[-1].strip().split()]
     print(box_dims)
+    # TODO handle triclinic boxes
+    # TODO check strip split
     # box = [x for x in lines[-1].split(" ") if x != ""]
     
     gro_data = [line_mapper(line) for line in lines[2:-1]]
