@@ -1,3 +1,15 @@
+"""
+Module providing the Sample class for molecular trajectory sampling.
+
+This module defines the Sample class, which manages the sampling of molecular
+trajectories using various samplers. It supports parallel processing using
+the multiprocessing module and integrates with the Ovito library for trajectory
+handling. The Sample class allows users to add different samplers, configure
+sampling parameters, and execute the sampling process either in parallel or
+serially.
+"""
+
+
 import numpy as np
 import multiprocessing as mp
 import os
@@ -9,7 +21,32 @@ from porereax.utils import Sampler, AtomSampler, BondSampler
 
 
 class Sample:
+    """
+    Class to manage sampling of molecular trajectories.
+    """
     def __init__(self, atom_lib, masses, trajectory_file, bond_file=None, system=None, start_end_nthframe=(0, -1, 1)):
+        """
+        Initialize Sample instance.
+
+        To create a Sample instance, ensure that the 'ovito' module is not
+        already imported in the current Python session, as it may lead to
+        conflicts during parallel processing.
+
+        Parameters
+        ----------
+        atom_lib : dict
+            Library mapping atom names to types.
+        masses : dict
+            Dictionary mapping atom names to their masses.
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to the bond file.
+        system : object, optional
+            System object containing additional information.
+        start_end_nthframe : tuple, optional
+            Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
+        """
         if "ovito" in sys.modules:
             print("Please remove ovito from loaded modules before using Sample class.")
             sys.exit(1)
@@ -46,6 +83,30 @@ class Sample:
         # TODO system (+ box)
 
     def init_from_subprocess(self, atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles, box):
+        """
+        Initialize Sample instance from a subprocess.
+
+        This method is designed to be called within a subprocess for parallel sampling.
+
+        Parameters
+        ----------
+        atom_lib : dict
+            Library mapping atom names to types.
+        masses : dict
+            Dictionary mapping atom names to their masses.
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to the bond file.
+        system : object, optional
+            System object containing additional information.
+        start_end_nthframe : tuple
+            Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
+        num_particles : int
+            Number of particles in the trajectory.
+        box : np.ndarray
+            Simulation box dimensions.
+        """
         self.trajectory_file = trajectory_file
         self.bond_file = bond_file
         self.system = system
@@ -68,6 +129,31 @@ class Sample:
 
     @staticmethod
     def get_trajectory_data(trajectory_file, bond_file, start_frame, end_frame):
+        """
+        Extract trajectory metadata using Ovito.
+
+        Parameters
+        ----------
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to the bond file.
+        start_frame : int
+            Starting frame index.
+        end_frame : int
+            Ending frame index.
+
+        Returns
+        -------
+        num_particles : int
+            Number of particles in the trajectory.
+        num_frames : int
+            Total number of frames in the trajectory.
+        frames : range
+            Range of frames to be processed.
+        box : np.ndarray
+            Simulation box dimensions.
+        """
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
         from ovito.data import BondsEnumerator
@@ -100,11 +186,35 @@ class Sample:
         return num_particles, num_frames, frames, box
 
     def add_sampler(self, sampler):
+        """
+        Add a sampler to the Sample instance.
+
+        Parameters
+        ----------
+        sampler : Sampler
+            An instance of a Sampler subclass to be added
+        """
         if not isinstance(sampler, Sampler):
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
     def add_charge_sampling(self, link_out, dimension, atoms, num_bins=600, range=(-3.0, 3.0)):
+        """
+        Add a ChargeSampler to the Sample instance.
+
+        Parameters
+        ----------
+        link_out : str
+            Output file link.
+        dimension : str
+            Sampling dimension (only "None" supported).
+        atoms : list
+            List of atom identifiers to sample.
+        num_bins : int, optional
+            Number of bins for histogram sampling.
+        range : tuple, optional
+            Range (min, max) for histogram sampling.
+        """
         inputs = {"link_out": link_out,
                   "dimension": dimension,
                   "num_bins": num_bins,
@@ -114,6 +224,16 @@ class Sample:
         self.sampler_inputs["charge_samplers"].append(inputs)
 
     def sample(self, is_parallel=True, num_cores=0):
+        """
+        Execute the sampling process.
+
+        Parameters
+        ----------
+        is_parallel : bool, optional
+            Whether to use parallel processing.
+        num_cores : int, optional
+            Number of CPU cores to use for parallel processing.
+        """
         # Determine number of cores to use
         avail_cores = mp.cpu_count()
         cluster_tasks = (
@@ -160,6 +280,39 @@ class Sample:
 
     @staticmethod
     def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, box):
+        """
+        Initialize and run sampling in a subprocess.
+
+        This static method is designed to be called within a subprocess for parallel sampling.
+
+        Parameters
+        ----------
+        atom_lib : dict
+            Library mapping atom names to types.
+        masses : dict
+            Dictionary mapping atom names to their masses.
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to the bond file.
+        system : object, optional
+            System object containing additional information.
+        start_end_nthframe : tuple
+            Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
+        sampler_inputs : dict
+            Dictionary of sampler input configurations.
+        process_id : int
+            Process ID for parallel sampling.
+        num_particles : int
+            Number of particles in the trajectory.
+        box : np.ndarray
+            Simulation box dimensions.
+
+        Returns
+        -------
+        str
+            Completion message for the subprocess.
+        """
         sample_instance = Sample.__new__(Sample)
         sample_instance.init_from_subprocess(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles=num_particles, box=box)
         sample_instance.init_sampler(sampler_inputs, process_id)
@@ -167,6 +320,16 @@ class Sample:
         return f"Process {process_id} finished sampling."
     
     def init_sampler(self, sampler_inputs, process_id):
+        """
+        Initialize samplers based on provided configurations.
+        
+        Parameters
+        ----------
+        sampler_inputs : dict
+            Dictionary of sampler input configurations.
+        process_id : int
+            Process ID for parallel sampling.
+        """
         for sampler in sampler_inputs:
             for params in sampler_inputs[sampler]:
                 if sampler == "charge_samplers":
@@ -178,6 +341,9 @@ class Sample:
                                                    range=params["range"]))
 
     def sample_helper(self):
+        """
+        Helper function to perform the sampling process.
+        """
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
         from ovito.data import BondsEnumerator

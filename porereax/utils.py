@@ -1,3 +1,12 @@
+"""
+Module providing utility classes and functions for sampling molecular data.
+
+This module defines base Sampler classes, including BondSampler and AtomSampler,
+which can be extended for specific sampling tasks. It also includes functions
+for saving and loading Python objects using pickle.
+"""
+
+
 import numpy as np
 import os
 import pickle
@@ -5,7 +14,24 @@ import itertools
 
 
 class Sampler:
+    """
+    Base class for samplers.
+    """
     def __init__(self, link_out: str, dimension: str, process_id=0, **parameters):
+        """
+        Base class for samplers.
+        
+        Parameters
+        ----------
+        link_out : str
+            Output file path for the sampler data.
+        dimension : str
+            Dimension along which to sample.
+        process_id : int, optional
+            Process ID for parallel processing (default is 0).
+        **parameters : dict
+            Additional parameters for the sampler.
+        """
         folder = ".".join(link_out.split(".")[:-1])
         if not os.path.exists(folder) and folder != "" and process_id == 0:
             os.makedirs(folder)
@@ -18,16 +44,61 @@ class Sampler:
         self.data = {}
 
     def init_sampling(self, atom_lib, dimension_params={}):
+        """
+        Initialize sampling data structures.
+        
+        Parameters
+        ----------
+        atom_lib : dict
+            Library of atom types.
+        dimension_params : dict, optional
+            Additional parameters for dimension-specific sampling.
+        """
         pass
 
     def get_data(self):
+        """
+        Retrieve the input parameters and sampled data.
+        
+        Returns
+        -------
+        input : dict
+            Input parameters used for the sampler.
+        data : dict
+            Sampled data.
+        """
         return self.input, self.data
 
     def sample(self, **parameters):
+        """
+        Perform sampling for a given frame.
+        
+        Parameters
+        ----------
+        **parameters : dict
+            Parameters required for sampling.
+        """
         pass
 
     @staticmethod
     def validate_inputs(inputs: dict, atom_lib: dict, sampler_type: str):
+        """
+        Validate common inputs for samplers.
+        
+        Parameters
+        ----------
+        inputs : dict
+            Input parameters to validate.
+        atom_lib : dict
+            Library of atom types.
+        sampler_type : str
+            Type of the sampler for error messages.
+
+        Raises
+        ------
+        ValueError
+            If any input parameter is invalid.
+        """
         if "link_out" not in inputs or not isinstance(inputs["link_out"], str):
             raise ValueError(f"{sampler_type} requires a 'link_out' string parameter.")
         if "dimension" not in inputs or not isinstance(inputs["dimension"], str):
@@ -35,10 +106,28 @@ class Sampler:
 
 
 class BondSampler(Sampler):
-    pass
-#     def __init__(self, link_out, dimension, **parameters):
-#         super().__init__(link_out, dimension, **parameters)
-#         self.bonds = {}
+    """
+    Sampler class for bonds.
+    """
+    def __init__(self, link_out, dimension, bonds, process_id=0, **parameters):
+        """
+        Sampler for bonds.
+
+        Parameters
+        ----------
+        link_out : str
+            Output file path for the sampler data.
+        dimension : str
+            Dimension along which to sample.
+        bonds : list
+            List of bonds to sample, each specified as a string identifier.
+        process_id : int, optional
+            Process ID for parallel processing (default is 0).
+        **parameters : dict
+            Additional parameters for the sampler.
+        """
+        super().__init__(link_out, dimension, process_id, **parameters)
+        self.bonds = {}
 
 #     def add_bond(self, bond, constrains={}):
 #         if not isinstance(bond, str):
@@ -50,7 +139,26 @@ class BondSampler(Sampler):
 #         self.bonds[identifier] = {"bond": bond, "constrains": constrains}
 
 class AtomSampler(Sampler):
+    """
+    Sampler class for atoms with optional bonded atoms.
+    """
     def __init__(self, link_out, dimension, atoms, process_id=0, **parameters):
+        """
+        Sampler for atoms with optional bonded atoms.
+        
+        Parameters
+        ----------
+        link_out : str
+            Output file path for the sampler data.
+        dimension : str
+            Dimension along which to sample.
+        atoms : list
+            List of atoms to sample, each specified as a dict with 'atom' and optional 'bonds'.
+        process_id : int, optional
+            Process ID for parallel processing (default is 0).
+        **parameters : dict
+            Additional parameters for the sampler.
+        """
         super().__init__(link_out, dimension, process_id, **parameters)
         self.molecules = {}
         for atom_info in atoms:
@@ -59,6 +167,16 @@ class AtomSampler(Sampler):
             self.__add_atom(atom, bonds)
 
     def __add_atom(self, atom, bonds=None):
+        """
+        Add an atom with optional bonded atoms to the sampler.
+
+        Parameters
+        ----------
+        atom : str
+            The atom identifier.
+        bonds : list, optional
+            List of bonded atom identifiers.
+        """
         if not isinstance(atom, str):
             raise TypeError("Atom must be a string identifier.")
         if not isinstance(bonds, list) and bonds is not None:
@@ -72,6 +190,21 @@ class AtomSampler(Sampler):
         self.molecules[identifier] = {"atom": atom, "bonds": bonds if bonds else []}
 
     def init_sampling(self, atom_lib, dimension_params={}):
+        """
+        Initialize sampling data structures for each atom and its bonded atoms.
+
+        Parameters
+        ----------
+        atom_lib : dict
+            Library of atom types.
+        dimension_params : dict, optional
+            Additional parameters for dimension-specific sampling.
+
+        Returns
+        -------
+        molecules : dict
+            Processed molecules with atom types and bonded atom permutations.
+        """
         for identifier, bonds_info in self.molecules.items():
             atom = bonds_info["atom"]
             if atom in atom_lib:
@@ -92,6 +225,18 @@ class AtomSampler(Sampler):
     
     @staticmethod
     def validate_inputs(inputs: dict, atom_lib: dict, sampler_type: str):
+        """
+        Validate common inputs for AtomSampler.
+
+        Parameters
+        ----------
+        inputs : dict
+            Input parameters to validate.
+        atom_lib : dict
+            Library of atom types.
+        sampler_type : str
+            Type of the sampler for error messages.
+        """
         Sampler.validate_inputs(inputs, atom_lib, sampler_type)
         if "atoms" not in inputs or not isinstance(inputs["atoms"], list) or len(inputs["atoms"]) == 0:
             raise ValueError(f"{sampler_type} requires a non-empty list of atoms.")
