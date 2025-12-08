@@ -6,7 +6,10 @@ import itertools
 
 class Sampler:
     def __init__(self, link_out: str, dimension: str, process_id=0, **parameters):
-        self.link_out = ".".join(link_out.split(".")[:-1]) + f"_proc{process_id}." + link_out.split(".")[-1]
+        folder = ".".join(link_out.split(".")[:-1])
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        self.link_out = folder + f"/proc_{process_id}." + link_out.split(".")[-1]
         self.dimension = dimension
         self.input = parameters
         self.input.update({"link_out": link_out})

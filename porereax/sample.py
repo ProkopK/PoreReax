@@ -23,10 +23,11 @@ class Sample:
         self.molecules = {}
         self.bonds = {}
 
-        self.__validate_trajectory(trajectory_file, bond_file)
-        self.__validate_inputs(atom_lib, masses)
-
-    def __validate_inputs(self, atom_lib, masses):
+        # Get trajectory data
+        with mp.Pool() as pool:
+            self.num_particles, self.num_frames, self.frames, self.box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, self.start_frame, self.end_frame, )).get()
+        self.end_frame = self.end_frame if self.end_frame != -1 else self.num_frames - 1
+        
         # Check atom library
         if not isinstance(atom_lib, dict):
             raise TypeError("atom_lib must be a dictionary mapping atom names to types.")
@@ -44,36 +45,59 @@ class Sample:
 
         # TODO system (+ box)
 
-    def __validate_trajectory(self, trajectory_file, bond_file):
-        # from ovito.io import import_file
-        # from ovito.modifiers import LoadTrajectoryModifier
-        # from ovito.data import BondsEnumerator
-        # os.environ["OVITO_THREAD_COUNT"] = "1"
-        # # Load trajectory
-        # if not isinstance(trajectory_file, str):
-        #     raise TypeError("trajectory_file must be a string path to the trajectory file.")
-        # self.pipeline = import_file(trajectory_file)
-        # if bond_file:
-        #     if not isinstance(self.bond_file, str):
-        #         raise TypeError("bond_file must be a string path to the bond file.")
-        #     bond_modifier = LoadTrajectoryModifier()
-        #     bond_modifier.source.load(bond_file)
-        #     self.pipeline.modifiers.append(bond_modifier)
+    def init_from_subprocess(self, atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles, box):
+        self.trajectory_file = trajectory_file
+        self.bond_file = bond_file
+        self.system = system
+        self.start_frame, self.end_frame, self.nth_frame = start_end_nthframe
 
-        # # Get and validate trajectory meta data
-        # self.first_frame = self.pipeline.compute()
-        # if self.first_frame.particles.count == 0:
-        #     raise ValueError("No particles found in the trajectory file.")
-        # if self.first_frame.particles.bonds is None:
-        #     raise ValueError("No bonds found. Ensure bond_file is provided of the trajectory contains bond data.")
-        # self.num_frames = self.pipeline.source.num_frames
-        # self.num_particles = self.first_frame.particles.count
-        # # Validate start and end frame values
-        # if self.start_frame < 0 or self.end_frame < -1 or (self.start_frame >= self.end_frame and self.end_frame != -1) or self.end_frame >= self.num_frames:
-        #     raise ValueError(f"Invalid start_end frame range. The trajectory has {self.num_frames} frames and the provided range is ({self.start_frame}, {self.end_frame}).")
-        # self.frames = range(self.start_frame, self.end_frame + 1 if self.end_frame != -1 else self.num_frames)
-        # self.box = np.diagonal(self.first_frame.cell.matrix)
-        pass
+        self.sampler_inputs = {"charge_samplers": []}
+        self.samplers = []
+        self.molecules = {}
+        self.bonds = {}
+
+        self.num_particles = num_particles
+        self.num_frames = self.end_frame - self.start_frame + 1
+        self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
+        self.box = box
+
+        self.type_to_name = {v: k for k, v in atom_lib.items()}
+        self.name_to_type = atom_lib
+        self.masses = masses
+        # TODO system (+ box)
+
+    @staticmethod
+    def get_trajectory_data(trajectory_file, bond_file, start_frame, end_frame):
+        from ovito.io import import_file
+        from ovito.modifiers import LoadTrajectoryModifier
+        from ovito.data import BondsEnumerator
+        os.environ["OVITO_THREAD_COUNT"] = "1"
+
+        # Load trajectory
+        if not isinstance(trajectory_file, str):
+            raise TypeError("trajectory_file must be a string path to the trajectory file.")
+        pipeline = import_file(trajectory_file)
+        if bond_file:
+            if not isinstance(bond_file, str):
+                raise TypeError("bond_file must be a string path to the bond file.")
+            bond_modifier = LoadTrajectoryModifier()
+            bond_modifier.source.load(bond_file)
+            pipeline.modifiers.append(bond_modifier)
+
+        # Get and validate trajectory meta data
+        first_frame = pipeline.compute()
+        if first_frame.particles.count == 0:
+            raise ValueError("No particles found in the trajectory file.")
+        if first_frame.particles.bonds is None:
+            raise ValueError("No bonds found. Ensure bond_file is provided of the trajectory contains bond data.")
+        num_frames = pipeline.source.num_frames
+        num_particles = first_frame.particles.count
+        # Validate start and end frame values
+        if start_frame < 0 or end_frame < -1 or (start_frame >= end_frame and end_frame != -1) or end_frame >= num_frames:
+            raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
+        frames = range(start_frame, end_frame + 1 if end_frame != -1 else num_frames)
+        box = np.diagonal(first_frame.cell.matrix)
+        return num_particles, num_frames, frames, box
 
     def add_sampler(self, sampler):
         if not isinstance(sampler, Sampler):
@@ -102,7 +126,6 @@ class Sample:
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
         if is_parallel and num_cores > 1:
-            print(f"Starting parallel sampling with {num_cores} cores...")
             start_end_nthframe_list = []
             frames_per_core = (self.end_frame - self.start_frame + 1) // num_cores
             for i in range(num_cores):
@@ -113,6 +136,7 @@ class Sample:
             if "ovito" in sys.modules:
                 print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to infinite loop issues.")
                 sys.exit(1)
+            print(f"Starting parallel sampling with {num_cores} cores...")
             with mp.Pool(num_cores) as pool:
                 results = [pool.apply_async(self.init_subprocess_sampler, (self.name_to_type,
                                                                            self.masses,
@@ -121,7 +145,10 @@ class Sample:
                                                                            self.system,
                                                                            start_end_nthframe_list[process_id],
                                                                            self.sampler_inputs,
-                                                                           process_id)) for process_id in range(num_cores)]
+                                                                           process_id,
+                                                                           self.num_particles,
+                                                                           self.box
+                                                                           )) for process_id in range(num_cores)]
                 results = []
                 pool.close()
                 pool.join()
@@ -132,8 +159,9 @@ class Sample:
             self.sample_helper()
 
     @staticmethod
-    def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id):
-        sample_instance = Sample(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe)
+    def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, box):
+        sample_instance = Sample.__new__(Sample)
+        sample_instance.init_from_subprocess(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles=num_particles, box=box)
         sample_instance.init_sampler(sampler_inputs, process_id)
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
@@ -155,39 +183,22 @@ class Sample:
         from ovito.data import BondsEnumerator
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
-        # Load trajectory
-        if not isinstance(self.trajectory_file, str):
-            raise TypeError("trajectory_file must be a string path to the trajectory file.")
+
         self.pipeline = import_file(self.trajectory_file)
         if self.bond_file:
-            if not isinstance(self.bond_file, str):
-                raise TypeError("bond_file must be a string path to the bond file.")
             bond_modifier = LoadTrajectoryModifier()
             bond_modifier.source.load(self.bond_file)
             self.pipeline.modifiers.append(bond_modifier)
 
-        # Get and validate trajectory meta data
-        self.first_frame = self.pipeline.compute()
-        if self.first_frame.particles.count == 0:
-            raise ValueError("No particles found in the trajectory file.")
-        if self.first_frame.particles.bonds is None:
-            raise ValueError("No bonds found. Ensure bond_file is provided of the trajectory contains bond data.")
-        self.num_frames = self.pipeline.source.num_frames
-        self.num_particles = self.first_frame.particles.count
-        # Validate start and end frame values
-        if self.start_frame < 0 or self.end_frame < -1 or (self.start_frame >= self.end_frame and self.end_frame != -1) or self.end_frame >= self.num_frames:
-            raise ValueError(f"Invalid start_end frame range. The trajectory has {self.num_frames} frames and the provided range is ({self.start_frame}, {self.end_frame}).")
-        self.frames = range(self.start_frame, self.end_frame + 1 if self.end_frame != -1 else self.num_frames)
-        self.box = np.diagonal(self.first_frame.cell.matrix)
-
         for sampler in self.samplers:
             if isinstance(sampler, AtomSampler):
-                mols = sampler.init_sampling(self.name_to_type)
+                mols = sampler.init_sampling(atom_lib=self.name_to_type)
                 self.molecules.update(mols)
             if isinstance(sampler, BondSampler):
                 bonds = sampler.init_sampling(self.name_to_type)
                 self.bonds.update(bonds)
         
+        # Prepare molecule indexing
         molecules_per_atom_type = {}
         for atom_type in self.type_to_name:
             molecules_per_atom_type[atom_type] = []
@@ -199,6 +210,7 @@ class Sample:
             molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1]))
         molecule_idx = {identifier: np.zeros(self.num_particles, dtype=int) for identifier in self.molecules}
 
+        # Loop over frames
         for frame_idx in self.frames:
             print(f"Processing frame {frame_idx}...")
             frame = self.pipeline.compute(frame_idx)
@@ -210,9 +222,11 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
+            # Reset molecule indices
             for mol in molecule_idx:
                 molecule_idx[mol] = np.zeros(self.num_particles, dtype=int)
 
+            # Identify molecules
             for atom_type in self.type_to_name:
                 atoms = np.where(atom_types == atom_type)[0]
                 # No molecules registered for this atom type
@@ -236,6 +250,7 @@ class Sample:
             for mol in molecule_idx:
                 molecule_idx[mol] = np.where(molecule_idx[mol]==1)[0]
 
+            # Sampling
             for sampler in self.samplers:
                 if isinstance(sampler, ChargeSampler):
                     sampler.sample(frame=frame_idx,
