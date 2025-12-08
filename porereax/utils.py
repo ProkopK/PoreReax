@@ -5,11 +5,11 @@ import itertools
 
 
 class Sampler:
-    def __init__(self, file_name, dimension, **parameters):
-        self.file_name = file_name
+    def __init__(self, link_out: str, dimension: str, process_id=0, **parameters):
+        self.link_out = ".".join(link_out.split(".")[:-1]) + f"_proc{process_id}." + link_out.split(".")[-1]
         self.dimension = dimension
         self.input = parameters
-        self.input.update({"file_name": file_name})
+        self.input.update({"link_out": link_out})
         self.input.update({"dimension": dimension})
         self.data = {}
         pass
@@ -24,25 +24,30 @@ class Sampler:
         pass
 
 class BondSampler(Sampler):
-    def __init__(self, file_name, dimension, **parameters):
-        super().__init__(file_name, dimension, **parameters)
-        self.bonds = {}
+    pass
+#     def __init__(self, link_out, dimension, **parameters):
+#         super().__init__(link_out, dimension, **parameters)
+#         self.bonds = {}
 
-    def add_bond(self, bond, constrains={}):
-        if not isinstance(bond, str):
-            raise TypeError("Bond must be a string identifier.")
-        if not isinstance(constrains, dict):
-            raise TypeError("Additional constrains musst be a dict")
-        identifier = bond
-        print(f"Adding bond {bond} to {self.__class__.__name__}")
-        self.bonds[identifier] = {"bond": bond, "constrains": constrains}
+#     def add_bond(self, bond, constrains={}):
+#         if not isinstance(bond, str):
+#             raise TypeError("Bond must be a string identifier.")
+#         if not isinstance(constrains, dict):
+#             raise TypeError("Additional constrains musst be a dict")
+#         identifier = bond
+#         print(f"Adding bond {bond} to {self.__class__.__name__}")
+#         self.bonds[identifier] = {"bond": bond, "constrains": constrains}
 
 class AtomSampler(Sampler):
-    def __init__(self, file_name, dimension, **parameters):
-        super().__init__(file_name, dimension, **parameters)
+    def __init__(self, link_out, dimension, atoms, process_id=0, **parameters):
+        super().__init__(link_out, dimension, process_id, **parameters)
         self.molecules = {}
+        for atom_info in atoms:
+            atom = atom_info["atom"]
+            bonds = atom_info.get("bonds", None)
+            self.__add_atom(atom, bonds)
 
-    def add_atom(self, atom, bonds=None):
+    def __add_atom(self, atom, bonds=None):
         if not isinstance(atom, str):
             raise TypeError("Atom must be a string identifier.")
         if not isinstance(bonds, list) and bonds is not None:
