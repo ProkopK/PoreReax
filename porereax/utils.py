@@ -7,15 +7,15 @@ import itertools
 class Sampler:
     def __init__(self, link_out: str, dimension: str, process_id=0, **parameters):
         folder = ".".join(link_out.split(".")[:-1])
-        if not os.path.exists(folder):
+        if not os.path.exists(folder) and folder != "" and process_id == 0:
             os.makedirs(folder)
         self.link_out = folder + f"/proc_{process_id}." + link_out.split(".")[-1]
+        self.process_id = process_id
         self.dimension = dimension
         self.input = parameters
         self.input.update({"link_out": link_out})
         self.input.update({"dimension": dimension})
         self.data = {}
-        pass
 
     def init_sampling(self, atom_lib, dimension_params={}):
         pass
@@ -25,6 +25,14 @@ class Sampler:
 
     def sample(self, **parameters):
         pass
+
+    @staticmethod
+    def validate_inputs(inputs: dict, atom_lib: dict, sampler_type: str):
+        if "link_out" not in inputs or not isinstance(inputs["link_out"], str):
+            raise ValueError(f"{sampler_type} requires a 'link_out' string parameter.")
+        if "dimension" not in inputs or not isinstance(inputs["dimension"], str):
+            raise ValueError(f"{sampler_type} requires a 'dimension' string parameter.")
+
 
 class BondSampler(Sampler):
     pass
@@ -59,7 +67,8 @@ class AtomSampler(Sampler):
         #     raise TypeError("Bonds must be a list or dict of atoms the centering atom is bonded to.")
         bonds.sort() if bonds else None
         identifier = atom + "+" + "_".join(bonds) if bonds else atom
-        print(f"Adding molecule {identifier} to {self.__class__.__name__} with atom {atom} and bonds {bonds}.")
+        if self.process_id == 0:
+            print(f"Adding molecule {identifier} to {self.__class__.__name__} with atom {atom} and bonds {bonds}.")
         self.molecules[identifier] = {"atom": atom, "bonds": bonds if bonds else []}
 
     def init_sampling(self, atom_lib, dimension_params={}):
@@ -80,6 +89,24 @@ class AtomSampler(Sampler):
             bond_permutations = [list(x) for x in set(tuple(bond_perm) for bond_perm in bond_permutations)] # Remove duplicates
             self.molecules[identifier].update({"atom": atom, "bonds": bond_permutations})
         return self.molecules
+    
+    @staticmethod
+    def validate_inputs(inputs: dict, atom_lib: dict, sampler_type: str):
+        Sampler.validate_inputs(inputs, atom_lib, sampler_type)
+        if "atoms" not in inputs or not isinstance(inputs["atoms"], list) or len(inputs["atoms"]) == 0:
+            raise ValueError(f"{sampler_type} requires a non-empty list of atoms.")
+        for atom_info in inputs["atoms"]:
+            if "atom" not in atom_info or not isinstance(atom_info["atom"], str):
+                raise ValueError(f"{sampler_type} requires each atom entry to have an 'atom' key with a string value.")
+            if atom_lib is not None and atom_info["atom"] not in atom_lib:
+                raise ValueError(f"{sampler_type}: Atom '{atom_info['atom']}' not found in atom library.")
+            if "bonds" in atom_info and not isinstance(atom_info["bonds"], list):
+                raise ValueError(f"{sampler_type} requires the 'bonds' key to be a list if provided.")
+            if atom_lib is not None and atom_info["bonds"] is not None:
+                for bonded_atom in atom_info["bonds"]:
+                    if bonded_atom not in atom_lib:
+                        raise ValueError(f"{sampler_type}: Bonded atom '{bonded_atom}' not found in atom library.")
+
 
 def save_object(obj, filename):
     """

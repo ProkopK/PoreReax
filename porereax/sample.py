@@ -104,13 +104,13 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
-    def add_charge_sampling(self, link_out, dimension, atoms, num_bins=None, range=None):
+    def add_charge_sampling(self, link_out, dimension, atoms, num_bins=600, range=(-3.0, 3.0)):
         inputs = {"link_out": link_out,
                   "dimension": dimension,
                   "num_bins": num_bins,
                   "range": range,
                   "atoms": atoms}
-        # ChargeSampler.validate_inputs(inputs)
+        ChargeSampler.validate_inputs(inputs)
         self.sampler_inputs["charge_samplers"].append(inputs)
 
     def sample(self, is_parallel=True, num_cores=0):
