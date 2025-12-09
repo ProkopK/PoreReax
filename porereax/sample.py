@@ -17,7 +17,7 @@ import sys
 
 import porereax.utils as utils
 from porereax.charge import ChargeSampler
-from porereax.utils import Sampler, AtomSampler, BondSampler
+from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
 class Sample:
@@ -198,14 +198,14 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
-    def add_charge_sampling(self, link_out, dimension, atoms, num_bins=600, range=(-3.0, 3.0)):
+    def add_charge_sampling(self, name_out, dimension, atoms, num_bins=600, range=(-3.0, 3.0)):
         """
         Add a ChargeSampler to the Sample instance.
 
         Parameters
         ----------
-        link_out : str
-            Output file link.
+        name_out : str
+            Name of the output directory and object file of the sampler data
         dimension : str
             Sampling dimension. Supported: "Histogram".
         atoms : list
@@ -215,7 +215,7 @@ class Sample:
         range : tuple, optional
             Range (min, max) for histogram sampling.
         """
-        inputs = {"link_out": link_out,
+        inputs = {"name_out": name_out,
                   "dimension": dimension,
                   "num_bins": num_bins,
                   "range": range,
@@ -245,6 +245,8 @@ class Sample:
         max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
+        self.init_samplers(self.sampler_inputs, process_id=0)
+
         if is_parallel and num_cores > 1:
             start_end_nthframe_list = []
             frames_per_core = (self.end_frame - self.start_frame + 1) // num_cores
@@ -269,14 +271,15 @@ class Sample:
                                                                            self.num_particles,
                                                                            self.box
                                                                            )) for process_id in range(num_cores)]
-                results = []
                 pool.close()
                 pool.join()
             print([r.get() for r in results])
         else:
             print("Starting serial sampling...")
-            self.init_sampler(self.sampler_inputs, process_id=0)
             self.sample_helper()
+
+        for sampler in self.samplers:
+            sampler.join_samplers(num_cores=num_cores if is_parallel else 1)
 
     @staticmethod
     def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, box):
@@ -315,11 +318,11 @@ class Sample:
         """
         sample_instance = Sample.__new__(Sample)
         sample_instance.init_from_subprocess(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles=num_particles, box=box)
-        sample_instance.init_sampler(sampler_inputs, process_id)
+        sample_instance.init_samplers(sampler_inputs, process_id)
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
     
-    def init_sampler(self, sampler_inputs, process_id):
+    def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
         
@@ -333,7 +336,7 @@ class Sample:
         for sampler in sampler_inputs:
             for params in sampler_inputs[sampler]:
                 if sampler == "charge_samplers":
-                    self.add_sampler(ChargeSampler(link_out=params["link_out"],
+                    self.add_sampler(ChargeSampler(name_out=params["name_out"],
                                                    dimension=params["dimension"],
                                                    atoms=params["atoms"],
                                                    process_id=process_id,
@@ -430,5 +433,5 @@ class Sample:
         for sampler in self.samplers:
             input_params, data = sampler.get_data()
             data.update({"input_params": input_params})
-            file_name = sampler.link_out
+            file_name = sampler.file_out
             utils.save_object(data, file_name)
