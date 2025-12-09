@@ -12,6 +12,7 @@ import numpy as np
 from porereax.meta_sampler import BondSampler, AtomSampler
 import porereax.utils as utils
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 
 
 class ChargeSampler(AtomSampler):
@@ -85,7 +86,7 @@ class ChargeSampler(AtomSampler):
         num_cores : int
             Number of parallel processes used.
         """
-        if self.process_id != 0:
+        if self.process_id != -1:
             return
         data_list = {}
         for process_id in range(num_cores):
@@ -164,9 +165,8 @@ def plot_hist(link_data: str, axis=True, mean=True, std=True, density=False, ide
     link_data : str
         Path to a data file created by a `porereax.charge.ChargeSampler` instance 
         with `dimension` as "Histogram"
-    axis : bool or matplotlib.axes.Axes, optional (default True)
-        If True (default) a new matplotlib Figure and Axes are created. 
-        If an Axes object is passed, that axes is used for plotting and no new Figure is created. 
+    axis : matplotlib.axes.Axes or bool, optional
+        Axis to plot on or True to create a new one. Default is True.
     mean : bool, optional (default True)
         If True plot a vertical dashed line at each atom's "mean_charge".
     std : bool, optional (default True)

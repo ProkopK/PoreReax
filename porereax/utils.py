@@ -8,6 +8,7 @@ for saving and loading Python objects using pickle.
 
 
 import pickle
+from matplotlib.axes import Axes
 
 
 def save_object(obj, filename):
@@ -41,7 +42,7 @@ def load_object(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
     
-def plot_setup(link_data: str, axis=True, identifiers=[], colors=[]):
+def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]):
     """
     Set up a matplotlib figure and axis for plotting.
 
@@ -49,8 +50,8 @@ def plot_setup(link_data: str, axis=True, identifiers=[], colors=[]):
     ----------
     link_data : str
         Path to the data file to be loaded.
-    axis : bool or matplotlib.axes.Axes, optional
-        If True, create a new axis; if an Axes object is provided, use it (default is True).
+    axis : matplotlib.axes.Axes or bool, optional
+        Axis to plot on or True to create a new one. Default is True.
     identifiers : list, optional
         List of identifiers to plot (default is an empty list, which means all identifiers).
     colors : list, optional

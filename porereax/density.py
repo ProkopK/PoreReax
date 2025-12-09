@@ -15,6 +15,7 @@ import numpy as np
 from porereax.meta_sampler import BondSampler, AtomSampler
 import porereax.utils as utils
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 
 
 class DensitySampler(AtomSampler):
@@ -81,7 +82,7 @@ class DensitySampler(AtomSampler):
         num_cores : int
             Number of parallel processes used.
         """
-        if self.process_id != 0:
+        if self.process_id != -1:
             return
         data_list = {}
         for process_id in range(num_cores):
@@ -190,7 +191,7 @@ def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []
     ax.set_xlabel("Position")
     ax.set_ylabel("Density")
 
-def plot_time(link_data: str, axis=True, identifiers = [], colors = [], dt=0.5):
+def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=0.5):
     """
     Plot density over time from sampled data.
 
@@ -198,8 +199,8 @@ def plot_time(link_data: str, axis=True, identifiers = [], colors = [], dt=0.5):
     ----------
     link_data : str
         Path to the data file containing sampled density data.
-    axis : bool, optional
-        Whether to display axes on the plot. Default is True.
+    axis : matplotlib.axes.Axes or bool, optional
+        Axis to plot on or True to create a new one. Default is True.
     identifiers : list, optional
         List of molecule identifiers to plot. Default is empty list (plot all).
     colors : list, optional

@@ -48,13 +48,21 @@ class Sample:
         start_end_nthframe : tuple, optional
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         """
+        with mp.Pool() as pool:
+            num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, )).get()
+
+        start_frame, end_frame, nth_frame = start_end_nthframe
+
+        self.init_helper(atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box)
+
+    def init_helper(self, atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box):
         if "ovito" in sys.modules:
             print("Please remove ovito from loaded modules before using Sample class.")
             sys.exit(1)
+
         self.trajectory_file = trajectory_file
         self.bond_file = bond_file
         self.system = system
-        self.start_frame, self.end_frame, self.nth_frame = start_end_nthframe
 
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": []}
@@ -62,11 +70,6 @@ class Sample:
         self.molecules = {}
         self.bonds = {}
 
-        # Get trajectory data
-        with mp.Pool() as pool:
-            self.num_particles, self.num_frames, self.frames, self.box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, self.start_frame, self.end_frame, )).get()
-        self.end_frame = self.end_frame if self.end_frame != -1 else self.num_frames - 1
-        
         # Check atom library
         if not isinstance(atom_lib, dict):
             raise TypeError("atom_lib must be a dictionary mapping atom names to types.")
@@ -82,56 +85,22 @@ class Sample:
             raise ValueError("masses keys must match atom_lib keys.")
         self.masses = masses
 
-        # TODO system (+ box)
-
-    def init_from_subprocess(self, atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles, box):
-        """
-        Initialize Sample instance from a subprocess.
-
-        This method is designed to be called within a subprocess for parallel sampling.
-
-        Parameters
-        ----------
-        atom_lib : dict
-            Library mapping atom names to types.
-        masses : dict
-            Dictionary mapping atom names to their masses.
-        trajectory_file : str
-            Path to the trajectory file.
-        bond_file : str, optional
-            Path to the bond file.
-        system : object, optional
-            System object containing additional information.
-        start_end_nthframe : tuple
-            Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
-        num_particles : int
-            Number of particles in the trajectory.
-        box : np.ndarray
-            Simulation box dimensions.
-        """
-        self.trajectory_file = trajectory_file
-        self.bond_file = bond_file
-        self.system = system
-        self.start_frame, self.end_frame, self.nth_frame = start_end_nthframe
-
-        self.sampler_inputs = {"charge_samplers": [],
-                               "density_samplers": []}
-        self.samplers = []
-        self.molecules = {}
-        self.bonds = {}
-
+        # Validate start and end frame values
+        if start_frame < 0 or end_frame < -1 or (start_frame >= end_frame and end_frame != -1) or end_frame >= num_frames:
+            raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
+        
+        self.start_frame = start_frame
+        self.end_frame = end_frame if end_frame != -1 else num_frames - 1
+        self.nth_frame = nth_frame
         self.num_particles = num_particles
-        self.num_frames = self.end_frame - self.start_frame + 1
-        self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
         self.box = box
+        self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
+        self.num_frames = len(self.frames)
 
-        self.type_to_name = {v: k for k, v in atom_lib.items()}
-        self.name_to_type = atom_lib
-        self.masses = masses
-        # TODO system (+ box)
+        # TODO system
 
     @staticmethod
-    def get_trajectory_data(trajectory_file, bond_file, start_frame, end_frame):
+    def get_trajectory_data(trajectory_file, bond_file):
         """
         Extract trajectory metadata using Ovito.
 
@@ -141,10 +110,6 @@ class Sample:
             Path to the trajectory file.
         bond_file : str, optional
             Path to the bond file.
-        start_frame : int
-            Starting frame index.
-        end_frame : int
-            Ending frame index.
 
         Returns
         -------
@@ -152,8 +117,6 @@ class Sample:
             Number of particles in the trajectory.
         num_frames : int
             Total number of frames in the trajectory.
-        frames : range
-            Range of frames to be processed.
         box : np.ndarray
             Simulation box dimensions.
         """
@@ -179,16 +142,14 @@ class Sample:
             raise ValueError("No particles found in the trajectory file.")
         if first_frame.particles.bonds is None:
             raise ValueError("No bonds found. Ensure bond_file is provided of the trajectory contains bond data.")
-        num_frames = pipeline.source.num_frames
-        num_particles = first_frame.particles.count
-        # Validate start and end frame values
-        if start_frame < 0 or end_frame < -1 or (start_frame >= end_frame and end_frame != -1) or end_frame >= num_frames:
-            raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
-        frames = range(start_frame, end_frame + 1 if end_frame != -1 else num_frames)
-        box = np.diagonal(first_frame.cell.matrix)
-        return num_particles, num_frames, frames, box
 
-    def add_sampler(self, sampler):
+        num_particles = first_frame.particles.count
+        num_frames = pipeline.source.num_frames
+        box = np.diagonal(first_frame.cell.matrix)
+
+        return num_particles, num_frames, box
+
+    def add_sampler(self, sampler: Sampler):
         """
         Add a sampler to the Sample instance.
 
@@ -273,15 +234,12 @@ class Sample:
         max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
-        self.init_samplers(self.sampler_inputs, process_id=0)
+        self.init_samplers(self.sampler_inputs, process_id=-1)
 
         if is_parallel and num_cores > 1:
-            start_end_nthframe_list = []
-            frames_per_core = (self.end_frame - self.start_frame + 1) // num_cores
-            for i in range(num_cores): # TODO check if this is correct and compre to self.frames
-                start_frame = self.start_frame + i * frames_per_core
-                end_frame = self.start_frame + (i + 1) * frames_per_core - 1 if i < num_cores - 1 else self.end_frame
-                start_end_nthframe_list.append((start_frame, end_frame, self.nth_frame))
+            frames_per_core = np.array_split(self.frames, num_cores)
+            start_end_nthframe_list = [(frames[0], frames[-1], 1) for frames in frames_per_core]
+            for i, (start_frame, end_frame, _) in enumerate(start_end_nthframe_list):
                 print(f"Process {i}: frames {start_frame} to {end_frame}")
             if "ovito" in sys.modules:
                 print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to avoid infinite spawning of subprocesses.")
@@ -297,6 +255,7 @@ class Sample:
                                                                            self.sampler_inputs,
                                                                            process_id,
                                                                            self.num_particles,
+                                                                           np.inf,
                                                                            self.box
                                                                            )) for process_id in range(num_cores)]
                 pool.close()
@@ -310,7 +269,7 @@ class Sample:
             sampler.join_samplers(num_cores=num_cores if is_parallel else 1)
 
     @staticmethod
-    def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, box):
+    def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, num_frames, box):
         """
         Initialize and run sampling in a subprocess.
 
@@ -345,7 +304,8 @@ class Sample:
             Completion message for the subprocess.
         """
         sample_instance = Sample.__new__(Sample)
-        sample_instance.init_from_subprocess(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, num_particles=num_particles, box=box)
+        start_frame, end_frame, nth_frame = start_end_nthframe
+        sample_instance.init_helper(atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box)
         sample_instance.init_samplers(sampler_inputs, process_id)
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
