@@ -205,6 +205,7 @@ class AtomSampler(Sampler):
         molecules : dict
             Processed molecules with atom types and bonded atom permutations.
         """
+        atoms = atom_lib.values()
         for identifier, bonds_info in self.molecules.items():
             atom = bonds_info["atom"]
             if atom in atom_lib:
@@ -216,11 +217,21 @@ class AtomSampler(Sampler):
             for bond in bonds:
                 if bond in atom_lib:
                     bond_types.append(atom_lib[bond])
+                elif bond == "X":
+                    bond_types.append("X")
                 else:
                     raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bond} not found in atom library.")
-            bond_permutations = list(map(list, itertools.permutations(bond_types))) # All permutations of bond types
-            bond_permutations = [list(x) for x in set(tuple(bond_perm) for bond_perm in bond_permutations)] # Remove duplicates
+            options = [atoms if x == "X" else [x] for x in bond_types]
+            expanded = itertools.product(*options)
+            bond_permutations = []
+            seen_permutations = set()
+            for e in expanded:
+                for perm in set(itertools.permutations(e)):
+                    if perm not in seen_permutations:
+                        seen_permutations.add(perm)
+                        bond_permutations.append(list(perm))
             self.molecules[identifier].update({"atom": atom, "bonds": bond_permutations})
+            print(f"For {identifier} with atom {atom}: Permutaions are {bond_permutations}")
         return self.molecules
     
     @staticmethod

@@ -207,7 +207,7 @@ class Sample:
         link_out : str
             Output file link.
         dimension : str
-            Sampling dimension (only "None" supported).
+            Sampling dimension. Supported: "Histogram".
         atoms : list
             List of atom identifiers to sample.
         num_bins : int, optional
@@ -254,7 +254,7 @@ class Sample:
                 start_end_nthframe_list.append((start_frame, end_frame, self.nth_frame))
                 print(f"Process {i}: frames {start_frame} to {end_frame}")
             if "ovito" in sys.modules:
-                print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to infinite loop issues.")
+                print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to avoid infinite spawning of subprocesses.")
                 sys.exit(1)
             print(f"Starting parallel sampling with {num_cores} cores...")
             with mp.Pool(num_cores) as pool:
@@ -375,6 +375,7 @@ class Sample:
             # Sort by number of bonds (fewest first)
             molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1]))
         molecule_idx = {identifier: np.zeros(self.num_particles, dtype=int) for identifier in self.molecules}
+        bond_matrix = np.zeros((self.num_particles, self.num_particles), dtype=bool)
 
         # Loop over frames
         for frame_idx in self.frames:
@@ -409,6 +410,7 @@ class Sample:
                     bonds = list(bond_enum.bonds_of_particle(atom))
                     particles = bond_topology[bonds].flatten()
                     other_particles = particles[particles != atom]
+                    bond_matrix[atom, other_particles] = True
                     other_types = list(atom_types[other_particles])
                     for bond_permutations, indentifier in molecules_per_atom_type[atom_type]:
                         if other_types in bond_permutations:

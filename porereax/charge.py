@@ -26,7 +26,7 @@ class ChargeSampler(AtomSampler):
         link_out : str
             Output file link.
         dimension : str
-            Sampling dimension (only "None" supported).
+            Sampling dimension. Supported: "Histogram".
         atoms : list
             List of atom identifiers to sample.
         process_id : int, optional
@@ -58,7 +58,7 @@ class ChargeSampler(AtomSampler):
             Processed molecules with atom types and bonded atom permutations.
         """
         for identifier, bonds_info in self.molecules.items():
-            if self.dimension == "None":
+            if self.dimension == "Histogram":
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"hist": hist, "bin_edges": bin_edges}
             else:
@@ -89,8 +89,8 @@ class ChargeSampler(AtomSampler):
             If any input parameter is invalid.
         """
         AtomSampler.validate_inputs(inputs, atom_lib, sampler_type="ChargeSampler")
-        if inputs["dimension"] != "None":
-            raise ValueError(f"ChargeSampler only supports 'None' dimension, got {inputs['dimension']}.")
+        if inputs["dimension"] != "Histogram":
+            raise ValueError(f"ChargeSampler does not support dimensions {inputs['dimension']}")
         if "num_bins" not in inputs or not isinstance(inputs["num_bins"], (int)) or inputs["num_bins"] <= 0:
             raise ValueError("ChargeSampler requires a positive integer 'num_bins' parameter.")
         if "range" not in inputs or (not isinstance(inputs["range"], (list, tuple, None)) or
