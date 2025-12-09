@@ -17,6 +17,7 @@ import sys
 
 import porereax.utils as utils
 from porereax.charge import ChargeSampler
+from porereax.density import DensitySampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -55,7 +56,8 @@ class Sample:
         self.system = system
         self.start_frame, self.end_frame, self.nth_frame = start_end_nthframe
 
-        self.sampler_inputs = {"charge_samplers": []}
+        self.sampler_inputs = {"charge_samplers": [],
+                               "density_samplers": []}
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -112,7 +114,8 @@ class Sample:
         self.system = system
         self.start_frame, self.end_frame, self.nth_frame = start_end_nthframe
 
-        self.sampler_inputs = {"charge_samplers": []}
+        self.sampler_inputs = {"charge_samplers": [],
+                               "density_samplers": []}
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -223,6 +226,31 @@ class Sample:
         ChargeSampler.validate_inputs(inputs)
         self.sampler_inputs["charge_samplers"].append(inputs)
 
+    def add_density_sampling(self, name_out, dimension, atoms, num_bins=100, direction="z"):
+        """
+        Add a DensitySampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "Position".
+        atoms : list
+            List of atom identifiers to sample.
+        num_bins : int, optional
+            Number of bins for position sampling. Relevant for Cartesian1D.
+        direction : str, optional
+            Direction along which to sample. For Cartesian1D, use ("x", "y", or "z").
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "num_bins": num_bins,
+                  "direction": direction,
+                  "atoms": atoms}
+        DensitySampler.validate_inputs(inputs)
+        self.sampler_inputs["density_samplers"].append(inputs)
+
     def sample(self, is_parallel=True, num_cores=0):
         """
         Execute the sampling process.
@@ -250,7 +278,7 @@ class Sample:
         if is_parallel and num_cores > 1:
             start_end_nthframe_list = []
             frames_per_core = (self.end_frame - self.start_frame + 1) // num_cores
-            for i in range(num_cores):
+            for i in range(num_cores): # TODO check if this is correct and compre to self.frames
                 start_frame = self.start_frame + i * frames_per_core
                 end_frame = self.start_frame + (i + 1) * frames_per_core - 1 if i < num_cores - 1 else self.end_frame
                 start_end_nthframe_list.append((start_frame, end_frame, self.nth_frame))
@@ -342,6 +370,13 @@ class Sample:
                                                    process_id=process_id,
                                                    num_bins=params["num_bins"],
                                                    range=params["range"]))
+                elif sampler == "density_samplers":
+                    self.add_sampler(DensitySampler(name_out=params["name_out"],
+                                                    dimension=params["dimension"],
+                                                    atoms=params["atoms"],
+                                                    process_id=process_id,
+                                                    num_bins=params["num_bins"],
+                                                    direction=params["direction"]))
 
     def sample_helper(self):
         """
@@ -361,7 +396,10 @@ class Sample:
 
         for sampler in self.samplers:
             if isinstance(sampler, AtomSampler):
-                mols = sampler.init_sampling(atom_lib=self.name_to_type)
+                mols = sampler.init_sampling(atom_lib=self.name_to_type, 
+                                             dimension_params={"num_frames": self.num_frames,
+                                                               "box": self.box,
+                                                               "masses": self.masses})
                 self.molecules.update(mols)
             if isinstance(sampler, BondSampler):
                 bonds = sampler.init_sampling(self.name_to_type)

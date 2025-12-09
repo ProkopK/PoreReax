@@ -1,0 +1,223 @@
+"""
+### Module for sampling atomic densities.
+
+It provides:
+1. DensitySampler: A class to sample atomic densities on specified atoms and their bonds with for multiple dimensions:
+    * Cartesian1D: Samples the density histogram along a specified Cartesian direction for the whole simulation box.
+    * Time: Samples the number of atoms (with given bonds) per frame.
+2. Functions to plot the sampled density data:
+    * plot_hist: Plots density histograms from sampled data.
+    * plot_time: Plots density over time from sampled data.
+"""
+
+
+import numpy as np
+from porereax.meta_sampler import BondSampler, AtomSampler
+import porereax.utils as utils
+import matplotlib.pyplot as plt
+
+
+class DensitySampler(AtomSampler):
+    """
+    Sampler class for atomic densities.
+    """
+    def __init__(self, name_out, dimension, atoms, process_id=0):
+        self.validate_inputs({"name_out": name_out, "dimension": dimension, "atoms": atoms})
+        super().__init__(name_out, dimension, atoms, process_id)
+
+    def init_sampling(self, atom_lib: dict, dimension_params={}):
+        for identifier, bonds_info in self.molecules.items():
+            if self.dimension == "Time":
+                if dimension_params.get("num_frames") == None:
+                    raise KeyError("DensitySampler needs num_frames in dimension_params for Time dimension")
+                num_frames = dimension_params.get("num_frames")
+                self.data[identifier] = {"densities": np.zeros(num_frames), "num_frames": num_frames, }
+            elif self.dimension == "Cartesian1D":
+                if dimension_params.get("box_lengths") == None or not isinstance(dimension_params.get("box_lengths"), (list, tuple)) or len(dimension_params.get("box_lengths")) != 3:
+                    raise KeyError("DensitySampler needs box_lengths in dimension_params for Cartesian1D dimension")
+                if dimension_params.get("num_bins") == None or not isinstance(dimension_params.get("num_bins"), int):
+                    raise KeyError("DensitySampler needs num_bins in dimension_params for Cartesian1D dimension")
+                if dimension_params.get("direction") == None or dimension_params.get("direction") not in ["x", "y", "z"]:
+                    raise KeyError("DensitySampler needs direction in dimension_params for Cartesian1D dimension")
+                box_lengths = np.array(dimension_params.get("box_lengths"))
+                num_bins = dimension_params.get("num_bins")
+                direction = {"x": 0, "y": 1, "z": 2}[dimension_params.get("direction")]
+                hist, bin_edges = np.histogram([], bins=num_bins, range=(0.0, box_lengths[direction]))
+                self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "box_lengths": box_lengths, "direction": direction, "num_bins": num_bins, "num_frames": 0}
+            else:
+                raise ValueError(f"DensitySampler does not support dimension {self.dimension}")
+        return super().init_sampling(atom_lib, dimension_params)
+    
+    def sample(self, frame: int, positions: np.ndarray, mol_index: dict):
+        """
+        Sample atomic densities for the given frame.
+
+        Parameters
+        ----------
+        frame : int
+            Current frame number.
+        positions : np.ndarray
+            Array of atomic positions.
+        mol_index : dict
+            Mapping of molecule identifiers to atom indices.
+        """
+        for identifier in self.molecules:
+            atom_indices = mol_index[identifier]
+            atom_positions = positions[atom_indices]
+            self.data[identifier]["num_frames"] += 1
+            if self.dimension == "Time":
+                self.data[identifier]["densities"][frame] = atom_indices.shape[0]
+            elif self.dimension == "Cartesian1D":
+                direction = self.data[identifier]["direction"]
+                hist, _ = np.histogram(atom_positions[:, direction], bins=self.data[identifier]["num_bins"], range=(0.0, self.data[identifier]["box_lengths"][direction]))
+                self.data[identifier]["hist"] += hist
+
+    def join_samplers(self, num_cores):
+        """
+        Join data from multiple samplers after parallel processing.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used.
+        """
+        if self.process_id != 0:
+            return
+        data_list = {}
+        for process_id in range(num_cores):
+            file_path = self.folder + f"/proc_{process_id}.pkl"
+            proc_data = utils.load_object(file_path)
+            for identifier, data in proc_data.items():
+                if identifier == "input_params":
+                    data_list[identifier] = data
+                    continue
+                elif identifier not in data_list:
+                    if self.dimension == "Time":
+                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
+                                                 "densities": np.zeros((num_cores, data["num_frames"]), dtype=int)}
+                    elif self.dimension == "Cartesian1D":
+                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
+                                                 "hist": np.zeros((num_cores, data["num_bins"]), dtype=float),
+                                                 "bin_edges": data["bin_edges"],
+                                                 "box_lengths": data["box_lengths"],
+                                                 "direction": data["direction"],
+                                                 "num_bins": data["num_bins"]}
+                if self.dimension == "Time":
+                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
+                    data_list[identifier]["densities"][process_id, :] = data["densities"]
+                elif self.dimension == "Cartesian1D":
+                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
+                    data_list[identifier]["hist"][process_id, :] = data["hist"]
+        combined_data = {}
+        for identifier in data_list:
+            if identifier == "input_params":
+                combined_data[identifier] = data_list[identifier]
+                continue
+            combined_data[identifier] = {}
+            if self.dimension == "Time":
+                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
+                combined_data[identifier]["densities"] = data_list[identifier]["densities"].flatten()
+            elif self.dimension == "Cartesian1D":
+                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
+                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"]
+                combined_data[identifier]["box_lengths"] = data_list[identifier]["box_lengths"]
+                combined_data[identifier]["direction"] = data_list[identifier]["direction"]
+                combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
+        utils.save_object(combined_data, self.folder + "/combined.obj")
+
+    @staticmethod
+    def validate_inputs(inputs: dict, atom_lib: dict = None):
+        """
+        Validate inputs for a DensitySampler.
+
+        Parameters
+        ----------
+        inputs : dict
+            Input parameters to validate.
+        atom_lib : dict, optional
+            Library of atom types for validation.
+        
+        Raises
+        ------
+        ValueError
+            If any input parameter is invalid.
+        """
+        AtomSampler.validate_inputs(inputs, atom_lib, sampler_type="DensitySampler")
+        valid_dimensions = ["Time", "Cartesian1D"]
+        if inputs["dimension"] not in valid_dimensions:
+            raise ValueError(f"DensitySampler does not support dimensions {inputs['dimension']}")
+        # TODO further validation of dimension-specific parameters
+
+
+def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []):
+    """
+    Plot density histograms from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    axis : bool, optional
+        Whether to display axes on the plot. Default is True.
+    std : bool, optional
+        Whether to plot standard deviation as shaded area. Default is True.
+    identifiers : list, optional
+        List of molecule identifiers to plot. Default is empty list (plot all).
+    colors : list, optional
+        List of colors for each identifier. Default is empty list (use default colors).
+    """
+    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    for i, identifier in enumerate(identifiers):
+        if identifier == "input_params":
+            continue
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+        density_data = data[identifier]
+        bin_centers = 0.5 * (density_data["bin_edges"][:-1] + density_data["bin_edges"][1:])
+        hist_data = density_data["hist"]
+        color = colors[i % len(colors)] if colors else None
+        ax.plot(bin_centers, hist_data, label=identifier, color=color)
+        if std:
+            hist_std = density_data["hist_std"]
+            ax.fill_between(bin_centers, 
+                            hist_data - hist_std, 
+                            hist_data + hist_std, 
+                            color=color, 
+                            alpha=0.3)
+    ax.set_xlabel("Position")
+    ax.set_ylabel("Density")
+
+def plot_time(link_data: str, axis=True, identifiers = [], colors = [], dt=0.5):
+    """
+    Plot density over time from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    axis : bool, optional
+        Whether to display axes on the plot. Default is True.
+    identifiers : list, optional
+        List of molecule identifiers to plot. Default is empty list (plot all).
+    colors : list, optional
+        List of colors for each identifier. Default is empty list (use default colors).
+    dt : float, optional
+        Time step between frames. Default is 0.5fs
+    """
+    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    for i, identifier in enumerate(identifiers):
+        if identifier == "input_params":
+            continue
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+        time_data = data[identifier]
+        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000.0  # Convert to ps
+        density_data = time_data["densities"]
+        color = colors[i % len(colors)] if colors else None
+        ax.plot(time_points, density_data, label=identifier, color=color)
+    ax.set_xlabel("Time Frame")
+    ax.set_ylabel("Density")

@@ -40,3 +40,45 @@ def load_object(filename):
     """
     with open(filename, 'rb') as f:
         return pickle.load(f)
+    
+def plot_setup(link_data: str, axis=True, identifiers=[], colors=[]):
+    """
+    Set up a matplotlib figure and axis for plotting.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file to be loaded.
+    axis : bool or matplotlib.axes.Axes, optional
+        If True, create a new axis; if an Axes object is provided, use it (default is True).
+    identifiers : list, optional
+        List of identifiers to plot (default is an empty list, which means all identifiers).
+    colors : list, optional
+        List of colors to use for plotting (default is an empty list, which uses default colors
+    
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The created figure object.
+    ax : matplotlib.axes.Axes
+        The created axes object.
+    data : dict
+        The loaded data from the specified file.
+    identifiers : list
+        The list of identifiers to be plotted.
+    colors : list
+        The list of colors to be used for plotting.
+    """
+    import matplotlib.pyplot as plt
+    data = load_object(link_data)
+    if data["input_params"]["dimension"] != "Time":
+        return
+    if axis == True:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+        ax = axis
+    identifiers = data.keys() if identifiers == [] else identifiers
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if colors == [] else colors
+
+    return fig, ax, data, identifiers, colors
