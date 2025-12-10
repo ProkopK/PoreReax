@@ -72,8 +72,6 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
     """
     import matplotlib.pyplot as plt
     data = load_object(link_data)
-    if data["input_params"]["dimension"] != "Time":
-        return
     if axis == True:
         fig, ax = plt.subplots()
     else:

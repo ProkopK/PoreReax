@@ -22,33 +22,28 @@ class DensitySampler(AtomSampler):
     """
     Sampler class for atomic densities.
     """
-    def __init__(self, name_out, dimension, atoms, process_id=0):
-        self.validate_inputs({"name_out": name_out, "dimension": dimension, "atoms": atoms})
-        super().__init__(name_out, dimension, atoms, process_id)
+    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str):
+        valid_dimensions = ["Cartesian1D", "Time"]
+        if not isinstance(dimension, str) or dimension not in valid_dimensions:
+            raise ValueError(f"DensitySampler does not support dimension {dimension}")
+        if not isinstance(num_bins, (int)) or num_bins <= 0:
+            raise ValueError("DensitySampler requires a positive integer 'num_bins' parameter.")
+        if direction not in ["x", "y", "z"]:
+            raise ValueError("DensitySampler requires 'direction' parameter to be one of 'x', 'y', or 'z'.")
+        self.num_bins = num_bins
+        self.direction = direction
+        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction)
 
-    def init_sampling(self, atom_lib: dict, dimension_params={}):
+        # Setup data
         for identifier, bonds_info in self.molecules.items():
             if self.dimension == "Time":
-                if dimension_params.get("num_frames") == None:
-                    raise KeyError("DensitySampler needs num_frames in dimension_params for Time dimension")
-                num_frames = dimension_params.get("num_frames")
-                self.data[identifier] = {"densities": np.zeros(num_frames), "num_frames": num_frames, }
+                self.data[identifier] = {"densities": np.zeros(num_frames), "num_frames": 0, }
             elif self.dimension == "Cartesian1D":
-                if dimension_params.get("box_lengths") == None or not isinstance(dimension_params.get("box_lengths"), (list, tuple)) or len(dimension_params.get("box_lengths")) != 3:
-                    raise KeyError("DensitySampler needs box_lengths in dimension_params for Cartesian1D dimension")
-                if dimension_params.get("num_bins") == None or not isinstance(dimension_params.get("num_bins"), int):
-                    raise KeyError("DensitySampler needs num_bins in dimension_params for Cartesian1D dimension")
-                if dimension_params.get("direction") == None or dimension_params.get("direction") not in ["x", "y", "z"]:
-                    raise KeyError("DensitySampler needs direction in dimension_params for Cartesian1D dimension")
-                box_lengths = np.array(dimension_params.get("box_lengths"))
-                num_bins = dimension_params.get("num_bins")
-                direction = {"x": 0, "y": 1, "z": 2}[dimension_params.get("direction")]
-                hist, bin_edges = np.histogram([], bins=num_bins, range=(0.0, box_lengths[direction]))
-                self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "box_lengths": box_lengths, "direction": direction, "num_bins": num_bins, "num_frames": 0}
-            else:
-                raise ValueError(f"DensitySampler does not support dimension {self.dimension}")
-        return super().init_sampling(atom_lib, dimension_params)
-    
+                box_lengths = box
+                dir_index = {"x": 0, "y": 1, "z": 2}[self.direction]
+                hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0.0, box_lengths[dir_index]))
+                self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "box_lengths": box_lengths, "direction": dir_index, "num_bins": num_bins, "num_frames": 0}
+
     def sample(self, frame: int, positions: np.ndarray, mol_index: dict):
         """
         Sample atomic densities for the given frame.
@@ -95,7 +90,7 @@ class DensitySampler(AtomSampler):
                 elif identifier not in data_list:
                     if self.dimension == "Time":
                         data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
-                                                 "densities": np.zeros((num_cores, data["num_frames"]), dtype=int)}
+                                                 "densities": [data["num_frames"]] * num_cores}
                     elif self.dimension == "Cartesian1D":
                         data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
                                                  "hist": np.zeros((num_cores, data["num_bins"]), dtype=float),
@@ -105,7 +100,7 @@ class DensitySampler(AtomSampler):
                                                  "num_bins": data["num_bins"]}
                 if self.dimension == "Time":
                     data_list[identifier]["num_frames"][process_id] = data["num_frames"]
-                    data_list[identifier]["densities"][process_id, :] = data["densities"]
+                    data_list[identifier]["densities"][process_id] = data["densities"]
                 elif self.dimension == "Cartesian1D":
                     data_list[identifier]["num_frames"][process_id] = data["num_frames"]
                     data_list[identifier]["hist"][process_id, :] = data["hist"]
@@ -117,7 +112,7 @@ class DensitySampler(AtomSampler):
             combined_data[identifier] = {}
             if self.dimension == "Time":
                 combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
-                combined_data[identifier]["densities"] = data_list[identifier]["densities"].flatten()
+                combined_data[identifier]["densities"] = np.concatenate(data_list[identifier]["densities"])
             elif self.dimension == "Cartesian1D":
                 combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
                 combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
@@ -127,29 +122,6 @@ class DensitySampler(AtomSampler):
                 combined_data[identifier]["direction"] = data_list[identifier]["direction"]
                 combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
         utils.save_object(combined_data, self.folder + "/combined.obj")
-
-    @staticmethod
-    def validate_inputs(inputs: dict, atom_lib: dict = None):
-        """
-        Validate inputs for a DensitySampler.
-
-        Parameters
-        ----------
-        inputs : dict
-            Input parameters to validate.
-        atom_lib : dict, optional
-            Library of atom types for validation.
-        
-        Raises
-        ------
-        ValueError
-            If any input parameter is invalid.
-        """
-        AtomSampler.validate_inputs(inputs, atom_lib, sampler_type="DensitySampler")
-        valid_dimensions = ["Time", "Cartesian1D"]
-        if inputs["dimension"] not in valid_dimensions:
-            raise ValueError(f"DensitySampler does not support dimensions {inputs['dimension']}")
-        # TODO further validation of dimension-specific parameters
 
 
 def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []):
@@ -170,6 +142,8 @@ def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []
         List of colors for each identifier. Default is empty list (use default colors).
     """
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    if data["input_params"]["dimension"] != "Cartesian1D":
+        return
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
             continue
@@ -209,6 +183,8 @@ def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         Time step between frames. Default is 0.5fs
     """
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    if data["input_params"]["dimension"] != "Time":
+        return
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
             continue

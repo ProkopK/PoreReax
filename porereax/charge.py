@@ -19,53 +19,25 @@ class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: list, process_id=0, num_bins=600, range=(-3.0, 3.0)):
-        """
-        Initialize ChargeSampler.
-        
-        Parameters
-        ----------
-        name_out : str
-            Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Histogram".
-        atoms : list
-            List of atom identifiers to sample.
-        process_id : int, optional
-            Process ID for parallel sampling.
-        num_bins : int, optional
-            Number of bins for histogram sampling.
-        range : tuple, optional
-            Range (min, max) for histogram sampling.
-        """
+    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
+        valid_dimensions = ["Histogram"]
+        if not isinstance(dimension, str) or dimension not in valid_dimensions:
+            raise ValueError(f"ChargeSampler does not support dimension {dimension}")
+        if not isinstance(num_bins, (int)) or num_bins <= 0:
+            raise ValueError("ChargeSampler requires a positive integer 'num_bins' parameter.")
+        if (not isinstance(range, (list, tuple)) or 
+                len(range) != 2 or
+                range[0] >= range[1]):
+            raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self.num_bins = num_bins
         self.range = range
-        self.validate_inputs({"name_out": name_out, "dimension": dimension, "atoms": atoms, "num_bins": num_bins, "range": range})
-        super().__init__(name_out, dimension, atoms, process_id, num_bins=num_bins, range=range)
+        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, range=range)
 
-    def init_sampling(self, atom_lib: dict, dimension_params={}):
-        """
-        Initialize sampling structures for charge sampling.
-
-        Parameters
-        ----------
-        atom_lib : dict
-            Library of atom types.
-        dimension_params : dict, optional
-            Additional parameters for dimension-specific sampling.
-
-        Returns
-        -------
-        molecules : dict
-            Processed molecules with atom types and bonded atom permutations.
-        """
+        # Setup data
         for identifier, bonds_info in self.molecules.items():
             if self.dimension == "Histogram":
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
-            else:
-                raise ValueError(f"ChargeSampler does not support dimension {self.dimension}")
-        return super().init_sampling(atom_lib, dimension_params)
 
     def sample(self, frame: int, charges: np.ndarray, mol_index: dict):
         for identifier in self.molecules:
@@ -126,35 +98,6 @@ class ChargeSampler(AtomSampler):
             pass
         utils.save_object(combined_data, self.folder + "/combined.obj")
 
-    @staticmethod
-    def validate_inputs(inputs: dict, atom_lib: dict = None):
-        """
-        Validate inputs for a ChargeSampler.
-        
-        Parameters
-        ----------
-        inputs : dict
-            Input parameters to validate.
-        atom_lib : dict, optional
-            Library of atom types for validation.
-        
-        Raises
-        ------
-        ValueError
-            If any input parameter is invalid.
-        """
-        AtomSampler.validate_inputs(inputs, atom_lib, sampler_type="ChargeSampler")
-        valid_dimensions = ["Histogram"]
-        if inputs["dimension"] not in valid_dimensions:
-            raise ValueError(f"ChargeSampler does not support dimensions {inputs['dimension']}")
-        if "num_bins" not in inputs or not isinstance(inputs["num_bins"], (int)) or inputs["num_bins"] <= 0:
-            raise ValueError("ChargeSampler requires a positive integer 'num_bins' parameter.")
-        if "range" not in inputs or (not isinstance(inputs["range"], (list, tuple, None)) or
-                                     len(inputs["range"]) != 2 or
-                                     inputs["range"][0] >= inputs["range"][1]):
-            raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
-
-
 def plot_hist(link_data: str, axis=True, mean=True, std=True, density=False, identifiers = [], colors = []):
     """
     Plot histogram curves with optional mean lines and standard-deviation shading
@@ -182,6 +125,8 @@ def plot_hist(link_data: str, axis=True, mean=True, std=True, density=False, ide
         matplotlib (plt.rcParams['axes.prop_cycle']) is used.
     """
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    if data["input_params"]["dimension"] != "Histogram":
+        return
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
             continue
