@@ -56,6 +56,34 @@ class Sample:
         self.init_helper(atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box)
 
     def init_helper(self, atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box):
+        """
+        Helper function to initialize Sample instance.
+
+        Parameters
+        ----------
+        atom_lib : dict
+            Library mapping atom names to types.
+        masses : dict
+            Dictionary mapping atom names to their masses.
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to the bond file.
+        system : object, optional
+            System object containing additional information.
+        start_frame : int
+            Starting frame for sampling.
+        end_frame : int
+            Ending frame for sampling.
+        nth_frame : int
+            Step size for frame sampling.
+        num_particles : int
+            Number of particles in the trajectory.
+        num_frames : int
+            Total number of frames in the trajectory.
+        box : np.ndarray
+            Simulation box dimensions.
+        """
         if "ovito" in sys.modules:
             print("Please remove ovito from loaded modules before using Sample class.")
             sys.exit(1)

@@ -23,6 +23,32 @@ class DensitySampler(AtomSampler):
     Sampler class for atomic densities.
     """
     def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str):
+        """
+        Sampler for atomic densities.
+
+        Parameters
+        ----------
+        name_out : str
+            Output folder name.
+        dimension : str
+            Sampling dimension. Supported: "Cartesian1D", "Time".
+        atoms : dict
+            Dictionary defining atoms to sample.
+        process_id : int
+            Process ID for parallel sampling.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
+        num_bins : int
+            Number of bins for histogram sampling (only for "Cartesian1D").
+        direction : str
+            Direction for histogram sampling ("x", "y", or "z") (only for "Cartesian1D").
+        """
         valid_dimensions = ["Cartesian1D", "Time"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"DensitySampler does not support dimension {dimension}")
@@ -151,7 +177,7 @@ def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
         density_data = data[identifier]
-        bin_centers = 0.5 * (density_data["bin_edges"][:-1] + density_data["bin_edges"][1:])
+        bin_centers = 0.5 * (density_data["bin_edges"][:-1] + density_data["bin_edges"][1:]) / 10 # Convert to nm
         hist_data = density_data["hist"]
         color = colors[i % len(colors)] if colors else None
         ax.plot(bin_centers, hist_data, label=identifier, color=color)
@@ -162,10 +188,10 @@ def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []
                             hist_data + hist_std, 
                             color=color, 
                             alpha=0.3)
-    ax.set_xlabel("Position")
-    ax.set_ylabel("Density")
+    ax.set_xlabel("Position / nm")
+    ax.set_ylabel("Density / atoms")
 
-def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=0.5):
+def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=20):
     """
     Plot density over time from sampled data.
 
@@ -192,9 +218,9 @@ def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
         time_data = data[identifier]
-        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000.0  # Convert to ps
+        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000  # Convert to ps
         density_data = time_data["densities"]
         color = colors[i % len(colors)] if colors else None
         ax.plot(time_points, density_data, label=identifier, color=color)
-    ax.set_xlabel("Time Frame")
-    ax.set_ylabel("Density")
+    ax.set_xlabel("Time / ps")
+    ax.set_ylabel("Density / atoms")

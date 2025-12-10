@@ -19,7 +19,34 @@ class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, 
+    range: tuple):
+        """
+        Sampler for atomic charges.
+
+        Parameters
+        ----------
+        name_out : str
+            Output folder name.
+        dimension : str
+            Sampling dimension. Currently only "Histogram" is supported.
+        atoms : dict
+            Dictionary defining atoms to sample.
+        process_id : int
+            Process ID for parallel sampling.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
+        num_bins : int
+            Number of bins for histogram sampling.
+        range : tuple
+            Range (min, max) for histogram sampling.
+        """
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"ChargeSampler does not support dimension {dimension}")
@@ -40,6 +67,18 @@ class ChargeSampler(AtomSampler):
                 self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame: int, charges: np.ndarray, mol_index: dict):
+        """
+        Sample charges for the current frame.
+
+        Parameters
+        ----------
+        frame : int
+            Current frame index.
+        charges : np.ndarray
+            Array of atomic charges.
+        mol_index : dict
+            Dictionary mapping molecule identifiers to atom indices.
+        """
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
             atom_charges = charges[atom_indices]

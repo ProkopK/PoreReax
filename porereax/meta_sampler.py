@@ -16,6 +16,28 @@ class Sampler:
     Base class for samplers.
     """
     def __init__(self, name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters):
+        """
+        Base sampler class.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory of the sampler data
+        dimension : str
+            Dimension along which to sample.
+        process_id : int
+            Process ID for parallel processing.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
+        **parameters : dict
+            Additional parameters for the sampler.
+        """
         if not isinstance(name_out, str) or name_out == "":
             raise ValueError(f"{self.__class__.__name__} requires a valid 'name_out' string parameter.")
         if not isinstance(process_id, int):
@@ -65,7 +87,7 @@ class Sampler:
 
 class AtomSampler(Sampler):
     """
-    Sampler class for atoms with optional bonded atoms.
+    Base class for samplers that sample atoms with optional bonded atoms.
     """
     def __init__(self, name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, **parameters):
         """
@@ -74,13 +96,23 @@ class AtomSampler(Sampler):
         Parameters
         ----------
         name_out : str
-            Name of the output directory and object file of the sampler data
+            Name of the output directory of the sampler data
         dimension : str
             Dimension along which to sample.
         atoms : list
-            List of atoms to sample, each specified as a dict with 'atom' and optional 'bonds'.
-        process_id : int, optional
-            Process ID for parallel processing (default is 0).
+            List of atoms to sample, each specified as a dictionary with keys:
+            - "atom": str, the atom type
+            - "bonds": list, optional, list of bonded atom types
+        process_id : int
+            Process ID for parallel processing.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
         **parameters : dict
             Additional parameters for the sampler.
         """
@@ -130,6 +162,14 @@ class AtomSampler(Sampler):
             self.molecules[identifier].update({"atom": atom, "bonds": bond_permutations})
 
     def get_mols(self):
+        """
+        Retrieve the defined molecules for sampling.
+
+        Returns
+        -------
+        molecules : dict
+            Dictionary of molecules defined for sampling.
+        """
         return self.molecules
 
 
