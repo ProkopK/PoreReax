@@ -49,13 +49,11 @@ class DensitySampler(AtomSampler):
         direction : str
             Direction for histogram sampling ("x", "y", or "z") (only for "Cartesian1D").
         """
-        valid_dimensions = ["Cartesian1D", "Time"]
+        valid_dimensions = ["Cartesian1D", "Cartesian2D", "Time"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"DensitySampler does not support dimension {dimension}")
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("DensitySampler requires a positive integer 'num_bins' parameter.")
-        if direction not in ["x", "y", "z"]:
-            raise ValueError("DensitySampler requires 'direction' parameter to be one of 'x', 'y', or 'z'.")
         self.num_bins = num_bins
         self.direction = direction
         super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction)
@@ -66,9 +64,18 @@ class DensitySampler(AtomSampler):
                 self.data[identifier] = {"densities": np.zeros(num_frames), "num_frames": 0, }
             elif self.dimension == "Cartesian1D":
                 box_lengths = box
+                if self.direction not in ["x", "y", "z"]:
+                    raise ValueError("DensitySampler with 'Cartesian1D' dimension requires 'direction' parameter to be one of 'x', 'y', or 'z'.")
                 dir_index = {"x": 0, "y": 1, "z": 2}[self.direction]
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0.0, box_lengths[dir_index]))
                 self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "box_lengths": box_lengths, "direction": dir_index, "num_bins": num_bins, "num_frames": 0}
+            elif self.dimension == "Cartesian2D":
+                box_lengths = box
+                if self.direction not in ["xy", "xz", "yz"]:
+                    raise ValueError("DensitySampler with 'Cartesian2D' dimension requires 'direction' parameter to be one of 'xy', 'xz', or 'yz'.")
+                dir_indices = {"xy": (0, 1), "xz": (0, 2), "yz": (1, 2)}[self.direction]
+                hist, x_edges, y_edges = np.histogram2d([], [], bins=self.num_bins, range=[[0.0, box_lengths[dir_indices[0]]], [0.0, box_lengths[dir_indices[1]]]])
+                self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "box_lengths": box_lengths, "direction": dir_indices, "num_bins": num_bins, "num_frames": 0}
 
     def sample(self, frame: int, positions: np.ndarray, mol_index: dict):
         """
@@ -92,6 +99,10 @@ class DensitySampler(AtomSampler):
             elif self.dimension == "Cartesian1D":
                 direction = self.data[identifier]["direction"]
                 hist, _ = np.histogram(atom_positions[:, direction], bins=self.data[identifier]["num_bins"], range=(0.0, self.data[identifier]["box_lengths"][direction]))
+                self.data[identifier]["hist"] += hist
+            elif self.dimension == "Cartesian2D":
+                dir_x, dir_y = self.data[identifier]["direction"]
+                hist, _, _ = np.histogram2d(atom_positions[:, dir_x], atom_positions[:, dir_y], bins=self.data[identifier]["num_bins"], range=[[0.0, self.data[identifier]["box_lengths"][dir_x]], [0.0, self.data[identifier]["box_lengths"][dir_y]]])
                 self.data[identifier]["hist"] += hist
 
     def join_samplers(self, num_cores):
@@ -124,12 +135,23 @@ class DensitySampler(AtomSampler):
                                                  "box_lengths": data["box_lengths"],
                                                  "direction": data["direction"],
                                                  "num_bins": data["num_bins"]}
+                    elif self.dimension == "Cartesian2D":
+                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
+                                                 "hist": np.zeros((num_cores, data["num_bins"], data["num_bins"]), dtype=float),
+                                                 "x_edges": data["x_edges"],
+                                                 "y_edges": data["y_edges"],
+                                                 "box_lengths": data["box_lengths"],
+                                                 "direction": data["direction"],
+                                                 "num_bins": data["num_bins"]}
                 if self.dimension == "Time":
                     data_list[identifier]["num_frames"][process_id] = data["num_frames"]
                     data_list[identifier]["densities"][process_id] = data["densities"]
                 elif self.dimension == "Cartesian1D":
                     data_list[identifier]["num_frames"][process_id] = data["num_frames"]
                     data_list[identifier]["hist"][process_id, :] = data["hist"]
+                elif self.dimension == "Cartesian2D":
+                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
+                    data_list[identifier]["hist"][process_id, :, :] = data["hist"]
         combined_data = {}
         for identifier in data_list:
             if identifier == "input_params":
@@ -144,6 +166,15 @@ class DensitySampler(AtomSampler):
                 combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
                 combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"]
+                combined_data[identifier]["box_lengths"] = data_list[identifier]["box_lengths"]
+                combined_data[identifier]["direction"] = data_list[identifier]["direction"]
+                combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
+            elif self.dimension == "Cartesian2D":
+                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
+                combined_data[identifier]["x_edges"] = data_list[identifier]["x_edges"]
+                combined_data[identifier]["y_edges"] = data_list[identifier]["y_edges"]
                 combined_data[identifier]["box_lengths"] = data_list[identifier]["box_lengths"]
                 combined_data[identifier]["direction"] = data_list[identifier]["direction"]
                 combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
@@ -224,3 +255,42 @@ def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         ax.plot(time_points, density_data, label=identifier, color=color)
     ax.set_xlabel("Time / ps")
     ax.set_ylabel("Density / atoms")
+
+def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
+    """
+    Plot 2D density histogram from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    identifier : str
+        Molecule identifier to plot.
+    """
+    data = utils.load_object(link_data)
+    if data["input_params"]["dimension"] != "Cartesian2D":
+        return
+    if identifier not in data:
+        print(f"Warning: Identifier {identifier} not found in data.")
+        return
+    density_data = data[identifier]
+    x_edges = density_data["x_edges"] / 10  # Convert to nm
+    y_edges = density_data["y_edges"] / 10  # Convert to nm
+    hist = density_data["hist"]
+    if transpose:
+        hist = hist
+
+    X, Y = np.meshgrid(x_edges, y_edges)
+    if transpose:
+        X, Y = Y, X
+    plt.figure()
+    plt.pcolormesh(X, Y, hist.T, shading='auto')
+    if transpose:
+        plt.xlabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
+        plt.ylabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
+    else:
+        plt.xlabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
+        plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
+    plt.axis('scaled')
+    plt.colorbar(label='Density / atoms')
+    plt.show()
