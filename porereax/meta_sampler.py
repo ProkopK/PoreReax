@@ -127,39 +127,34 @@ class AtomSampler(Sampler):
                 raise ValueError(f"{self.__class__.__name__} requires the 'bonds' key to be a list if provided.")
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
-            bonds.sort() if bonds else None
-            identifier = atom + "+" + "_".join(bonds) if bonds else atom
-            if self.process_id == -1:
-                print(f"Adding molecule {identifier} to {self.__class__.__name__} with atom {atom} and bonds {bonds}.")
-            self.molecules[identifier] = {"atom": atom, "bonds": bonds if bonds else []}
-        print()
+            bonds.sort() if bonds != None else None
+            identifier = atom + "+" + "_".join(bonds) if bonds != None else atom
 
-        atoms = atom_lib.values()
-        for identifier, bonds_info in self.molecules.items():
-            atom = bonds_info["atom"]
             if atom in atom_lib:
                 atom = atom_lib[atom]
             else:
                 raise ValueError(f"Error in {self.__class__.__name__}: Atom {atom} not found in atom library.")
-            bonds = bonds_info["bonds"]
-            bond_types = []
-            for bond in bonds:
-                if bond in atom_lib:
-                    bond_types.append(atom_lib[bond])
-                elif bond == "X":
-                    bond_types.append("X")
-                else:
-                    raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bond} not found in atom library.")
-            options = [atoms if x == "X" else [x] for x in bond_types]
-            expanded = itertools.product(*options)
-            bond_permutations = []
-            seen_permutations = set()
-            for e in expanded:
-                for perm in set(itertools.permutations(e)):
-                    if perm not in seen_permutations:
-                        seen_permutations.add(perm)
-                        bond_permutations.append(list(perm))
-            self.molecules[identifier].update({"atom": atom, "bonds": bond_permutations})
+            if bonds != None:
+                bond_types = []
+                for bond in bonds:
+                    if bond in atom_lib:
+                        bond_types.append(atom_lib[bond])
+                    elif bond == "X":
+                        bond_types.append("X")
+                    else:
+                        raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bond} not found in atom library.")
+                options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
+                expanded = itertools.product(*options)
+                bond_permutations = []
+                seen_permutations = set()
+                for e in expanded:
+                    for perm in set(itertools.permutations(e)):
+                        if perm not in seen_permutations:
+                            seen_permutations.add(perm)
+                            bond_permutations.append(list(perm))
+            else:
+                bond_permutations = None
+            self.molecules[identifier] = {"atom": atom, "bonds": bond_permutations}
 
     def get_mols(self):
         """

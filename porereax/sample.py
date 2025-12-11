@@ -48,8 +48,13 @@ class Sample:
         start_end_nthframe : tuple, optional
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         """
+        if "ovito" in sys.modules:
+            print("Please remove ovito from loaded modules before using Sample class.")
+            sys.exit(1)
         with mp.Pool() as pool:
             num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, )).get()
+
+        print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
 
         start_frame, end_frame, nth_frame = start_end_nthframe
 
@@ -84,10 +89,6 @@ class Sample:
         box : np.ndarray
             Simulation box dimensions.
         """
-        if "ovito" in sys.modules:
-            print("Please remove ovito from loaded modules before using Sample class.")
-            sys.exit(1)
-
         self.trajectory_file = trajectory_file
         self.bond_file = bond_file
         self.system = system
@@ -408,8 +409,20 @@ class Sample:
                     molecules_per_atom_type[atom_type].append((bonds, identifier))
             # Sort by number of bonds (fewest first)
             molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1]))
-        molecule_idx = {identifier: np.zeros(self.num_particles, dtype=int) for identifier in self.molecules}
-        bond_matrix = np.zeros((self.num_particles, self.num_particles), dtype=bool)
+            if molecules_per_atom_type[atom_type] == []:
+                molecules_per_atom_type.pop(atom_type)
+        # List for each molecule, which atoms belong to it
+        molecule_idx = {}
+        # List for each molecule, the bonded atoms of each atom
+        molecule_bonds = {}
+        for identifier in self.molecules:
+            molecule_idx[identifier] = np.zeros(self.num_particles, dtype=bool)
+            if self.molecules[identifier]["bonds"] != None:
+                molecule_bonds[identifier] = np.zeros((self.num_particles, len(self.molecules[identifier]["bonds"][0]), ), dtype=int)
+            else:
+                molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), dtype=bool)
+        print(molecules_per_atom_type)
+        print(molecule_idx)
 
         # Loop over frames
         for frame_idx in self.frames:
@@ -425,32 +438,31 @@ class Sample:
 
             # Reset molecule indices
             for mol in molecule_idx:
-                molecule_idx[mol] = np.zeros(self.num_particles, dtype=int)
+                molecule_idx[mol] = np.zeros(self.num_particles, dtype=bool)
+                molecule_bonds[mol] = np.zeros((self.num_particles, molecule_bonds[mol].shape[1], ), dtype=int)
 
             # Identify molecules
-            for atom_type in self.type_to_name:
+            for atom_type in molecules_per_atom_type:
                 atoms = np.where(atom_types == atom_type)[0]
-                # No molecules registered for this atom type
-                if molecules_per_atom_type[atom_type] == []:
-                    continue
-                # Molecule registered without bond constraints
-                elif molecules_per_atom_type[atom_type][0][0] == [[]]:
+                # Molecule registered without bond constraints; it should be first because of sorting
+                if molecules_per_atom_type[atom_type][0][0] == None:
                     molecule_idx[molecules_per_atom_type[atom_type][0][1]][atoms] = 1
-                # No bond constraints, for this atom type
-                if len(molecules_per_atom_type[atom_type]) == 1 and molecules_per_atom_type[atom_type][0][0] == [[]]:
-                    continue
+                    # No other molecules of this atom type
+                    if len(molecules_per_atom_type[atom_type]) == 1:
+                        continue
                 # Atom with bond constraints
                 for atom in atoms:
                     bonds = list(bond_enum.bonds_of_particle(atom))
                     particles = bond_topology[bonds].flatten()
                     other_particles = particles[particles != atom]
-                    bond_matrix[atom, other_particles] = True
                     other_types = list(atom_types[other_particles])
-                    for bond_permutations, indentifier in molecules_per_atom_type[atom_type]:
-                        if other_types in bond_permutations:
-                            molecule_idx[indentifier][atom] = 1
+                    for bond_permutations, identifier in molecules_per_atom_type[atom_type]:
+                        if bond_permutations != None and other_types in bond_permutations:
+                            molecule_idx[identifier][atom] = 1
+                            molecule_bonds[identifier][atom] = other_particles
             for mol in molecule_idx:
-                molecule_idx[mol] = np.where(molecule_idx[mol]==1)[0]
+                molecule_idx[mol] = np.where(molecule_idx[mol])[0]
+                molecule_bonds[mol] = molecule_bonds[mol][molecule_idx[mol]]
 
             # Sampling
             for sampler in self.samplers:
@@ -458,12 +470,12 @@ class Sample:
                     sampler.sample(frame=frame_idx-self.start_frame,
                                    charges=atom_charges,
                                    mol_index=molecule_idx)
-                if isinstance(sampler, DensitySampler):
+                elif isinstance(sampler, DensitySampler):
                     sampler.sample(frame=frame_idx-self.start_frame,
                                    positions=atom_positions,
                                    mol_index=molecule_idx)
                 else:
-                    sampler.sample()
+                    print(f"Unknown sampler type: {type(sampler)}. Skipping...")
 
         for sampler in self.samplers:
             input_params, data = sampler.get_data()

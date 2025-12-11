@@ -100,7 +100,7 @@ class ChargeSampler(AtomSampler):
         if self.process_id != -1:
             return
         data_list = {}
-        for process_id in range(num_cores):
+        for process_id in range(num_cores) if num_cores > 1 else [-1]:
             file_path = self.folder + f"/proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
             for identifier, data in proc_data.items():

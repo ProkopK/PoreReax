@@ -117,7 +117,7 @@ class DensitySampler(AtomSampler):
         if self.process_id != -1:
             return
         data_list = {}
-        for process_id in range(num_cores):
+        for process_id in range(num_cores) if num_cores > 1 else [-1]:
             file_path = self.folder + f"/proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
             for identifier, data in proc_data.items():
@@ -277,8 +277,6 @@ def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
     x_edges = density_data["x_edges"] / 10  # Convert to nm
     y_edges = density_data["y_edges"] / 10  # Convert to nm
     hist = density_data["hist"]
-    if transpose:
-        hist = hist
 
     X, Y = np.meshgrid(x_edges, y_edges)
     if transpose:
