@@ -83,22 +83,24 @@ class AngleSampler(AtomSampler):
         for identifier, bonds_info in self.molecules.items():
             atom_indices = mol_index[identifier]
             angles = []
+            bonded_atoms = mol_bonds[identifier]
+            if bonded_atoms.shape[1] < 2:
+                continue
             if self.angle:
-                # Specific angle
-                central_atom_type = self.angle[1]
-                if bonds_info["atom"] != central_atom_type:
-                    continue
-                bonded_atoms = mol_bonds[identifier]
                 atom_a_type = self.angle[0]
+                atom_b_type = self.angle[1]
                 atom_c_type = self.angle[2]
+                if bonds_info["atom"] != atom_b_type:
+                    continue
                 bonded_types = types[bonded_atoms]
-                for i in range(bonded_atoms.shape[1]):
-                    for j in range(bonded_atoms.shape[1]):
-                        if i == j:
-                            continue
-                        atom_a = bonded_atoms[:, i]
-                        atom_b = atom_indices
-                        atom_c = bonded_atoms[:, j]
+            for i in range(bonded_atoms.shape[1]):
+                for j in range(bonded_atoms.shape[1]):
+                    if i == j:
+                        continue
+                    atom_a = bonded_atoms[:, i]
+                    atom_b = atom_indices
+                    atom_c = bonded_atoms[:, j]
+                    if self.angle:
                         mask_a = bonded_types[:, i] == atom_a_type
                         mask_c = bonded_types[:, j] == atom_c_type
                         valid_mask = mask_a & mask_c
@@ -107,26 +109,12 @@ class AngleSampler(AtomSampler):
                         atom_a = atom_a[valid_mask]
                         atom_b = atom_b[valid_mask]
                         atom_c = atom_c[valid_mask]
-                        vec_ab = positions[atom_a] - positions[atom_b]
-                        vec_cb = positions[atom_c] - positions[atom_b]
-                        cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
-                        cos_angle = np.clip(cos_angle, -1.0, 1.0)
-                        angle_deg = np.degrees(np.arccos(cos_angle))
-                        angles.extend(angle_deg.tolist())
-            else:
-                # All angles
-                bonded_atoms = mol_bonds[identifier]
-                for i in range(bonded_atoms.shape[1]):
-                    for j in range(i + 1, bonded_atoms.shape[1]):
-                        atom_a = bonded_atoms[:, i]
-                        atom_b = atom_indices
-                        atom_c = bonded_atoms[:, j]
-                        vec_ab = positions[atom_a] - positions[atom_b]
-                        vec_cb = positions[atom_c] - positions[atom_b]
-                        cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
-                        cos_angle = np.clip(cos_angle, -1.0, 1.0)
-                        angle_deg = np.degrees(np.arccos(cos_angle))
-                        angles.extend(angle_deg.tolist())
+                    vec_ab = positions[atom_a] - positions[atom_b]
+                    vec_cb = positions[atom_c] - positions[atom_b]
+                    cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
+                    cos_angle = np.clip(cos_angle, -1.0, 1.0)
+                    angle_deg = np.degrees(np.arccos(cos_angle))
+                    angles.extend(angle_deg.tolist())
             if angles:
                 self.data[identifier]["num_frames"] += 1
                 self.data[identifier]["num_angles"] += len(angles)

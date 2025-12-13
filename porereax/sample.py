@@ -516,7 +516,9 @@ class Sample:
                     sampler.sample(frame=frame_idx-self.start_frame,
                                    positions=atom_positions,
                                    mol_index=molecule_idx,
-                                   charges=atom_charges)
+                                   charges=atom_charges,
+                                   mol_bonds=molecule_bonds,
+                                   types=atom_types)
                 elif isinstance(sampler, AngleSampler):
                     sampler.sample(frame=frame_idx-self.start_frame,
                                    positions=atom_positions,

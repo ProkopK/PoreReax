@@ -53,6 +53,7 @@ class DensitySampler(AtomSampler):
         conditions : dict, optional
             Additional conditions for sampling.
             - "Charge": tuple (min_charge, max_charge)
+            - "Angle": tuple (min_angle, max_angle) using angle type all
         """
         valid_dimensions = ["Cartesian1D", "Cartesian2D", "Time"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
@@ -67,6 +68,12 @@ class DensitySampler(AtomSampler):
                     len(charge_cond) != 2 or
                     charge_cond[0] >= charge_cond[1]):
                 raise ValueError("DensitySampler 'conditions' parameter 'Charge' must be a list or tuple of two numbers (min_charge, max_charge) with min < max.")
+        if "Angle" in conditions:
+            angle_cond = conditions["Angle"]
+            if (not isinstance(angle_cond, (list, tuple)) or 
+                    len(angle_cond) != 2 or
+                    angle_cond[0] >= angle_cond[1]):
+                raise ValueError("DensitySampler 'conditions' parameter 'Angle' must be a list or tuple of two numbers (min_angle, max_angle) with min < max.")
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
@@ -91,7 +98,7 @@ class DensitySampler(AtomSampler):
                 self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
                 self.data[identifier]["direction"] = dir_indices
 
-    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray):
+    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray, mol_bonds: dict, types: np.ndarray):
         """
         Sample atomic densities for the given frame.
 
@@ -114,6 +121,12 @@ class DensitySampler(AtomSampler):
                 atom_charges = charges[atom_indices]
                 charge_mask = (atom_charges >= min_charge) & (atom_charges <= max_charge)
                 atom_indices = atom_indices[charge_mask]
+            if "Angle" in self.conditions:
+                angles = self.__get_atom_angles(atom_indices, positions, mol_bonds[identifier], types)
+                min_angle, max_angle = self.conditions["Angle"]
+                angle_mask = (angles >= min_angle) & (angles <= max_angle)
+                angle_mask = np.any(angle_mask, axis=1)
+                atom_indices = atom_indices[angle_mask]
             atom_positions = positions[atom_indices]
             self.data[identifier]["num_frames"] += 1
             if self.dimension == "Time":
@@ -126,6 +139,43 @@ class DensitySampler(AtomSampler):
                 dir_x, dir_y = self.data[identifier]["direction"]
                 hist, _, _ = np.histogram2d(atom_positions[:, dir_x], atom_positions[:, dir_y], bins=self.num_bins, range=[[0.0, self.box[dir_x]], [0.0, self.box[dir_y]]])
                 self.data[identifier]["hist"] += hist
+
+    def __get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray, types: np.ndarray):
+        """
+        Calculate angles for atoms based on their bonded neighbors.
+
+        Parameters
+        ----------
+        atom_indices : np.ndarray
+            Indices of the central atoms.
+        positions : np.ndarray
+            Array of atomic positions.
+        bonded_atoms : np.ndarray
+            Array of bonded atom indices for each central atom.
+        types : np.ndarray
+            Array of atomic types.
+
+        Returns
+        -------
+        angles : np.ndarray
+            Calculated angles in degrees for the central atoms.
+        """
+        angles = np.zeros((bonded_atoms.shape[0], bonded_atoms.shape[1] * bonded_atoms.shape[1]- bonded_atoms.shape[1]))
+        for i in range(bonded_atoms.shape[1]):
+            for j in range(bonded_atoms.shape[1]):
+                if i == j:
+                    continue
+                atom_a = bonded_atoms[:, i]
+                atom_b = atom_indices
+                atom_c = bonded_atoms[:, j]
+                vec_ab = positions[atom_a] - positions[atom_b]
+                vec_cb = positions[atom_c] - positions[atom_b]
+                cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
+                cos_angle = np.clip(cos_angle, -1.0, 1.0)
+                angle_deg = np.degrees(np.arccos(cos_angle))
+                print(angles.shape, i * (bonded_atoms.shape[1]-1) + j - (1 if j > i else 0))
+                angles[:, i * (bonded_atoms.shape[1]-1) + j - (1 if j > i else 0)] = angle_deg
+        return np.array(angles)
 
     def join_samplers(self, num_cores):
         """
