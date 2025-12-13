@@ -9,6 +9,7 @@ for saving and loading Python objects using pickle.
 
 import pickle
 from matplotlib.axes import Axes
+import numpy as np
 
 
 def save_object(obj, filename):
@@ -81,3 +82,32 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if colors == [] else colors
 
     return fig, ax, data, identifiers, colors
+
+def plot_hist(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None):
+    plot_kwargs["color"] = color
+    plot_kwargs['label'] = identifier
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    axis.plot(bin_centers, hist_data, **plot_kwargs)
+    if std_data is not None:
+        upper_bound = hist_data + std_data
+        lower_bound = hist_data - std_data
+        axis.fill_between(bin_centers, lower_bound, upper_bound, color=color, alpha=0.3)
+    if mean_data is not None:
+        axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
+
+def get_identifiers(link_data: str):
+    """
+    Retrieve the list of identifiers from a data file.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file created by a sampler instance.
+
+    Returns
+    -------
+    list
+        List of identifiers present in the data file.
+    """
+    data = load_object(link_data)
+    return [identifier for identifier in data.keys() if identifier != "input_params"]

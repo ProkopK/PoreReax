@@ -9,6 +9,7 @@ which can be extended for specific sampling tasks.
 import numpy as np
 import os
 import itertools
+import porereax.utils as utils
 
 
 class Sampler:
@@ -61,15 +62,9 @@ class Sampler:
         self.num_frames = num_frames
         self.box = box
         self.input = {}
-        self.input.update({"name_out": name_out, "dimension": dimension})
+        self.input.update({"name_out": name_out, "dimension": dimension, "box": box})
         self.input.update(parameters)
         self.data = {}
-
-    def sample(self, **parameters):
-        pass
-
-    def join_samplers(self, num_cores):
-        pass
 
     def get_data(self):
         """
@@ -83,6 +78,28 @@ class Sampler:
             Sampled data.
         """
         return self.input, self.data
+
+    def sample(self, **parameters):
+        pass
+
+    def join_samplers(self, num_cores):
+        if self.process_id != -1:
+            return
+        data_list = {}
+        for process_id in range(num_cores) if num_cores > 1 else [-1]:
+            file_path = self.folder + f"/proc_{process_id}.pkl"
+            proc_data = utils.load_object(file_path)
+            for identifier, data in proc_data.items():
+                if identifier == "input_params":
+                    data_list[identifier] = data
+                else:
+                    if identifier not in data_list:
+                        data_list[identifier] = {}
+                    for key, value in data.items():
+                        if key not in data_list[identifier]:
+                            data_list[identifier][key] = []
+                        data_list[identifier][key].append(value)
+        return data_list
 
 
 class AtomSampler(Sampler):

@@ -22,7 +22,7 @@ class DensitySampler(AtomSampler):
     """
     Sampler class for atomic densities.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str):
+    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for atomic densities.
 
@@ -45,39 +45,53 @@ class DensitySampler(AtomSampler):
         box : np.ndarray
             Simulation box dimensions.
         num_bins : int
-            Number of bins for histogram sampling (only for "Cartesian1D").
+            Number of bins for Cartesian sampling along each axis.
         direction : str
-            Direction for histogram sampling ("x", "y", or "z") (only for "Cartesian1D").
+            Direction for Cartesian sampling. Options:
+            - ("x", "y", or "z") for "Cartesian1D".
+            - ("xy", "xz", or "yz") for "Cartesian2D".
+        conditions : dict, optional
+            Additional conditions for sampling.
+            - "Charge": tuple (min_charge, max_charge)
         """
         valid_dimensions = ["Cartesian1D", "Cartesian2D", "Time"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"DensitySampler does not support dimension {dimension}")
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("DensitySampler requires a positive integer 'num_bins' parameter.")
+        if not isinstance(conditions, dict):
+            raise ValueError("DensitySampler requires a dictionary 'conditions' parameter.")
+        if "Charge" in conditions:
+            charge_cond = conditions["Charge"]
+            if (not isinstance(charge_cond, (list, tuple)) or 
+                    len(charge_cond) != 2 or
+                    charge_cond[0] >= charge_cond[1]):
+                raise ValueError("DensitySampler 'conditions' parameter 'Charge' must be a list or tuple of two numbers (min_charge, max_charge) with min < max.")
         self.num_bins = num_bins
         self.direction = direction
-        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction)
+        self.conditions = conditions
+        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
         for identifier, bonds_info in self.molecules.items():
             if self.dimension == "Time":
                 self.data[identifier] = {"densities": np.zeros(num_frames), "num_frames": 0, }
             elif self.dimension == "Cartesian1D":
-                box_lengths = box
                 if self.direction not in ["x", "y", "z"]:
                     raise ValueError("DensitySampler with 'Cartesian1D' dimension requires 'direction' parameter to be one of 'x', 'y', or 'z'.")
                 dir_index = {"x": 0, "y": 1, "z": 2}[self.direction]
-                hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0.0, box_lengths[dir_index]))
-                self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "box_lengths": box_lengths, "direction": dir_index, "num_bins": num_bins, "num_frames": 0}
+                hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0.0, box[dir_index]))
+                self.data[identifier] = {"hist": hist, "bin_edges": bin_edges, "direction": dir_index, "num_frames": 0}
+                self.data[identifier]["direction"] = dir_index
             elif self.dimension == "Cartesian2D":
-                box_lengths = box
                 if self.direction not in ["xy", "xz", "yz"]:
                     raise ValueError("DensitySampler with 'Cartesian2D' dimension requires 'direction' parameter to be one of 'xy', 'xz', or 'yz'.")
                 dir_indices = {"xy": (0, 1), "xz": (0, 2), "yz": (1, 2)}[self.direction]
-                hist, x_edges, y_edges = np.histogram2d([], [], bins=self.num_bins, range=[[0.0, box_lengths[dir_indices[0]]], [0.0, box_lengths[dir_indices[1]]]])
-                self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "box_lengths": box_lengths, "direction": dir_indices, "num_bins": num_bins, "num_frames": 0}
+                hist, x_edges, y_edges = np.histogram2d([], [], bins=self.num_bins, range=[[0.0, box[dir_indices[0]]], [0.0, box[dir_indices[1]]]])
+                self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
+                self.data[identifier]["direction"] = dir_indices
 
-    def sample(self, frame: int, positions: np.ndarray, mol_index: dict):
+    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray):
         """
         Sample atomic densities for the given frame.
 
@@ -89,20 +103,28 @@ class DensitySampler(AtomSampler):
             Array of atomic positions.
         mol_index : dict
             Mapping of molecule identifiers to atom indices.
+        charges : np.ndarray
+            Array of atomic charges.
         """
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
+            # Apply conditions
+            if "Charge" in self.conditions:
+                min_charge, max_charge = self.conditions["Charge"]
+                atom_charges = charges[atom_indices]
+                charge_mask = (atom_charges >= min_charge) & (atom_charges <= max_charge)
+                atom_indices = atom_indices[charge_mask]
             atom_positions = positions[atom_indices]
             self.data[identifier]["num_frames"] += 1
             if self.dimension == "Time":
                 self.data[identifier]["densities"][frame] = atom_indices.shape[0]
             elif self.dimension == "Cartesian1D":
                 direction = self.data[identifier]["direction"]
-                hist, _ = np.histogram(atom_positions[:, direction], bins=self.data[identifier]["num_bins"], range=(0.0, self.data[identifier]["box_lengths"][direction]))
+                hist, _ = np.histogram(atom_positions[:, direction], bins=self.num_bins, range=(0.0, self.box[direction]))
                 self.data[identifier]["hist"] += hist
             elif self.dimension == "Cartesian2D":
                 dir_x, dir_y = self.data[identifier]["direction"]
-                hist, _, _ = np.histogram2d(atom_positions[:, dir_x], atom_positions[:, dir_y], bins=self.data[identifier]["num_bins"], range=[[0.0, self.data[identifier]["box_lengths"][dir_x]], [0.0, self.data[identifier]["box_lengths"][dir_y]]])
+                hist, _, _ = np.histogram2d(atom_positions[:, dir_x], atom_positions[:, dir_y], bins=self.num_bins, range=[[0.0, self.box[dir_x]], [0.0, self.box[dir_y]]])
                 self.data[identifier]["hist"] += hist
 
     def join_samplers(self, num_cores):
@@ -114,92 +136,36 @@ class DensitySampler(AtomSampler):
         num_cores : int
             Number of parallel processes used.
         """
-        if self.process_id != -1:
-            return
-        data_list = {}
-        for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self.folder + f"/proc_{process_id}.pkl"
-            proc_data = utils.load_object(file_path)
-            for identifier, data in proc_data.items():
-                if identifier == "input_params":
-                    data_list[identifier] = data
-                    continue
-                elif identifier not in data_list:
-                    if self.dimension == "Time":
-                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
-                                                 "densities": [data["num_frames"]] * num_cores}
-                    elif self.dimension == "Cartesian1D":
-                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
-                                                 "hist": np.zeros((num_cores, data["num_bins"]), dtype=float),
-                                                 "bin_edges": data["bin_edges"],
-                                                 "box_lengths": data["box_lengths"],
-                                                 "direction": data["direction"],
-                                                 "num_bins": data["num_bins"]}
-                    elif self.dimension == "Cartesian2D":
-                        data_list[identifier] = {"num_frames": np.zeros(num_cores, dtype=int),
-                                                 "hist": np.zeros((num_cores, data["num_bins"], data["num_bins"]), dtype=float),
-                                                 "x_edges": data["x_edges"],
-                                                 "y_edges": data["y_edges"],
-                                                 "box_lengths": data["box_lengths"],
-                                                 "direction": data["direction"],
-                                                 "num_bins": data["num_bins"]}
-                if self.dimension == "Time":
-                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
-                    data_list[identifier]["densities"][process_id] = data["densities"]
-                elif self.dimension == "Cartesian1D":
-                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
-                    data_list[identifier]["hist"][process_id, :] = data["hist"]
-                elif self.dimension == "Cartesian2D":
-                    data_list[identifier]["num_frames"][process_id] = data["num_frames"]
-                    data_list[identifier]["hist"][process_id, :, :] = data["hist"]
+        data_list = super().join_samplers(num_cores)
         combined_data = {}
         for identifier in data_list:
             if identifier == "input_params":
-                combined_data[identifier] = data_list[identifier]
+                combined_data["input_params"] = data_list["input_params"]
                 continue
             combined_data[identifier] = {}
+            num_frames = np.sum(data_list[identifier]["num_frames"])
+            combined_data[identifier]["num_frames"] = num_frames
             if self.dimension == "Time":
-                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
                 combined_data[identifier]["densities"] = np.concatenate(data_list[identifier]["densities"])
             elif self.dimension == "Cartesian1D":
-                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
-                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
-                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"]
-                combined_data[identifier]["box_lengths"] = data_list[identifier]["box_lengths"]
-                combined_data[identifier]["direction"] = data_list[identifier]["direction"]
-                combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins) # TODO check normalization
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0) # TODO fix std calculation
+                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
+                combined_data[identifier]["direction"] = data_list[identifier]["direction"][0]
             elif self.dimension == "Cartesian2D":
-                combined_data[identifier]["num_frames"] = np.sum(data_list[identifier]["num_frames"])
-                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / combined_data[identifier]["num_frames"]
-                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-                combined_data[identifier]["x_edges"] = data_list[identifier]["x_edges"]
-                combined_data[identifier]["y_edges"] = data_list[identifier]["y_edges"]
-                combined_data[identifier]["box_lengths"] = data_list[identifier]["box_lengths"]
-                combined_data[identifier]["direction"] = data_list[identifier]["direction"]
-                combined_data[identifier]["num_bins"] = data_list[identifier]["num_bins"]
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros((self.num_bins, self.num_bins)) # TODO check normalization
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0) # TODO fix std calculation
+                combined_data[identifier]["x_edges"] = data_list[identifier]["x_edges"][0]
+                combined_data[identifier]["y_edges"] = data_list[identifier]["y_edges"][0]
+                combined_data[identifier]["direction"] = data_list[identifier]["direction"][0]
         utils.save_object(combined_data, self.folder + "/combined.obj")
 
 
-def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []):
-    """
-    Plot density histograms from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file containing sampled density data.
-    axis : bool, optional
-        Whether to display axes on the plot. Default is True.
-    std : bool, optional
-        Whether to plot standard deviation as shaded area. Default is True.
-    identifiers : list, optional
-        List of molecule identifiers to plot. Default is empty list (plot all).
-    colors : list, optional
-        List of colors for each identifier. Default is empty list (use default colors).
-    """
+def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+
     if data["input_params"]["dimension"] != "Cartesian1D":
+        print("Data dimension is not 'Cartesian1D'. Cannot plot histogram.")
         return
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
@@ -207,38 +173,15 @@ def plot_hist(link_data: str, axis=True, std=True, identifiers = [], colors = []
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
-        density_data = data[identifier]
-        bin_centers = 0.5 * (density_data["bin_edges"][:-1] + density_data["bin_edges"][1:]) / 10 # Convert to nm
-        hist_data = density_data["hist"]
-        color = colors[i % len(colors)] if colors else None
-        ax.plot(bin_centers, hist_data, label=identifier, color=color)
-        if std:
-            hist_std = density_data["hist_std"]
-            ax.fill_between(bin_centers, 
-                            hist_data - hist_std, 
-                            hist_data + hist_std, 
-                            color=color, 
-                            alpha=0.3)
-    ax.set_xlabel("Position / nm")
+        bin_edges = data[identifier]["bin_edges"]
+        hist = data[identifier]["hist"]
+        std_hist = data[identifier]["std_hist"] if std else None
+        utils.plot_hist(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
+
+    ax.set_xlabel(f"{data['input_params']['direction']} Position / nm")
     ax.set_ylabel("Density / atoms")
 
-def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=20):
-    """
-    Plot density over time from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file containing sampled density data.
-    axis : matplotlib.axes.Axes or bool, optional
-        Axis to plot on or True to create a new one. Default is True.
-    identifiers : list, optional
-        List of molecule identifiers to plot. Default is empty list (plot all).
-    colors : list, optional
-        List of colors for each identifier. Default is empty list (use default colors).
-    dt : float, optional
-        Time step between frames. Default is 0.5fs
-    """
+def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=50):
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
     if data["input_params"]["dimension"] != "Time":
         return

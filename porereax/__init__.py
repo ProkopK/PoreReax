@@ -3,6 +3,7 @@ import porereax.utils as utils
 
 import porereax.density as density
 import porereax.charge as charge
+import porereax.angle as angle
 
 import porereax.sample as sample
 from porereax.sample import Sample
@@ -15,6 +16,7 @@ __all__ = [
     "utils",
     "density",
     "charge",
+    "angle",
     "Sample",
     "__version__",
 ]

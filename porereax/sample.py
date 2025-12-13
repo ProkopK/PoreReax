@@ -18,6 +18,7 @@ import sys
 import porereax.utils as utils
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler
+from porereax.angle import AngleSampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -94,7 +95,8 @@ class Sample:
         self.system = system
 
         self.sampler_inputs = {"charge_samplers": [],
-                               "density_samplers": []}
+                               "density_samplers": [],
+                               "angle_samplers": [],}
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -191,7 +193,7 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
-    def add_charge_sampling(self, name_out, dimension, atoms, num_bins=600, range=(-3.0, 3.0)):
+    def add_charge_sampling(self, name_out, dimension, atoms, num_bins=800, range=(-2.0, 2.0)):
         """
         Add a ChargeSampler to the Sample instance.
 
@@ -215,7 +217,7 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["charge_samplers"].append(inputs)
 
-    def add_density_sampling(self, name_out, dimension, atoms, num_bins=200, direction="z"):
+    def add_density_sampling(self, name_out, dimension, atoms, num_bins=200, direction="z", conditions={}):
         """
         Add a DensitySampler to the Sample instance.
 
@@ -224,20 +226,108 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         dimension : str
-            Sampling dimension. Supported: "Position".
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
         atoms : list
             List of atom identifiers to sample.
         num_bins : int, optional
             Number of bins for position sampling. Relevant for Cartesian1D.
         direction : str, optional
             Direction along which to sample. For Cartesian1D, use ("x", "y", or "z").
+        conditions : dict, optional
+            Dictionary of conditions to filter atoms during sampling.
+            Supported conditions:
+            - "Charge": tuple (min_charge, max_charge) to filter atoms by charge.
         """
         inputs = {"name_out": name_out,
                   "dimension": dimension,
                   "atoms": atoms,
                   "num_bins": num_bins,
-                  "direction": direction,}
+                  "direction": direction,
+                  "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
+
+    def add_angle_sampling(self, name_out, dimension, atoms, num_bins=180, angle="all"):
+        """
+        Add an AngleSampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "Histogram".
+        atoms : list
+            List of atom identifiers to sample.
+        num_bins : int, optional
+            Number of bins for histogram sampling.
+        angle : str, optional
+            Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "atoms": atoms,
+                  "num_bins": num_bins,
+                  "angle": angle,}
+        self.sampler_inputs["angle_samplers"].append(inputs)
+
+    def init_samplers(self, sampler_inputs, process_id):
+        """
+        Initialize samplers based on provided configurations.
+        
+        Parameters
+        ----------
+        sampler_inputs : dict
+            Dictionary of sampler input configurations.
+        process_id : int
+            Process ID for parallel sampling.
+        """
+        def add_bond_sampler(sampler: BondSampler):
+            bonds = sampler.get_bonds()
+            self.bonds.update(bonds)
+            self.__add_sampler(sampler)
+        def add_atom_sampler(sampler: AtomSampler):
+            mols = sampler.get_mols()
+            self.molecules.update(mols)
+            self.__add_sampler(sampler)
+        for sampler_type in sampler_inputs:
+            for sampler in sampler_inputs[sampler_type]:
+                if sampler_type == "charge_samplers":
+                    sampler_instance = ChargeSampler(name_out=sampler["name_out"],
+                                                     dimension=sampler["dimension"],
+                                                     atoms=sampler["atoms"],
+                                                     process_id=process_id,
+                                                     atom_lib=self.name_to_type, 
+                                                     masses=self.masses,
+                                                     num_frames=self.num_frames,
+                                                     box=self.box,
+                                                     num_bins=sampler["num_bins"],
+                                                     range=sampler["range"])
+                    add_atom_sampler(sampler_instance)
+                elif sampler_type == "density_samplers":
+                    sampler_instance = DensitySampler(name_out=sampler["name_out"],
+                                                      dimension=sampler["dimension"],
+                                                      atoms=sampler["atoms"],
+                                                      process_id=process_id,
+                                                      atom_lib=self.name_to_type, 
+                                                      masses=self.masses,
+                                                      num_frames=self.num_frames,
+                                                      box=self.box,
+                                                      num_bins=sampler["num_bins"],
+                                                      direction=sampler["direction"],
+                                                      conditions=sampler["conditions"])
+                    add_atom_sampler(sampler_instance)
+                elif sampler_type == "angle_samplers":
+                    sampler_instance = AngleSampler(name_out=sampler["name_out"],
+                                                    dimension=sampler["dimension"],
+                                                    atoms=sampler["atoms"],
+                                                    process_id=process_id,
+                                                    atom_lib=self.name_to_type, 
+                                                    masses=self.masses,
+                                                    num_frames=self.num_frames,
+                                                    box=self.box,
+                                                    num_bins=sampler["num_bins"],
+                                                    angle=sampler["angle"])
+                    add_atom_sampler(sampler_instance)
 
     def sample(self, is_parallel=True, num_cores=0):
         """
@@ -336,52 +426,6 @@ class Sample:
         sample_instance.init_samplers(sampler_inputs, process_id)
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
-    
-    def init_samplers(self, sampler_inputs, process_id):
-        """
-        Initialize samplers based on provided configurations.
-        
-        Parameters
-        ----------
-        sampler_inputs : dict
-            Dictionary of sampler input configurations.
-        process_id : int
-            Process ID for parallel sampling.
-        """
-        def add_bond_sampler(sampler: BondSampler):
-            bonds = sampler.get_bonds()
-            self.bonds.update(bonds)
-            self.__add_sampler(sampler)
-        def add_atom_sampler(sampler: AtomSampler):
-            mols = sampler.get_mols()
-            self.molecules.update(mols)
-            self.__add_sampler(sampler)
-        for sampler_type in sampler_inputs:
-            for sampler in sampler_inputs[sampler_type]:
-                if sampler_type == "charge_samplers":
-                    sampler_instance = ChargeSampler(name_out=sampler["name_out"],
-                                                     dimension=sampler["dimension"],
-                                                     atoms=sampler["atoms"],
-                                                     process_id=process_id,
-                                                     atom_lib=self.name_to_type, 
-                                                     masses=self.masses,
-                                                     num_frames=self.num_frames,
-                                                     box=self.box,
-                                                     num_bins=sampler["num_bins"],
-                                                     range=sampler["range"])
-                    add_atom_sampler(sampler_instance)
-                elif sampler_type == "density_samplers":
-                    sampler_instance = DensitySampler(name_out=sampler["name_out"],
-                                                      dimension=sampler["dimension"],
-                                                      atoms=sampler["atoms"],
-                                                      process_id=process_id,
-                                                      atom_lib=self.name_to_type, 
-                                                      masses=self.masses,
-                                                      num_frames=self.num_frames,
-                                                      box=self.box,
-                                                      num_bins=sampler["num_bins"],
-                                                      direction=sampler["direction"])
-                    add_atom_sampler(sampler_instance)
 
     def sample_helper(self):
         """
@@ -420,9 +464,7 @@ class Sample:
             if self.molecules[identifier]["bonds"] != None:
                 molecule_bonds[identifier] = np.zeros((self.num_particles, len(self.molecules[identifier]["bonds"][0]), ), dtype=int)
             else:
-                molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), dtype=bool)
-        print(molecules_per_atom_type)
-        print(molecule_idx)
+                molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), )
 
         # Loop over frames
         for frame_idx in self.frames:
@@ -473,7 +515,14 @@ class Sample:
                 elif isinstance(sampler, DensitySampler):
                     sampler.sample(frame=frame_idx-self.start_frame,
                                    positions=atom_positions,
-                                   mol_index=molecule_idx)
+                                   mol_index=molecule_idx,
+                                   charges=atom_charges)
+                elif isinstance(sampler, AngleSampler):
+                    sampler.sample(frame=frame_idx-self.start_frame,
+                                   positions=atom_positions,
+                                   mol_index=molecule_idx,
+                                   mol_bonds=molecule_bonds,
+                                   types=atom_types)
                 else:
                     print(f"Unknown sampler type: {type(sampler)}. Skipping...")
 
