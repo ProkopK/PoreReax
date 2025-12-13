@@ -8,7 +8,7 @@ class AngleSampler(AtomSampler):
     """
     Sampler class for angles formed by three atoms.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, angle: str):
+    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, angle: str):
         """
         Sampler for angles formed by three atoms.
 
@@ -109,8 +109,8 @@ class AngleSampler(AtomSampler):
                         atom_a = atom_a[valid_mask]
                         atom_b = atom_b[valid_mask]
                         atom_c = atom_c[valid_mask]
-                    vec_ab = positions[atom_a] - positions[atom_b]
-                    vec_cb = positions[atom_c] - positions[atom_b]
+                    vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self.box)
+                    vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self.box)
                     cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
                     cos_angle = np.clip(cos_angle, -1.0, 1.0)
                     angle_deg = np.degrees(np.arccos(cos_angle))

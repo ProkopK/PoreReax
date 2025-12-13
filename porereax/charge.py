@@ -9,9 +9,8 @@ It provides:
 
 
 import numpy as np
-from porereax.meta_sampler import BondSampler, AtomSampler
+from porereax.meta_sampler import AtomSampler
 import porereax.utils as utils
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
 
@@ -19,7 +18,7 @@ class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
         """
         Sampler for atomic charges.
 
@@ -114,6 +113,7 @@ class ChargeSampler(AtomSampler):
                 combined_data[identifier]["std_hist"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
         utils.save_object(combined_data, self.folder + "/combined.obj")
+
 
 def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, density=False, plot_kwargs = {}):
     fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)

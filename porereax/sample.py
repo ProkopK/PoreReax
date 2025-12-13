@@ -19,6 +19,7 @@ import porereax.utils as utils
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler
 from porereax.angle import AngleSampler
+from porereax.bond_length import BondLengthSampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -96,7 +97,8 @@ class Sample:
 
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": [],
-                               "angle_samplers": [],}
+                               "angle_samplers": [],
+                               "bond_length_samplers": [],}
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -270,6 +272,32 @@ class Sample:
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
+    def add_bond_length_sampling(self, name_out, dimension, bonds, num_bins=200, range=(0.0, 5.0)):
+        """
+        Add a BondLengthSampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "Histogram".
+        bonds : list
+            List of bonds to sample. Each bond is defined as a dictionary in the format:
+            {"bond": "a-b", "bonds_A": [...], "bonds_B": [...]} where a and b are atom identifiers,
+            and bonds_A and bonds_B are lists of atom identifiers that atoms a and b are bonded to, respectively.
+        num_bins : int, optional
+            Number of bins for histogram sampling.
+        range : tuple, optional
+            Range (min, max) in Angstroms for histogram sampling.
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "bonds": bonds,
+                  "num_bins": num_bins,
+                  "range": range,}
+        self.sampler_inputs["bond_length_samplers"].append(inputs)
+
     def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
@@ -282,6 +310,8 @@ class Sample:
             Process ID for parallel sampling.
         """
         def add_bond_sampler(sampler: BondSampler):
+            mols = sampler.get_mols()
+            self.molecules.update(mols)
             bonds = sampler.get_bonds()
             self.bonds.update(bonds)
             self.__add_sampler(sampler)
@@ -328,6 +358,18 @@ class Sample:
                                                     num_bins=sampler["num_bins"],
                                                     angle=sampler["angle"])
                     add_atom_sampler(sampler_instance)
+                elif sampler_type == "bond_length_samplers":
+                    sampler_instance = BondLengthSampler(name_out=sampler["name_out"],
+                                                         dimension=sampler["dimension"],
+                                                         bonds=sampler["bonds"],
+                                                         process_id=process_id,
+                                                         atom_lib=self.name_to_type, 
+                                                         masses=self.masses,
+                                                         num_frames=self.num_frames,
+                                                         box=self.box,
+                                                         num_bins=sampler["num_bins"],
+                                                         range=sampler["range"])
+                    add_bond_sampler(sampler_instance)
 
     def sample(self, is_parallel=True, num_cores=0):
         """
@@ -351,7 +393,9 @@ class Sample:
         max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
+        print(f"Inputs before: {self.sampler_inputs}")
         self.init_samplers(self.sampler_inputs, process_id=-1)
+        print(f"Inputs after: {self.sampler_inputs}")
 
         if is_parallel and num_cores > 1:
             frames_per_core = np.array_split(self.frames, num_cores)
@@ -437,12 +481,13 @@ class Sample:
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
 
+        # Load trajectory
         self.pipeline = import_file(self.trajectory_file)
         if self.bond_file:
             bond_modifier = LoadTrajectoryModifier()
             bond_modifier.source.load(self.bond_file)
             self.pipeline.modifiers.append(bond_modifier)
-        
+
         # Prepare molecule indexing
         molecules_per_atom_type = {}
         for atom_type in self.type_to_name:
@@ -466,6 +511,8 @@ class Sample:
             else:
                 molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), )
 
+        bond_idx = {}
+
         # Loop over frames
         for frame_idx in self.frames:
             print(f"Processing frame {frame_idx}...")
@@ -475,6 +522,7 @@ class Sample:
             atom_identifiers = frame.particles.identifiers.array
             atom_positions = frame.particles.positions.array
             atom_velocities = frame.particles.velocities.array
+            bond_count = frame.particles.bonds.count
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
@@ -506,6 +554,30 @@ class Sample:
                 molecule_idx[mol] = np.where(molecule_idx[mol])[0]
                 molecule_bonds[mol] = molecule_bonds[mol][molecule_idx[mol]]
 
+            # Reset bond indices
+            for identifier in self.bonds:
+                bond_idx[identifier] = np.zeros(bond_count, dtype=bool)
+
+            # Identify bonds
+            for bond_id, bond in enumerate(bond_topology):
+                atom_a = bond[0]
+                atom_b = bond[1]
+                type_a = atom_types[atom_a]
+                type_b = atom_types[atom_b]
+                for identifier in self.bonds:
+                    bond_info = self.bonds[identifier]
+                    bond_def = bond_info["bond"]
+                    mol_A = bond_info["mol_A"]
+                    mol_B = bond_info["mol_B"]
+                    if ((type_a == bond_def[0] and type_b == bond_def[1])):
+                        if atom_a in molecule_idx[mol_A] and atom_b in molecule_idx[mol_B]:
+                            bond_idx[identifier][bond_id] = 1
+                    elif ((type_a == bond_def[1] and type_b == bond_def[0])):
+                        if atom_a in molecule_idx[mol_B] and atom_b in molecule_idx[mol_A]:
+                            bond_idx[identifier][bond_id] = 1
+            for identifier in bond_idx:
+                bond_idx[identifier] = np.where(bond_idx[identifier])[0]
+
             # Sampling
             for sampler in self.samplers:
                 if isinstance(sampler, ChargeSampler):
@@ -525,6 +597,11 @@ class Sample:
                                    mol_index=molecule_idx,
                                    mol_bonds=molecule_bonds,
                                    types=atom_types)
+                elif isinstance(sampler, BondLengthSampler):
+                    sampler.sample(frame=frame_idx-self.start_frame,
+                                   positions=atom_positions,
+                                   bond_index=bond_idx,
+                                   bond_topology=bond_topology)
                 else:
                     print(f"Unknown sampler type: {type(sampler)}. Skipping...")
 

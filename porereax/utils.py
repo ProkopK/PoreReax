@@ -43,6 +43,24 @@ def load_object(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
     
+def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
+    """
+    Apply the minimal image convention to a vector given the simulation box dimensions.
+
+    Parameters
+    ----------
+    vec : np.ndarray
+        The input vector (shape: (N, 3)).
+    box : np.ndarray
+        The simulation box dimensions (shape: (3,)).
+
+    Returns
+    -------
+    np.ndarray
+        The vector adjusted by the minimal image convention (shape: (N, 3)).
+    """
+    return vec - box * np.round(vec / box)
+    
 def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]):
     """
     Set up a matplotlib figure and axis for plotting.
@@ -87,6 +105,7 @@ def plot_hist(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.
     plot_kwargs["color"] = color
     plot_kwargs['label'] = identifier
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    print(f"Plotting histogram for {identifier}: ", bin_centers, hist_data)
     axis.plot(bin_centers, hist_data, **plot_kwargs)
     if std_data is not None:
         upper_bound = hist_data + std_data

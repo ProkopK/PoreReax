@@ -61,10 +61,11 @@ class Sampler:
         self.masses = masses
         self.num_frames = num_frames
         self.box = box
+        self.molecules = {}
+        self.data = {}
         self.input = {}
         self.input.update({"name_out": name_out, "dimension": dimension, "box": box})
         self.input.update(parameters)
-        self.data = {}
 
     def get_data(self):
         """
@@ -100,6 +101,84 @@ class Sampler:
                             data_list[identifier][key] = []
                         data_list[identifier][key].append(value)
         return data_list
+    
+    def permutate_bonds(self, bonds, atom_lib):
+        """
+        Generate all permutations of bonded atom types, considering 'X' as wildcard.
+
+        Parameters
+        ----------
+        bonds : list
+            List of bonded atom type strings.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+
+        Returns
+        -------
+        bond_permutations : list
+            List of lists containing all permutations of bonded atom type IDs.
+        """
+        bond_types = []
+        for bonded_atom in bonds:
+            if bonded_atom in atom_lib:
+                bond_types.append(atom_lib[bonded_atom])
+            elif bonded_atom == "X":
+                bond_types.append("X")
+            else:
+                raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bonded_atom} not found in atom library.")
+        options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
+        expanded = itertools.product(*options)
+        bond_permutations = []
+        seen_permutations = set()
+        for e in expanded:
+            for perm in set(itertools.permutations(e)):
+                if perm not in seen_permutations:
+                    seen_permutations.add(perm)
+                    bond_permutations.append(list(perm))
+        return bond_permutations
+    
+    def build_mol_dictionary(self, atom, bonds, atom_lib):
+        """
+        Build molecule dictionary for sampling.
+
+        Parameters
+        ----------
+        atom : str
+            Atom type string.
+        bonds : list or None
+            List of bonded atom type strings or None.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        Returns
+        -------
+        identifier : str
+            Unique identifier for the molecule.
+        mol : dict
+            Molecule dictionary containing atom type ID and bonded atom type ID permutations.
+        """
+        if atom in atom_lib:
+            atom_id = atom_lib[atom]
+        else:
+            raise ValueError(f"Error in {self.__class__.__name__}: Atom {atom} not found in atom library.")
+        bonds.sort() if bonds != None else None
+        identifier = atom + "+" + "_".join(bonds) if bonds != None else atom
+        if bonds != None:
+            bond_permutations = self.permutate_bonds(bonds, atom_lib)
+        else:
+            bond_permutations = None
+        mol = {"atom": atom_id, "bonds": bond_permutations}
+        return identifier, mol
+
+    def get_mols(self):
+        """
+        Retrieve the defined molecules for sampling.
+
+        Returns
+        -------
+        molecules : dict
+            Dictionary of molecules defined for sampling.
+        """
+        return self.molecules
 
 
 class AtomSampler(Sampler):
@@ -133,10 +212,9 @@ class AtomSampler(Sampler):
         **parameters : dict
             Additional parameters for the sampler.
         """
+        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
         if not isinstance(atoms, list) or len(atoms) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of atoms.")
-        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
-        self.molecules = {}
         for atom_info in atoms:
             if "atom" not in atom_info or not isinstance(atom_info["atom"], str):
                 raise ValueError(f"{self.__class__.__name__} requires each atom entry to have an 'atom' key with a string value.")
@@ -144,77 +222,62 @@ class AtomSampler(Sampler):
                 raise ValueError(f"{self.__class__.__name__} requires the 'bonds' key to be a list if provided.")
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
-            bonds.sort() if bonds != None else None
-            identifier = atom + "+" + "_".join(bonds) if bonds != None else atom
-
-            if atom in atom_lib:
-                atom = atom_lib[atom]
-            else:
-                raise ValueError(f"Error in {self.__class__.__name__}: Atom {atom} not found in atom library.")
-            if bonds != None:
-                bond_types = []
-                for bond in bonds:
-                    if bond in atom_lib:
-                        bond_types.append(atom_lib[bond])
-                    elif bond == "X":
-                        bond_types.append("X")
-                    else:
-                        raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bond} not found in atom library.")
-                options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
-                expanded = itertools.product(*options)
-                bond_permutations = []
-                seen_permutations = set()
-                for e in expanded:
-                    for perm in set(itertools.permutations(e)):
-                        if perm not in seen_permutations:
-                            seen_permutations.add(perm)
-                            bond_permutations.append(list(perm))
-            else:
-                bond_permutations = None
-            self.molecules[identifier] = {"atom": atom, "bonds": bond_permutations}
-
-    def get_mols(self):
-        """
-        Retrieve the defined molecules for sampling.
-
-        Returns
-        -------
-        molecules : dict
-            Dictionary of molecules defined for sampling.
-        """
-        return self.molecules
+            identifier, mol = self.build_mol_dictionary(atom, bonds, atom_lib)
+            self.molecules[identifier] = mol
 
 
 class BondSampler(Sampler):
     """
     Sampler class for bonds.
     """
-    pass
-#     def __init__(self, name_out, dimension, bonds, process_id=0, **parameters):
-#         """
-#         Sampler for bonds.
+    def __init__(self, name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, **parameters):
+        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
+        if not isinstance(bonds, list) or len(bonds) == 0:
+            raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
+        self.bonds = {}
+        for bond_info in bonds:
+            if "bond" not in bond_info or not isinstance(bond_info["bond"], str):
+                raise ValueError(f"{self.__class__.__name__} requires each bond entry to have a 'bond' key with a string value.")
+            if len(bond_info["bond"].split("-")) != 2:
+                raise ValueError(f"{self.__class__.__name__} requires the 'bond' key to be in the format 'A-B'.")
+            if "bonds_A" in bond_info and not isinstance(bond_info["bonds_A"], list):
+                raise ValueError(f"{self.__class__.__name__} requires the 'bonds_A' key to be a list if provided.")
+            if "bonds_B" in bond_info and not isinstance(bond_info["bonds_B"], list):
+                raise ValueError(f"{self.__class__.__name__} requires the 'bonds_B' key to be a list if provided.")
 
-#         Parameters
-#         ----------
-#         name_out : str
-#             Name of the output directory and object file of the sampler data
-#         dimension : str
-#             Dimension along which to sample.
-#         bonds : list
-#             List of bonds to sample, each specified as a string identifier.
-#         process_id : int, optional
-#             Process ID for parallel processing (default is 0).
-#         **parameters : dict
-#             Additional parameters for the sampler.
-#         """
-#         super().__init__(name_out, dimension, process_id, **parameters)
-#         self.bonds = {}
+            bond = bond_info["bond"]
+            atom_A, atom_B = bond.split("-")
+            bonds_A = bond_info.get("bonds_A", None)
+            bonds_B = bond_info.get("bonds_B", None)
+            bonds_A = bonds_A.copy() if bonds_A != None else None
+            bonds_B = bonds_B.copy() if bonds_B != None else None
+            bonds_A.sort() if bonds_A != None else None
+            bonds_B.sort() if bonds_B != None else None
+            bond_info_A = "(" + "_".join(bonds_A) + ")" if bonds_A != None else ""
+            bond_info_B = "(" + "_".join(bonds_B) + ")" if bonds_B != None else ""
+            identifier = bond_info_A + atom_A + "-" + atom_B + bond_info_B
 
-#     def add_bond(self, bond, constrains={}):
-#         if not isinstance(bond, str):
-#             raise TypeError("Bond must be a string identifier.")
-#         if not isinstance(constrains, dict):
-#             raise TypeError("Additional constrains musst be a dict")
-#         identifier = bond
-#         print(f"Adding bond {bond} to {self.__class__.__name__}")
-#         self.bonds[identifier] = {"bond": bond, "constrains": constrains}
+            bonds_A.append(atom_B) if bonds_A != None else None
+            bonds_B.append(atom_A) if bonds_B != None else None
+            bonds_A.sort() if bonds_A != None else None
+            bonds_B.sort() if bonds_B != None else None
+
+            mol_identifier_A, mol_A = self.build_mol_dictionary(atom_A, bonds_A, atom_lib)
+            mol_identifier_B, mol_B = self.build_mol_dictionary(atom_B, bonds_B, atom_lib)
+            self.molecules[mol_identifier_A] = mol_A
+            self.molecules[mol_identifier_B] = mol_B
+
+            self.bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
+        print("Molecules for bond sampler: ", self.molecules.keys())
+        print("Bonds for bond sampler: ", self.bonds.keys())
+
+    def get_bonds(self):
+        """
+        Retrieve the defined bonds for sampling.
+
+        Returns
+        -------
+        bonds : dict
+            Dictionary of bonds defined for sampling.
+        """
+        return self.bonds

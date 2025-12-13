@@ -22,7 +22,7 @@ class DensitySampler(AtomSampler):
     """
     Sampler class for atomic densities.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: dict, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for atomic densities.
 
@@ -168,12 +168,11 @@ class DensitySampler(AtomSampler):
                 atom_a = bonded_atoms[:, i]
                 atom_b = atom_indices
                 atom_c = bonded_atoms[:, j]
-                vec_ab = positions[atom_a] - positions[atom_b]
-                vec_cb = positions[atom_c] - positions[atom_b]
+                vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self.box)
+                vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self.box)
                 cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
                 cos_angle = np.clip(cos_angle, -1.0, 1.0)
                 angle_deg = np.degrees(np.arccos(cos_angle))
-                print(angles.shape, i * (bonded_atoms.shape[1]-1) + j - (1 if j > i else 0))
                 angles[:, i * (bonded_atoms.shape[1]-1) + j - (1 if j > i else 0)] = angle_deg
         return np.array(angles)
 
