@@ -64,7 +64,7 @@ class Sampler:
         self.molecules = {}
         self.data = {}
         self.input = {}
-        self.input.update({"name_out": name_out, "dimension": dimension, "box": box})
+        self.input.update({"name_out": name_out, "dimension": dimension, "box": box, "sampler_type": self.__class__.__name__})
         self.input.update(parameters)
 
     def get_data(self):
@@ -84,6 +84,13 @@ class Sampler:
         pass
 
     def join_samplers(self, num_cores):
+        """
+        Join sampler data from multiple processes.
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used for sampling.
+        """
         if self.process_id != -1:
             return
         data_list = {}
@@ -149,6 +156,7 @@ class Sampler:
             List of bonded atom type strings or None.
         atom_lib : dict
             Dictionary mapping atom type strings to their type IDs.
+
         Returns
         -------
         identifier : str
@@ -231,6 +239,33 @@ class BondSampler(Sampler):
     Sampler class for bonds.
     """
     def __init__(self, name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, **parameters):
+        """
+        Sampler for bonds.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory of the sampler data
+        dimension : str
+            Dimension along which to sample.
+        bonds : list
+            List of bonds to sample, each specified as a dictionary with keys:
+            - "bond": str, the bond in format "A-B"
+            - "bonds_A": list, optional, list of bonded atom types for atom A
+            - "bonds_B": list, optional, list of bonded atom types for atom B
+        process_id : int
+            Process ID for parallel processing.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
+        **parameters : dict
+            Additional parameters for the sampler.
+        """
         super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
         if not isinstance(bonds, list) or len(bonds) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
@@ -268,8 +303,6 @@ class BondSampler(Sampler):
             self.molecules[mol_identifier_B] = mol_B
 
             self.bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
-        print("Molecules for bond sampler: ", self.molecules.keys())
-        print("Bonds for bond sampler: ", self.bonds.keys())
 
     def get_bonds(self):
         """

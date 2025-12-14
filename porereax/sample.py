@@ -119,7 +119,7 @@ class Sample:
         self.masses = masses
 
         # Validate start and end frame values
-        if start_frame < 0 or end_frame < -1 or (start_frame >= end_frame and end_frame != -1) or end_frame >= num_frames:
+        if (start_frame < 0) or (end_frame < -1) or (start_frame > end_frame and end_frame != -1) or (start_frame >= num_frames) or (end_frame >= num_frames):
             raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
         
         self.start_frame = start_frame
@@ -272,7 +272,7 @@ class Sample:
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
-    def add_bond_length_sampling(self, name_out, dimension, bonds, num_bins=200, range=(0.0, 5.0)):
+    def add_bond_length_sampling(self, name_out, dimension, bonds, num_bins=200, range=(0.0, 3.0)):
         """
         Add a BondLengthSampler to the Sample instance.
 
@@ -390,12 +390,10 @@ class Sample:
             or os.getenv("LSB_DJOB_NUMPROC")
             or os.getenv("NSLOTS"))
         cluster_tasks = int(cluster_tasks) if cluster_tasks else None
-        max_cores = min(avail_cores, cluster_tasks) if cluster_tasks else avail_cores-1
+        max_cores = min(avail_cores, cluster_tasks, self.num_frames) if cluster_tasks else min(avail_cores-1, self.num_frames)
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
-        print(f"Inputs before: {self.sampler_inputs}")
         self.init_samplers(self.sampler_inputs, process_id=-1)
-        print(f"Inputs after: {self.sampler_inputs}")
 
         if is_parallel and num_cores > 1:
             frames_per_core = np.array_split(self.frames, num_cores)

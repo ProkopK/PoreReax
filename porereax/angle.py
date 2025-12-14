@@ -144,31 +144,9 @@ class AngleSampler(AtomSampler):
                 num_angles = np.sum(data_list[identifier]["num_angles"])
                 combined_data[identifier]["num_frames"] = num_frames
                 combined_data[identifier]["num_angles"] = num_angles
-                combined_data[identifier]["mean_angle"] = np.sum(data_list[identifier]["mean_angle"]) / num_angles if num_angles > 0 else np.nan
+                combined_data[identifier]["mean"] = np.sum(data_list[identifier]["mean_angle"]) / num_angles if num_angles > 0 else np.nan
                 combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins) # TODO check normalization
-                combined_data[identifier]["std_angle"] = 0 # TODO: fix std calculation
+                combined_data[identifier]["std_mean"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["std_hist"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
         utils.save_object(combined_data, self.folder + "/combined.obj")
-
-
-def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
-    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
-
-    if data["input_params"]["dimension"] != "Histogram":
-        
-        return
-    for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
-        if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
-            continue
-        bin_edges = data[identifier]["bin_edges"]
-        hist = data[identifier]["hist"]
-        std_hist = data[identifier]["std_hist"] if std else None
-        mean_value = data[identifier]["mean_angle"] if mean else None
-        utils.plot_hist(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist, mean_value)
-
-    ax.set_xlabel("Angle (degrees)")
-    ax.set_ylabel("Counts / frame") # TODO check normalization

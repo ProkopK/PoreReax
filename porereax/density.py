@@ -14,6 +14,7 @@ It provides:
 import numpy as np
 from porereax.meta_sampler import BondSampler, AtomSampler
 import porereax.utils as utils
+import porereax.plot as plot_utils
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
@@ -210,8 +211,32 @@ class DensitySampler(AtomSampler):
         utils.save_object(combined_data, self.folder + "/combined.obj")
 
 
-def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
-    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+def plot_1d(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
+    """
+    Plot 1D density histogram from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    axis : Axes or bool, optional
+        Matplotlib Axes to plot on. If True, a new figure and axes are created.
+    identifiers : list, optional
+        List of molecule identifiers to plot. If empty, all identifiers are plotted.
+    colors : list, optional
+        List of colors for plotting.
+    std : bool, optional
+        Whether to plot standard deviation error bars.
+    mean : bool, optional
+        Whether to plot mean lines.
+    plot_kwargs : dict, optional
+        Additional keyword arguments for the plot function.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax, data, identifiers, colors = plot_utils.plot_setup(link_data, axis, identifiers, colors)
 
     if data["input_params"]["dimension"] != "Cartesian1D":
         print("Data dimension is not 'Cartesian1D'. Cannot plot histogram.")
@@ -231,7 +256,23 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     ax.set_ylabel("Density / atoms")
 
 def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=50):
-    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    """
+    Plot density over time from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file created by a sampler instance.
+    axis : Axes or bool, optional
+        Axis to plot on or True to create a new one. Default is True.
+    identifiers : list, optional
+        List of identifiers to plot (default is an empty list, which means all identifiers).
+    colors : list, optional
+        List of colors to use for plotting (default is an empty list, which uses default colors).
+    dt : int, optional
+        Time interval between frames in femtoseconds (default is 50 fs).
+    """
+    fig, ax, data, identifiers, colors = plot_utils.plot_setup(link_data, axis, identifiers, colors)
     if data["input_params"]["dimension"] != "Time":
         return
     for i, identifier in enumerate(identifiers):

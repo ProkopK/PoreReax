@@ -58,34 +58,9 @@ class BondLengthSampler(BondSampler):
                 std_hist = np.std(data_list[identifier]["hist"], axis=0)
                 combined_data[identifier]["num_frames"] = num_frames
                 combined_data[identifier]["num_bonds"] = num_bonds
-                combined_data[identifier]["mean_bond_length"] = mean_bond_length
+                combined_data[identifier]["mean"] = mean_bond_length
                 combined_data[identifier]["hist"] = hist
                 combined_data[identifier]["std_hist"] = std_hist
+                combined_data[identifier]["std_mean"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
         utils.save_object(combined_data, self.folder + "/combined.obj")
-
-
-def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, density=False, plot_kwargs = {}):
-    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
-
-    if data["input_params"]["dimension"] != "Histogram":
-        return
-    for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
-        if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
-            continue
-        bin_edges = data[identifier]["bin_edges"]
-        hist = data[identifier]["hist"]
-        print("Raw histogram data for ", identifier, ": ", hist)
-        if density:
-            hist = hist / data[identifier]["num_bonds"]
-        std_hist = data[identifier]["std_hist"] if std else None
-        mean_value = data[identifier]["mean_bond_length"] if mean else None
-        utils.plot_hist(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist, mean_value)
-    ax.set_xlabel("Bond Length / Angstrom")
-    if density == False:
-        ax.set_ylabel("Counts")
-    else:
-        ax.set_ylabel("Counts per Atom")
