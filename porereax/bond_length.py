@@ -1,7 +1,6 @@
 import numpy as np
 from porereax.meta_sampler import BondSampler
 import porereax.utils as utils
-from matplotlib.axes import Axes
 
 
 class BondLengthSampler(BondSampler):

@@ -211,7 +211,7 @@ class DensitySampler(AtomSampler):
         utils.save_object(combined_data, self.folder + "/combined.obj")
 
 
-def plot_1d(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
+def plot_1d_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
     """
     Plot 1D density histogram from sampled data.
 
@@ -250,7 +250,7 @@ def plot_1d(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [
         bin_edges = data[identifier]["bin_edges"]
         hist = data[identifier]["hist"]
         std_hist = data[identifier]["std_hist"] if std else None
-        utils.plot_hist(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
+        plot_utils.plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
 
     ax.set_xlabel(f"{data['input_params']['direction']} Position / nm")
     ax.set_ylabel("Density / atoms")
@@ -324,4 +324,3 @@ def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
         plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
     plt.axis('scaled')
     plt.colorbar(label='Density / atoms')
-    plt.show()

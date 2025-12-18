@@ -6,6 +6,7 @@ import porereax.density as density
 import porereax.charge as charge
 import porereax.angle as angle
 import porereax.bond_length as bond_length
+import porereax.bond_structure as bond_structure
 
 from porereax.sample import Sample
 
@@ -20,6 +21,7 @@ __all__ = [
     "charge",
     "angle",
     "bond_length",
+    "bond_structure",
     "Sample",
     "__version__",
 ]

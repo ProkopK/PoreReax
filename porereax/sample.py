@@ -20,6 +20,7 @@ from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
+from porereax.bond_structure import BondStructureSampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -98,7 +99,8 @@ class Sample:
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": [],
                                "angle_samplers": [],
-                               "bond_length_samplers": [],}
+                               "bond_length_samplers": [],
+                               "bond_structure_samplers": [],}
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -298,6 +300,21 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
+    def add_bond_structure_sampling(self, name_out, dimension):
+        """
+        Add a BondStructureSampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "BondStructure".
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,}
+        self.sampler_inputs["bond_structure_samplers"].append(inputs)
+
     def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
@@ -370,6 +387,15 @@ class Sample:
                                                          num_bins=sampler["num_bins"],
                                                          range=sampler["range"])
                     add_bond_sampler(sampler_instance)
+                elif sampler_type == "bond_structure_samplers":
+                    sampler_instance = BondStructureSampler(name_out=sampler["name_out"],
+                                                            dimension=sampler["dimension"],
+                                                            process_id=process_id,
+                                                            atom_lib=self.name_to_type, 
+                                                            masses=self.masses,
+                                                            num_frames=self.num_frames,
+                                                            box=self.box)
+                    add_atom_sampler(sampler_instance)
 
     def sample(self, is_parallel=True, num_cores=0):
         """
@@ -600,6 +626,11 @@ class Sample:
                                    positions=atom_positions,
                                    bond_index=bond_idx,
                                    bond_topology=bond_topology)
+                elif isinstance(sampler, BondStructureSampler):
+                    sampler.sample(frame=frame_idx-self.start_frame,
+                                   bond_enum=bond_enum,
+                                   bond_topology=bond_topology,
+                                   atom_types=atom_types)
                 else:
                     print(f"Unknown sampler type: {type(sampler)}. Skipping...")
 

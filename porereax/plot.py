@@ -45,7 +45,7 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
 
     return fig, ax, data, identifiers, colors
 
-def plot_hist(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, std_mean: float = None):
+def plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, std_mean: float = None):
     """
     Plot a histogram curve on the given axis.
 
@@ -108,7 +108,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     -------
     None
     """
-    fig, ax, data, identifiers, colors = utils.plot_setup(link_data, axis, identifiers, colors)
+    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
 
     sampler_type = data["input_params"]["sampler_type"]
     if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler"]:
@@ -143,7 +143,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         std_hist = data[identifier]["std_hist"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
         std_mean = data[identifier]["std_mean"] if std and mean else None
-        utils.plot_hist(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
+        plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
     ax.set_xlabel(x_label)
     if density == False:
         ax.set_ylabel("Counts")
