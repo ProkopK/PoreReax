@@ -176,7 +176,7 @@ class Sample:
         if first_frame.particles.count == 0:
             raise ValueError("No particles found in the trajectory file.")
         if first_frame.particles.bonds is None:
-            raise ValueError("No bonds found. Ensure bond_file is provided of the trajectory contains bond data.")
+            raise ValueError("No bonds found. Ensure bond_file is provided or the trajectory contains bond data.")
 
         num_particles = first_frame.particles.count
         num_frames = pipeline.source.num_frames
@@ -542,10 +542,10 @@ class Sample:
             print(f"Processing frame {frame_idx}...")
             frame = self.pipeline.compute(frame_idx)
             atom_types = frame.particles.particle_types.array
-            atom_charges = frame.particles["Charge"].array
-            atom_identifiers = frame.particles.identifiers.array
+            atom_charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(self.num_particles)
+            atom_identifiers = frame.particles.identifiers.array if frame.particles.identifiers is not None else np.arange(self.num_particles)
             atom_positions = frame.particles.positions.array
-            atom_velocities = frame.particles.velocities.array
+            # atom_velocities = frame.particles.velocities.array
             bond_count = frame.particles.bonds.count
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
