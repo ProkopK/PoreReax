@@ -548,6 +548,7 @@ class Sample:
             # atom_velocities = frame.particles.velocities.array
             bond_count = frame.particles.bonds.count
             bond_topology = frame.particles.bonds.topology.array
+            bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(bond_count)
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
             # Reset molecule indices
@@ -613,6 +614,7 @@ class Sample:
                                bond_index=bond_idx,
                                bond_enum=bond_enum,
                                bond_topology=bond_topology,
+                               bond_orders=bond_orders,
                 )
 
         for sampler in self.samplers:

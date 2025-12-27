@@ -121,15 +121,17 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         y_label = "Counts per Atom"
     elif sampler_type == "BondLengthSampler":
         density_normalization = "num_bonds"
-        x_label = "Bond Length / Angstrom"
         y_label = "Counts per Bond"
+        if data["input_params"]["dimension"] == "Bond Order":
+            x_label = "Bond Order"
+        elif data["input_params"]["dimension"] == "Bond Length":
+            x_label = "Bond Length / Angstrom"
+            
     elif sampler_type == "AngleSampler":
         density_normalization = "num_angles"
         x_label = "Angle / degrees"
         y_label = "Counts per Angle"
 
-    if data["input_params"]["dimension"] != "Histogram":
-        return
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
             continue
