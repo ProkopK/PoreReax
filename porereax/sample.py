@@ -604,35 +604,16 @@ class Sample:
 
             # Sampling
             for sampler in self.samplers:
-                if isinstance(sampler, ChargeSampler):
-                    sampler.sample(frame=frame_idx-self.start_frame,
-                                   charges=atom_charges,
-                                   mol_index=molecule_idx)
-                elif isinstance(sampler, DensitySampler):
-                    sampler.sample(frame=frame_idx-self.start_frame,
-                                   positions=atom_positions,
-                                   mol_index=molecule_idx,
-                                   charges=atom_charges,
-                                   mol_bonds=molecule_bonds,
-                                   types=atom_types)
-                elif isinstance(sampler, AngleSampler):
-                    sampler.sample(frame=frame_idx-self.start_frame,
-                                   positions=atom_positions,
-                                   mol_index=molecule_idx,
-                                   mol_bonds=molecule_bonds,
-                                   types=atom_types)
-                elif isinstance(sampler, BondLengthSampler):
-                    sampler.sample(frame=frame_idx-self.start_frame,
-                                   positions=atom_positions,
-                                   bond_index=bond_idx,
-                                   bond_topology=bond_topology)
-                elif isinstance(sampler, BondStructureSampler):
-                    sampler.sample(frame=frame_idx-self.start_frame,
-                                   bond_enum=bond_enum,
-                                   bond_topology=bond_topology,
-                                   atom_types=atom_types)
-                else:
-                    print(f"Unknown sampler type: {type(sampler)}. Skipping...")
+                sampler.sample(frame=frame_idx-self.start_frame,
+                               positions=atom_positions,
+                               charges=atom_charges,
+                               mol_index=molecule_idx,
+                               mol_bonds=molecule_bonds,
+                               atom_types=atom_types,
+                               bond_index=bond_idx,
+                               bond_enum=bond_enum,
+                               bond_topology=bond_topology,
+                )
 
         for sampler in self.samplers:
             input_params, data = sampler.get_data()

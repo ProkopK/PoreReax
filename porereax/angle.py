@@ -63,7 +63,7 @@ class AngleSampler(AtomSampler):
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"num_frames": 0, "num_angles": 0, "mean_angle": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, mol_bonds: dict, types: np.ndarray):
+    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, mol_bonds: dict, atom_types: np.ndarray, **parameters):
         """
         Sample angles for the given frame.
 
@@ -77,7 +77,7 @@ class AngleSampler(AtomSampler):
             Dictionary mapping molecule identifiers to atom indices.
         mol_bonds : dict
             Dictionary mapping molecule identifiers to all atoms the central atom is bonded to.
-        types : np.ndarray
+        atom_types : np.ndarray
             Array of atomic types.
         """
         for identifier, bonds_info in self.molecules.items():
@@ -92,7 +92,7 @@ class AngleSampler(AtomSampler):
                 atom_c_type = self.angle[2]
                 if bonds_info["atom"] != atom_b_type:
                     continue
-                bonded_types = types[bonded_atoms]
+                bonded_types = atom_types[bonded_atoms]
             for i in range(bonded_atoms.shape[1]):
                 for j in range(bonded_atoms.shape[1]):
                     if i == j:

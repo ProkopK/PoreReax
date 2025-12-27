@@ -99,20 +99,13 @@ class DensitySampler(AtomSampler):
                 self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
                 self.data[identifier]["direction"] = dir_indices
 
-    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray, mol_bonds: dict, types: np.ndarray):
+    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray, mol_bonds: dict, **parameters):
         """
         Sample atomic densities for the given frame.
 
         Parameters
         ----------
-        frame : int
-            Current frame number.
-        positions : np.ndarray
-            Array of atomic positions.
-        mol_index : dict
-            Mapping of molecule identifiers to atom indices.
-        charges : np.ndarray
-            Array of atomic charges.
+
         """
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
@@ -123,7 +116,7 @@ class DensitySampler(AtomSampler):
                 charge_mask = (atom_charges >= min_charge) & (atom_charges <= max_charge)
                 atom_indices = atom_indices[charge_mask]
             if "Angle" in self.conditions:
-                angles = self.__get_atom_angles(atom_indices, positions, mol_bonds[identifier], types)
+                angles = self.__get_atom_angles(atom_indices, positions, mol_bonds[identifier])
                 min_angle, max_angle = self.conditions["Angle"]
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
                 angle_mask = np.any(angle_mask, axis=1)
@@ -141,7 +134,7 @@ class DensitySampler(AtomSampler):
                 hist, _, _ = np.histogram2d(atom_positions[:, dir_x], atom_positions[:, dir_y], bins=self.num_bins, range=[[0.0, self.box[dir_x]], [0.0, self.box[dir_y]]])
                 self.data[identifier]["hist"] += hist
 
-    def __get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray, types: np.ndarray):
+    def __get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
         """
         Calculate angles for atoms based on their bonded neighbors.
 
@@ -153,8 +146,6 @@ class DensitySampler(AtomSampler):
             Array of atomic positions.
         bonded_atoms : np.ndarray
             Array of bonded atom indices for each central atom.
-        types : np.ndarray
-            Array of atomic types.
 
         Returns
         -------

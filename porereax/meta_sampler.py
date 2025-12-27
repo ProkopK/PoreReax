@@ -81,7 +81,7 @@ class Sampler:
         return self.input, self.data
 
     def sample(self, **parameters):
-        pass
+        print(f"Unknown sampler type: {type(self.__class__.__name__)}. Skipping...")
 
     def join_samplers(self, num_cores):
         """

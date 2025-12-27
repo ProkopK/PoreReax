@@ -20,7 +20,7 @@ class BondStructureSampler(Sampler):
             for atom_type in atom_lib.values():
                 self.data["structure_counts"][atom_type] = {}
 
-    def sample(self, frame: int, bond_enum, bond_topology: np.ndarray, atom_types: np.ndarray):
+    def sample(self, frame: int, bond_enum, bond_topology: np.ndarray, atom_types: np.ndarray, **parameters):
         if self.dimension == "BondStructure":
             for atom_type in self.data["structure_counts"]:
                 atoms = np.where(atom_types == atom_type)[0]

@@ -64,7 +64,7 @@ class ChargeSampler(AtomSampler):
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame: int, charges: np.ndarray, mol_index: dict):
+    def sample(self, frame: int, charges: np.ndarray, mol_index: dict, **parameters):
         """
         Sample charges for the current frame.
 

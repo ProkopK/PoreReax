@@ -27,7 +27,7 @@ class BondLengthSampler(BondSampler):
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean_bond_length": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame: int, positions: np.ndarray, bond_index: dict, bond_topology: np.ndarray):
+    def sample(self, frame: int, positions: np.ndarray, bond_index: dict, bond_topology: np.ndarray, **parameters):
         for identifier in self.bonds:
             bonds = bond_topology[bond_index[identifier]]
             if bonds.size == 0:
