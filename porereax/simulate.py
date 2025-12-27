@@ -4,19 +4,18 @@
 """Module to convert GROMACS .gro files to LAMMPS data files."""               #
 ################################################################################
 
-import numpy as np
 import os
-import sys
-from jinja2 import Template, Environment, FileSystemLoader
+from jinja2 import Template
 
 
 class Simulate():
-    def __init__(self, gro_lib, gro_charges, atom_masses, atom_lib, poreSim_structure=True, structure_file=None):
+    def __init__(self, gro_lib, gro_charges, atom_masses, poreSim_structure=True, structure_file=None):
         self.path = os.getcwd()
-        self.name = os.path.basename(self.path)
         if poreSim_structure:
-            self.structure_file = os.path.join(self.path, "nvt", "nvt.gro")
+            self.name = os.path.basename(os.path.split(self.path)[0])
+            self.structure_file = os.path.join(os.path.split(self.path)[0], "nvt", "nvt.gro")
         else:
+            self.name = os.path.basename(self.path)
             self.structure_file = structure_file
         if self.structure_file is None:
             raise ValueError("Structure file must be provided if poreSim_structure is False.")
@@ -28,10 +27,12 @@ class Simulate():
             raise ValueError("gro_lib must be provided as a dictionary mapping atom names to atom types.")
         if not all(isinstance(k, str) for k in gro_lib.keys()):
             raise ValueError("All keys in gro_lib must be strings representing atom names.")
-        if not all(isinstance(v, int) and (v >= 1 or v == -1) for v in gro_lib.values()):
-            raise ValueError("All values in gro_lib must be integers >= 1 representing atom types or -1 for ghost particles.")
+        if not all(isinstance(v, str) for v in gro_lib.values()):
+            raise ValueError("All values in gro_lib must be strings representing atom names in the reaxFF force field.")
         self.gro_lib = gro_lib
-        self.num_atom_types = max(gro_lib.values())
+        self.type_to_name = dict(enumerate(set([v for v in gro_lib.values() if v != ""]), start=1))
+        self.name_to_type = {v: k for k, v in self.type_to_name.items()}
+        self.num_atom_types = max(self.type_to_name.keys())
 
         # Validate gro_charges
         if not isinstance(gro_charges, dict):
@@ -40,31 +41,20 @@ class Simulate():
             raise ValueError("All keys in gro_charges must be strings representing atom names.")
         if not all(isinstance(v, (int, float)) for v in gro_charges.values()):
             raise ValueError("All values in gro_charges must be numbers representing charges.")
-        if not all(gro_charges.get(k, None) is not None for k in gro_lib.keys() if gro_lib[k] != -1):
-            raise ValueError("All atom names in gro_lib (except those mapped to -1) must have corresponding charges in gro_charges.")
+        if not all(gro_charges.get(k) is not None for k in gro_lib.keys() if gro_lib[k] != ""):
+            raise ValueError("All atom names in gro_lib (except those mapped to \"\") must have corresponding charges in gro_charges.")
         self.gro_charges = gro_charges
 
         # Validate atom_masses
         if not isinstance(atom_masses, dict):
             raise ValueError("atom_masses must be provided as a dictionary mapping atom types to masses.")
-        if not all(isinstance(k, int) and k >= 1 for k in atom_masses.keys()):
-            raise ValueError("All keys in atom_masses must be integers >= 1 representing atom types.")
+        if not all(isinstance(k, str) for k in atom_masses.keys()):
+            raise ValueError("All keys in atom_masses must be strings representing atom names.")
         if not all(isinstance(v, (int, float)) and v > 0 for v in atom_masses.values()):
             raise ValueError("All values in atom_masses must be positive numbers representing masses.")
-        if not all(atom_masses.get(k, None) is not None for k in range(1, self.num_atom_types + 1)):
-            raise ValueError("All atom types in gro_lib must have corresponding masses in atom_masses.")
+        if not all(atom_masses.get(v) is not None for v in self.type_to_name.values()):
+            raise ValueError("All atoms in gro_lib must have corresponding masses in atom_masses.")
         self.atom_masses = atom_masses
-
-        # Validate atom_lib
-        if not isinstance(atom_lib, dict):
-            raise ValueError("atom_lib must be provided as a dictionary mapping atom types to atom names.")
-        if not all(isinstance(k, int) and k >= 1 for k in atom_lib.keys()):
-            raise ValueError("All keys in atom_lib must be integers >= 1 representing atom types.")
-        if not all(isinstance(v, str) for v in atom_lib.values()):
-            raise ValueError("All values in atom_lib must be strings representing atom names.")
-        if not all(atom_lib.get(k, None) is not None for k in range(1, self.num_atom_types + 1)):
-            raise ValueError("All atom types in gro_lib must have corresponding names in atom_lib.")
-        self.atom_lib = atom_lib
 
         self.job_file = None
         self.force_field = None
@@ -96,38 +86,36 @@ class Simulate():
         })
 
     def generate(self):
-        # Create ReaxFF directory
-        os.makedirs(os.path.join(self.path, "reax"), exist_ok=True)
+        # Create and convert gro to lammps data
+        self.__create_input_file(os.path.join(self.path, "system.data"))
 
-        self.__create_input_file(os.path.join(self.path, "reax", "system.data"))
-
+        # Copy force field file
         if self.force_field is None:
             self.force_field = os.path.join(os.path.dirname(__file__), "templates", "reax.ffield")
             print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
-        # Copy force field file
-        os.system(f"cp {self.force_field} {os.path.join(self.path, 'reax', 'reax.ffield')}")
+        os.system(f"cp {self.force_field} {os.path.join(self.path, "reax.ffield")}")
 
         if self.job_file is None:
             self.job_file = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
         with open(self.job_file, 'r') as f:
             job_template = Template(f.read())
 
-        with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_0.lmp"), 'r') as lf:
-            lmp_initial_template = Template(lf.read())
+        with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_0.lmp"), 'r') as f:
+            lmp_initial_template = Template(f.read())
 
-        with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_n.lmp"), 'r') as lf:
-            lmp_step_template = Template(lf.read())
+        with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_n.lmp"), 'r') as f:
+            lmp_step_template = Template(f.read())
 
-        atoms = ' '.join(self.atom_lib[k] for k in range(1, self.num_atom_types + 1))
+        atoms = ' '.join(self.type_to_name[k] for k in range(1, self.num_atom_types + 1))
 
-        # Create initial LAMMPS input file and shell scripts
-        with open(os.path.join(self.path, "reax", "reax_run_0.lmp"), 'w') as f:
+        # Create initial LAMMPS input file
+        with open(os.path.join(self.path, "reax_run_0.lmp"), 'w') as f:
             file_content = lmp_initial_template.render(
                 atoms=atoms
             )
             f.write(file_content)
         # Create job file for initial run
-        with open(os.path.join(self.path, "reax", "reax_run_0.job"), 'w') as f:
+        with open(os.path.join(self.path, "reax_run_0.job"), 'w') as f:
             file_content = job_template.render(
                 SIMULATIONNODES=1,
                 SIMULATIONPROCS=10,
@@ -141,7 +129,7 @@ class Simulate():
 
         for step_idx, step in enumerate(self.sim):
             file_name = f"reax_run_{step_idx+1}"
-            lmp_file = os.path.join(self.path, "reax", f"{file_name}.lmp")
+            lmp_file = os.path.join(self.path, f"{file_name}.lmp")
             with open(lmp_file, 'w') as f:
                 file_content = lmp_step_template.render(
                     SIMNUMBER=step_idx + 1,
@@ -155,7 +143,7 @@ class Simulate():
                     NSTEPS=step["nsteps"]
                 )
                 f.write(file_content)
-            job_file = os.path.join(self.path, "reax", f"{file_name}.job")
+            job_file = os.path.join(self.path, f"{file_name}.job")
             with open(job_file, 'w') as f:
                 file_content = job_template.render(
                     SIMULATIONNODES=step["nodes"],
@@ -169,6 +157,15 @@ class Simulate():
                     f.write(f"\n\nsbatch reax_run_{step_idx+1}.job\n")
                 
         # Create ana files
+        with open(os.path.join(os.path.dirname(__file__), "templates", "ana.py"), 'r') as f:
+            ana_template = Template(f.read())
+        with open(os.path.join(self.path, "ana.py"), 'w') as f:
+            file_content = ana_template.render(
+                NUMSIMS=len(self.sim),
+                NAME_TO_TYPE=self.name_to_type,
+                ATOM_MASSES=self.atom_masses,
+            )
+            f.write(file_content)
 
     def __line_mapper(self, line):
         """
@@ -263,12 +260,12 @@ class Simulate():
         file.write("\nAtoms\n\n")
         for i, data in enumerate(gro_data):
             res_id, _, atom_name, x, y, z, _, _, _ = data
-            atom_type = self.gro_lib.get(atom_name)
+            atom_type = self.name_to_type.get(self.gro_lib.get(atom_name))
             charge = self.gro_charges.get(atom_name)
             if atom_type is None:
-                raise ValueError(f"Atom name '{atom_name}' not found in atom library.")
+                raise ValueError(f"Atom name '{atom_name}' not found in gro_lib.")
             if charge is None:
-                raise ValueError(f"Charge for atom name '{atom_name}' with type '{atom_type}' not found in atom charges.")
+                raise ValueError(f"Charge for atom name '{atom_name}' not found in gro_charges.")
             charge_count += charge
             atom_count[atom_type] += 1
             file.write(f"{i+1:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} {y:8.3f} {z:8.3f}\n")
@@ -280,7 +277,7 @@ class Simulate():
         print(f"Total charge in system: {charge_count:.4f}e")
         print("Atom counts by type:")
         for atom_type, count in atom_count.items():
-            print(f"  Type {atom_type}: {count} atoms")
+            print(f"  Type {self.type_to_name[atom_type]}: {count} atoms")
 
     def __create_input_file(self, file_path):
         """
@@ -291,7 +288,7 @@ class Simulate():
             Path to the output LAMMPS data file.
         """
         box_dims, gro_data = self.__read_gro_file()
-        gro_data = [data for data in gro_data if self.gro_lib.get(data[2], 0) != -1] # Filter out ghost particles e.g. from tip4p water model     
+        gro_data = [data for data in gro_data if self.gro_lib.get(data[2], 0) != ""] # Filter out ghost particles e.g. from tip4p water model     
         num_atoms = len(gro_data)
         with open(file_path, 'w') as file:
             self.__write_lammps_header(file, num_atoms, box_dims)
