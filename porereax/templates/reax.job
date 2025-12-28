@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes={{ SIMULATIONNODES }}
-#SBATCH --ntasks-per-node={{ SIMULATIONPROCS }}
+#SBATCH --ntasks-per-node={{ SIMULATIONTASKSPERNODE }}
 #SBATCH --time={{ SIMULATIONTIME }}
 #SBATCH --job-name={{ SIMULATIONLABEL }}
 #SBATCH --error=%x_%j.err
@@ -11,4 +11,4 @@ module purge
 . /opt/bwhpc/common/etc/easybuild/enable_eb_modules
 module load LAMMPS/2Aug2023_update2-foss-2023a-kokkos
 
-mpirun lmp -in {{ FILENAME }}.lmp -log {{ FILENAME }}.log -k on -sf kk -pk kokkos neigh half newton on comm host
+{{ LAMMPS_COMMAND }}

@@ -157,7 +157,6 @@ class Sample:
         """
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
-        from ovito.data import BondsEnumerator
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
@@ -542,13 +541,13 @@ class Sample:
             print(f"Processing frame {frame_idx}...")
             frame = self.pipeline.compute(frame_idx)
             atom_types = frame.particles.particle_types.array
-            atom_charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(self.num_particles)
-            atom_identifiers = frame.particles.identifiers.array if frame.particles.identifiers is not None else np.arange(self.num_particles)
-            atom_positions = frame.particles.positions.array
+            # atom_charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(self.num_particles)
+            # atom_identifiers = frame.particles.identifiers.array if frame.particles.identifiers is not None else np.arange(self.num_particles)
+            # atom_positions = frame.particles.positions.array
             # atom_velocities = frame.particles.velocities.array
             bond_count = frame.particles.bonds.count
             bond_topology = frame.particles.bonds.topology.array
-            bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(bond_count)
+            # bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(bond_count)
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
             # Reset molecule indices
@@ -606,16 +605,25 @@ class Sample:
             # Sampling
             for sampler in self.samplers:
                 sampler.sample(frame=frame_idx-self.start_frame,
-                               positions=atom_positions,
-                               charges=atom_charges,
                                mol_index=molecule_idx,
                                mol_bonds=molecule_bonds,
-                               atom_types=atom_types,
                                bond_index=bond_idx,
+                               particles=frame.particles,
                                bond_enum=bond_enum,
-                               bond_topology=bond_topology,
-                               bond_orders=bond_orders,
                 )
+            # # Sampling
+            # for sampler in self.samplers:
+            #     sampler.sample(frame=frame_idx-self.start_frame,
+            #                    mol_index=molecule_idx,
+            #                    mol_bonds=molecule_bonds,
+            #                    bond_index=bond_idx,
+            #                    positions=atom_positions,
+            #                    charges=atom_charges,
+            #                    atom_types=atom_types,
+            #                    bond_enum=bond_enum,
+            #                    bond_topology=bond_topology,
+            #                    bond_orders=bond_orders,
+            #     )
 
         for sampler in self.samplers:
             input_params, data = sampler.get_data()

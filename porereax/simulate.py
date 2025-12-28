@@ -9,16 +9,14 @@ from jinja2 import Template
 
 
 class Simulate():
-    def __init__(self, gro_lib, gro_charges, atom_masses, poreSim_structure=True, structure_file=None):
+    def __init__(self, gro_lib, gro_charges, atom_masses, structure_file=None):
         self.path = os.getcwd()
-        if poreSim_structure:
+        if structure_file is None:
             self.name = os.path.basename(os.path.split(self.path)[0])
             self.structure_file = os.path.join(os.path.split(self.path)[0], "nvt", "nvt.gro")
         else:
             self.name = os.path.basename(self.path)
             self.structure_file = structure_file
-        if self.structure_file is None:
-            raise ValueError("Structure file must be provided if poreSim_structure is False.")
         if not os.path.isfile(self.structure_file):
             raise FileNotFoundError(f"Structure file {self.structure_file} not found.")
 
@@ -57,13 +55,17 @@ class Simulate():
         self.atom_masses = atom_masses
 
         self.job_file = None
+        self.submit_cmd = None
         self.force_field = None
         self.force_field_atoms = None
         self.sim = []
 
-    def add_job_file(self, file_path):
+    def add_job_file(self, file_path, sumbit_command):
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Job file {file_path} not found.")
+        if not isinstance(sumbit_command, str) or sumbit_command == "":
+            raise ValueError("submit_cmd must be a not empty string.")
+        self.submit_cmd = sumbit_command
         self.job_file = file_path
 
     def add_force_field(self, force_field):
@@ -97,6 +99,7 @@ class Simulate():
 
         if self.job_file is None:
             self.job_file = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
+            self.submit_cmd = "sbatch"
         with open(self.job_file, 'r') as f:
             job_template = Template(f.read())
 
@@ -118,14 +121,14 @@ class Simulate():
         with open(os.path.join(self.path, "reax_run_0.job"), 'w') as f:
             file_content = job_template.render(
                 SIMULATIONNODES=1,
-                SIMULATIONPROCS=10,
+                SIMULATIONTASKSPERNODE=10,
                 SIMULATIONTIME="0:30:00",
                 SIMULATIONLABEL=f"{self.name}_initial",
-                FILENAME="reax_run_0"
+                LAMMPS_COMMAND="mpirun lmp -in reax_run_0.lmp -log reax_run_0.log -k on -sf kk -pk kokkos neigh half newton on comm host",
             )
             f.write(file_content)
             if self.sim:
-                f.write(f"\n\nsbatch reax_run_1.job\n")
+                f.write(f"\n\n{self.submit_cmd} reax_run_1.job\n")
 
         for step_idx, step in enumerate(self.sim):
             file_name = f"reax_run_{step_idx+1}"
@@ -147,14 +150,14 @@ class Simulate():
             with open(job_file, 'w') as f:
                 file_content = job_template.render(
                     SIMULATIONNODES=step["nodes"],
-                    SIMULATIONPROCS=step["tasks_per_node"],
+                    SIMULATIONTASKSPERNODE=step["tasks_per_node"],
                     SIMULATIONTIME=["wall_time"],
                     SIMULATIONLABEL=f"{self.name}_run_{step_idx+1}",
-                    FILENAME=f"reax_run_{step_idx+1}",
+                    LAMMPS_COMMAND=f"mpirun lmp -in reax_run_{step_idx+1}.lmp -log reax_run_{step_idx+1}.log -k on -sf kk -pk kokkos neigh half newton on comm host",
                 )
                 f.write(file_content)
                 if step_idx+1<len(self.sim):
-                    f.write(f"\n\nsbatch reax_run_{step_idx+1}.job\n")
+                    f.write(f"\n\n{self.submit_cmd} reax_run_{step_idx+1}.job\n")
                 
         # Create ana files
         with open(os.path.join(os.path.dirname(__file__), "templates", "ana.py"), 'r') as f:

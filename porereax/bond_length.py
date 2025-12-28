@@ -27,7 +27,10 @@ class BondLengthSampler(BondSampler):
             if self.dimension in ["Bond Length", "Bond Order"]:
                 self.data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame: int, positions: np.ndarray, bond_index: dict, bond_topology: np.ndarray, bond_orders: np.ndarray, **parameters):
+    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
+        bond_topology = particles.bonds.topology.array
+        positions = particles.positions.array
+        bond_orders = particles.get("Bond Order").array if "Bond Order" in particles else np.zeros(particles.bonds.count)
         for identifier in self.bonds:
             bonds = bond_topology[bond_index[identifier]]
             if bonds.size == 0:

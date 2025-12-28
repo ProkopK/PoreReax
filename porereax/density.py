@@ -99,14 +99,9 @@ class DensitySampler(AtomSampler):
                 self.data[identifier] = {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
                 self.data[identifier]["direction"] = dir_indices
 
-    def sample(self, frame: int, positions: np.ndarray, mol_index: dict, charges: np.ndarray, mol_bonds: dict, **parameters):
-        """
-        Sample atomic densities for the given frame.
-
-        Parameters
-        ----------
-
-        """
+    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
+        charges = particles.get("Charge").array if "Charge" in frame.particles else np.zeros(particles.count)
+        positions = particles.positions.array
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
             # Apply conditions
