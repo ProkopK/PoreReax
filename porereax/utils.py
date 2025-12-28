@@ -15,7 +15,7 @@ import numpy as np
 def save_object(obj, filename):
     """
     Save a Python object to a file using pickle.
-    
+
     Parameters
     ----------
     obj : any
@@ -29,12 +29,12 @@ def save_object(obj, filename):
 def load_object(filename):
     """
     Load a Python object from a file using pickle.
-    
+
     Parameters
     ----------
     filename : str
         The path to the file from which the object will be loaded.
-        
+
     Returns
     -------
     any
@@ -42,7 +42,7 @@ def load_object(filename):
     """
     with open(filename, 'rb') as f:
         return pickle.load(f)
-    
+
 def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
     """
     Apply the minimal image convention to a vector given the simulation box dimensions.

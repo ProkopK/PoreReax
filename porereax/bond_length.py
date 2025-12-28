@@ -13,7 +13,7 @@ class BondLengthSampler(BondSampler):
             raise ValueError(f"BondLengthSampler does not support dimension {dimension}")
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("BondLengthSampler requires a positive integer 'num_bins' parameter.")
-        if (not isinstance(range, (list, tuple)) or 
+        if (not isinstance(range, (list, tuple)) or
                 len(range) != 2 or
                 range[0] >= range[1]):
             raise ValueError("BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")

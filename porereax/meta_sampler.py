@@ -70,7 +70,7 @@ class Sampler:
     def get_data(self):
         """
         Retrieve the input parameters and sampled data.
-        
+
         Returns
         -------
         input : dict
@@ -108,7 +108,7 @@ class Sampler:
                             data_list[identifier][key] = []
                         data_list[identifier][key].append(value)
         return data_list
-    
+
     def permutate_bonds(self, bonds, atom_lib):
         """
         Generate all permutations of bonded atom types, considering 'X' as wildcard.
@@ -143,7 +143,7 @@ class Sampler:
                     seen_permutations.add(perm)
                     bond_permutations.append(list(perm))
         return bond_permutations
-    
+
     def build_mol_dictionary(self, atom, bonds, atom_lib):
         """
         Build molecule dictionary for sampling.
@@ -196,7 +196,7 @@ class AtomSampler(Sampler):
     def __init__(self, name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, **parameters):
         """
         Sampler for atoms with optional bonded atoms.
-        
+
         Parameters
         ----------
         name_out : str

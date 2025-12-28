@@ -9,13 +9,12 @@ sampling parameters, and execute the sampling process either in parallel or
 serially.
 """
 
-
 import numpy as np
 import multiprocessing as mp
 import os
 import sys
-
 import porereax.utils as utils
+
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler
 from porereax.angle import AngleSampler
@@ -28,6 +27,7 @@ class Sample:
     """
     Class to manage sampling of molecular trajectories.
     """
+
     def __init__(self, atom_lib, masses, trajectory_file, bond_file=None, system=None, start_end_nthframe=(0, -1, 1)):
         """
         Initialize Sample instance.
@@ -123,7 +123,7 @@ class Sample:
         # Validate start and end frame values
         if (start_frame < 0) or (end_frame < -1) or (start_frame > end_frame and end_frame != -1) or (start_frame >= num_frames) or (end_frame >= num_frames):
             raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
-        
+
         self.start_frame = start_frame
         self.end_frame = end_frame if end_frame != -1 else num_frames - 1
         self.nth_frame = nth_frame
@@ -317,7 +317,7 @@ class Sample:
     def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
-        
+
         Parameters
         ----------
         sampler_inputs : dict
@@ -342,7 +342,7 @@ class Sample:
                                                      dimension=sampler["dimension"],
                                                      atoms=sampler["atoms"],
                                                      process_id=process_id,
-                                                     atom_lib=self.name_to_type, 
+                                                     atom_lib=self.name_to_type,
                                                      masses=self.masses,
                                                      num_frames=self.num_frames,
                                                      box=self.box,
@@ -354,7 +354,7 @@ class Sample:
                                                       dimension=sampler["dimension"],
                                                       atoms=sampler["atoms"],
                                                       process_id=process_id,
-                                                      atom_lib=self.name_to_type, 
+                                                      atom_lib=self.name_to_type,
                                                       masses=self.masses,
                                                       num_frames=self.num_frames,
                                                       box=self.box,
@@ -367,7 +367,7 @@ class Sample:
                                                     dimension=sampler["dimension"],
                                                     atoms=sampler["atoms"],
                                                     process_id=process_id,
-                                                    atom_lib=self.name_to_type, 
+                                                    atom_lib=self.name_to_type,
                                                     masses=self.masses,
                                                     num_frames=self.num_frames,
                                                     box=self.box,
@@ -379,7 +379,7 @@ class Sample:
                                                          dimension=sampler["dimension"],
                                                          bonds=sampler["bonds"],
                                                          process_id=process_id,
-                                                         atom_lib=self.name_to_type, 
+                                                         atom_lib=self.name_to_type,
                                                          masses=self.masses,
                                                          num_frames=self.num_frames,
                                                          box=self.box,
@@ -390,7 +390,7 @@ class Sample:
                     sampler_instance = BondStructureSampler(name_out=sampler["name_out"],
                                                             dimension=sampler["dimension"],
                                                             process_id=process_id,
-                                                            atom_lib=self.name_to_type, 
+                                                            atom_lib=self.name_to_type,
                                                             masses=self.masses,
                                                             num_frames=self.num_frames,
                                                             box=self.box)

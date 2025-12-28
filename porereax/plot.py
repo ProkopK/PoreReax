@@ -20,7 +20,7 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
         List of identifiers to plot (default is an empty list, which means all identifiers).
     colors : list, optional
         List of colors to use for plotting (default is an empty list, which uses default colors
-    
+
     Returns
     -------
     fig : matplotlib.figure.Figure
@@ -114,7 +114,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler"]:
         print(f"Warning: plot_hist is not implemented for sampler type {sampler_type}.")
         return
-    
+
     if sampler_type == "ChargeSampler":
         density_normalization = "num_atoms"
         x_label = "Charge / e"
@@ -126,7 +126,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
             x_label = "Bond Order"
         elif data["input_params"]["dimension"] == "Bond Length":
             x_label = "Bond Length / Angstrom"
-            
+
     elif sampler_type == "AngleSampler":
         density_normalization = "num_angles"
         x_label = "Angle / degrees"
