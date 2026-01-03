@@ -119,6 +119,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         density_normalization = "num_atoms"
         x_label = "Charge / e"
         y_label = "Counts per Atom"
+
     elif sampler_type == "BondLengthSampler":
         density_normalization = "num_bonds"
         y_label = "Counts per Bond"
@@ -151,3 +152,117 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         ax.set_ylabel("Counts")
     else:
         ax.set_ylabel(y_label)
+
+def plot_1d_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
+    """
+    Plot 1D density histogram from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    axis : Axes or bool, optional
+        Matplotlib Axes to plot on. If True, a new figure and axes are created.
+    identifiers : list, optional
+        List of molecule identifiers to plot. If empty, all identifiers are plotted.
+    colors : list, optional
+        List of colors for plotting.
+    std : bool, optional
+        Whether to plot standard deviation error bars.
+    mean : bool, optional
+        Whether to plot mean lines.
+    plot_kwargs : dict, optional
+        Additional keyword arguments for the plot function.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
+
+    if data["input_params"]["dimension"] != "Cartesian1D":
+        print("Data dimension is not 'Cartesian1D'. Cannot plot histogram.")
+        return
+    for i, identifier in enumerate(identifiers):
+        if identifier == "input_params":
+            continue
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+        bin_edges = data[identifier]["bin_edges"]
+        hist = data[identifier]["hist"]
+        std_hist = data[identifier]["std_hist"] if std else None
+        plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
+
+    ax.set_xlabel(f"{data['input_params']['direction']} Position / nm")
+    ax.set_ylabel("Density / atoms")
+
+def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=50):
+    """
+    Plot density over time from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file created by a sampler instance.
+    axis : Axes or bool, optional
+        Axis to plot on or True to create a new one. Default is True.
+    identifiers : list, optional
+        List of identifiers to plot (default is an empty list, which means all identifiers).
+    colors : list, optional
+        List of colors to use for plotting (default is an empty list, which uses default colors).
+    dt : int, optional
+        Time interval between frames in femtoseconds (default is 50 fs).
+    """
+    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
+    if data["input_params"]["dimension"] != "Time":
+        return
+    for i, identifier in enumerate(identifiers):
+        if identifier == "input_params":
+            continue
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+        time_data = data[identifier]
+        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000  # Convert to ps
+        density_data = time_data["densities"]
+        color = colors[i % len(colors)] if colors else None
+        ax.plot(time_points, density_data, label=identifier, color=color)
+    ax.set_xlabel("Time / ps")
+    ax.set_ylabel("Density / atoms")
+
+def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
+    """
+    Plot 2D density histogram from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled density data.
+    identifier : str
+        Molecule identifier to plot.
+    """
+    data = utils.load_object(link_data)
+    if data["input_params"]["dimension"] != "Cartesian2D":
+        return
+    if identifier not in data:
+        print(f"Warning: Identifier {identifier} not found in data.")
+        return
+    density_data = data[identifier]
+    x_edges = density_data["x_edges"] / 10  # Convert to nm
+    y_edges = density_data["y_edges"] / 10  # Convert to nm
+    hist = density_data["hist"]
+
+    X, Y = np.meshgrid(x_edges, y_edges)
+    if transpose:
+        X, Y = Y, X
+    plt.figure()
+    plt.pcolormesh(X, Y, hist.T, shading='auto')
+    if transpose:
+        plt.xlabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
+        plt.ylabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
+    else:
+        plt.xlabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
+        plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
+    plt.axis('scaled')
+    plt.colorbar(label='Density / atoms')

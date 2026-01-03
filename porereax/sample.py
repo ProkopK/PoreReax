@@ -16,10 +16,10 @@ import sys
 import porereax.utils as utils
 
 from porereax.charge import ChargeSampler
-from porereax.density import DensitySampler
+from porereax.density import DensitySampler, BondDensitySampler
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
-from porereax.bond_structure import BondStructureSampler
+from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -98,9 +98,11 @@ class Sample:
 
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": [],
+                               "bond_density_samplers": [],
                                "angle_samplers": [],
                                "bond_length_samplers": [],
-                               "bond_structure_samplers": [],}
+                               "molecule_structure_samplers": [],
+                               }
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -249,6 +251,37 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
 
+    def add_bond_density_sampling(self, name_out, dimension, bonds, num_bins=200, direction="z", conditions={}):
+        """
+        Add a BondDensitySampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+        bonds : list
+            List of bonds to sample. Each bond is defined as a dictionary in the format:
+            {"bond": "a-b", "bonds_A": [...], "bonds_B": [...]} where a and b are atom identifiers,
+            and bonds_A and bonds_B are lists of atom identifiers that atoms a and b are bonded to, respectively.
+        num_bins : int, optional
+            Number of bins for position sampling. Relevant for Cartesian1D.
+        direction : str, optional
+            Direction along which to sample. For Cartesian1D, use ("x", "y", or "z").
+        conditions : dict, optional
+            Dictionary of conditions to filter bonds during sampling.
+            Supported conditions:
+            - "Bond Order": tuple (min_order, max_order) to filter bonds by bond order.
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "bonds": bonds,
+                  "num_bins": num_bins,
+                  "direction": direction,
+                  "conditions": conditions,}
+        self.sampler_inputs["bond_density_samplers"].append(inputs)
+
     def add_angle_sampling(self, name_out, dimension, atoms, num_bins=180, angle="all"):
         """
         Add an AngleSampler to the Sample instance.
@@ -299,20 +332,19 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_bond_structure_sampling(self, name_out, dimension):
+    def add_molecule_structure_sampling(self, name_out):
         """
-        Add a BondStructureSampler to the Sample instance.
+        Add a MoleculeStructureSampler to the Sample instance.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "BondStructure".
         """
+        dimension = "MoleculeStructure"
         inputs = {"name_out": name_out,
                   "dimension": dimension,}
-        self.sampler_inputs["bond_structure_samplers"].append(inputs)
+        self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
     def init_samplers(self, sampler_inputs, process_id):
         """
@@ -362,6 +394,19 @@ class Sample:
                                                       direction=sampler["direction"],
                                                       conditions=sampler["conditions"])
                     add_atom_sampler(sampler_instance)
+                elif sampler_type == "bond_density_samplers":
+                    sampler_instance = BondDensitySampler(name_out=sampler["name_out"],
+                                                          dimension=sampler["dimension"],
+                                                          bonds=sampler["bonds"],
+                                                          process_id=process_id,
+                                                          atom_lib=self.name_to_type,
+                                                          masses=self.masses,
+                                                          num_frames=self.num_frames,
+                                                          box=self.box,
+                                                          num_bins=sampler["num_bins"],
+                                                          direction=sampler["direction"],
+                                                          conditions=sampler["conditions"])
+                    add_bond_sampler(sampler_instance)
                 elif sampler_type == "angle_samplers":
                     sampler_instance = AngleSampler(name_out=sampler["name_out"],
                                                     dimension=sampler["dimension"],
@@ -386,8 +431,8 @@ class Sample:
                                                          num_bins=sampler["num_bins"],
                                                          range=sampler["range"])
                     add_bond_sampler(sampler_instance)
-                elif sampler_type == "bond_structure_samplers":
-                    sampler_instance = BondStructureSampler(name_out=sampler["name_out"],
+                elif sampler_type == "molecule_structure_samplers":
+                    sampler_instance = MoleculeStructureSampler(name_out=sampler["name_out"],
                                                             dimension=sampler["dimension"],
                                                             process_id=process_id,
                                                             atom_lib=self.name_to_type,
@@ -541,13 +586,8 @@ class Sample:
             print(f"Processing frame {frame_idx}...")
             frame = self.pipeline.compute(frame_idx)
             atom_types = frame.particles.particle_types.array
-            # atom_charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(self.num_particles)
-            # atom_identifiers = frame.particles.identifiers.array if frame.particles.identifiers is not None else np.arange(self.num_particles)
-            # atom_positions = frame.particles.positions.array
-            # atom_velocities = frame.particles.velocities.array
             bond_count = frame.particles.bonds.count
             bond_topology = frame.particles.bonds.topology.array
-            # bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(bond_count)
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
             # Reset molecule indices
@@ -611,19 +651,6 @@ class Sample:
                                particles=frame.particles,
                                bond_enum=bond_enum,
                 )
-            # # Sampling
-            # for sampler in self.samplers:
-            #     sampler.sample(frame=frame_idx-self.start_frame,
-            #                    mol_index=molecule_idx,
-            #                    mol_bonds=molecule_bonds,
-            #                    bond_index=bond_idx,
-            #                    positions=atom_positions,
-            #                    charges=atom_charges,
-            #                    atom_types=atom_types,
-            #                    bond_enum=bond_enum,
-            #                    bond_topology=bond_topology,
-            #                    bond_orders=bond_orders,
-            #     )
 
         for sampler in self.samplers:
             input_params, data = sampler.get_data()

@@ -4,18 +4,18 @@ from porereax.meta_sampler import Sampler
 import matplotlib.pyplot as plt
 
 
-class BondStructureSampler(Sampler):
+class MoleculeStructureSampler(Sampler):
     """
-    Sampler class for bond structure analysis.
+    Sampler class for molecule structure analysis.
     """
     def __init__(self, name_out: str, dimension: str, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray):
-        valid_dimensions = ["BondStructure"]
+        valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
-            raise ValueError(f"BondStructureSampler does not support dimension {dimension}")
+            raise ValueError(f"MoleculeStructureSampler does not support dimension {dimension}")
         super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box)
 
         # Setup data
-        if self.dimension == "BondStructure":
+        if self.dimension == "MoleculeStructure":
             self.data = {"num_frames": 0, "structure_counts": {}}
             for atom_type in atom_lib.values():
                 self.data["structure_counts"][atom_type] = {}
@@ -23,7 +23,7 @@ class BondStructureSampler(Sampler):
     def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
         atom_types = particles.particle_types.array
         bond_topology = particles.bonds.topology.array
-        if self.dimension == "BondStructure":
+        if self.dimension == "MoleculeStructure":
             for atom_type in self.data["structure_counts"]:
                 atoms = np.where(atom_types == atom_type)[0]
                 for atom in atoms:
@@ -75,6 +75,6 @@ def plot(link_data: str, identifier):
     counts = np.array([structure_counts[s] for s in structures]) / num_frames
     fig, ax = plt.subplots()
     ax.bar(structures, counts)
-    ax.set_xlabel("Bond Structure")
+    ax.set_xlabel("Molecule Structure")
     ax.xaxis.set_tick_params(rotation=90)
     ax.set_ylabel("Average Count per Frame")

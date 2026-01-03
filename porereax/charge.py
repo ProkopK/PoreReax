@@ -65,7 +65,7 @@ class ChargeSampler(AtomSampler):
                 self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
-        charges = particles.get("Charge").array if "Charge" in frame.particles else np.zeros(particles.count)
+        charges = particles.get("Charge").array if "Charge" in particles else np.zeros(particles.count)
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
             atom_charges = charges[atom_indices]
