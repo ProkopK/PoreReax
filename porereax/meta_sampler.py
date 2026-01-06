@@ -51,10 +51,8 @@ class Sampler:
             raise ValueError(f"{self.__class__.__name__} requires a positive integer 'num_frames' parameter.")
         if not isinstance(box, np.ndarray) or box.shape != (3,):
             raise ValueError(f"{self.__class__.__name__} requires a numpy array 'box' parameter with shape (3,).")
-        self.folder = name_out
-        if not os.path.exists(self.folder) and self.folder != "" and process_id == -1:
-            os.makedirs(self.folder)
-        self.file_out = self.folder + f"/proc_{process_id}.pkl"
+        self.name_out = name_out
+        self.file_out = name_out + f"_proc_{process_id}.pkl"
         self.dimension = dimension
         self.process_id = process_id
         self.atom_lib = atom_lib
@@ -67,18 +65,9 @@ class Sampler:
         self.input.update({"name_out": name_out, "dimension": dimension, "box": box, "sampler_type": self.__class__.__name__})
         self.input.update(parameters)
 
-    def get_data(self):
-        """
-        Retrieve the input parameters and sampled data.
-
-        Returns
-        -------
-        input : dict
-            Input parameters used for the sampler.
-        data : dict
-            Sampled data.
-        """
-        return self.input, self.data
+    def save_object(self):
+        self.data.update({"input_params": self.input})
+        utils.save_object(self.data, self.file_out)
 
     def sample(self, **parameters):
         print(f"Unknown sampler type: {type(self.__class__.__name__)}. Skipping...")
@@ -95,8 +84,9 @@ class Sampler:
             return
         data_list = {}
         for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self.folder + f"/proc_{process_id}.pkl"
+            file_path = self.name_out + f"_proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
+            os.remove(file_path)
             for identifier, data in proc_data.items():
                 if identifier == "input_params":
                     data_list[identifier] = data
@@ -109,7 +99,8 @@ class Sampler:
                         data_list[identifier][key].append(value)
         return data_list
 
-    def permutate_bonds(self, bonds, atom_lib):
+    @staticmethod
+    def permutate_bonds(bonds, atom_lib, class_name):
         """
         Generate all permutations of bonded atom types, considering 'X' as wildcard.
 
@@ -119,6 +110,8 @@ class Sampler:
             List of bonded atom type strings.
         atom_lib : dict
             Dictionary mapping atom type strings to their type IDs.
+        class_name : str
+            Name of the calling class for error messages.
 
         Returns
         -------
@@ -132,7 +125,7 @@ class Sampler:
             elif bonded_atom == "X":
                 bond_types.append("X")
             else:
-                raise ValueError(f"Error in {self.__class__.__name__}: Bonded atom {bonded_atom} not found in atom library.")
+                raise ValueError(f"Error in {class_name}: Bonded atom {bonded_atom} not found in atom library.")
         options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
         expanded = itertools.product(*options)
         bond_permutations = []
@@ -144,7 +137,8 @@ class Sampler:
                     bond_permutations.append(list(perm))
         return bond_permutations
 
-    def build_mol_dictionary(self, atom, bonds, atom_lib):
+    @staticmethod
+    def build_mol_dictionary(atom, bonds, atom_lib, class_name):
         """
         Build molecule dictionary for sampling.
 
@@ -156,6 +150,8 @@ class Sampler:
             List of bonded atom type strings or None.
         atom_lib : dict
             Dictionary mapping atom type strings to their type IDs.
+        class_name : str
+            Name of the calling class for error messages.
 
         Returns
         -------
@@ -167,11 +163,11 @@ class Sampler:
         if atom in atom_lib:
             atom_id = atom_lib[atom]
         else:
-            raise ValueError(f"Error in {self.__class__.__name__}: Atom {atom} not found in atom library.")
+            raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
         bonds.sort() if bonds != None else None
         identifier = atom + "+" + "_".join(bonds) if bonds != None else atom
         if bonds != None:
-            bond_permutations = self.permutate_bonds(bonds, atom_lib)
+            bond_permutations = Sampler.permutate_bonds(bonds, atom_lib, class_name)
         else:
             bond_permutations = None
         mol = {"atom": atom_id, "bonds": bond_permutations}
@@ -230,7 +226,7 @@ class AtomSampler(Sampler):
                 raise ValueError(f"{self.__class__.__name__} requires the 'bonds' key to be a list if provided.")
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
-            identifier, mol = self.build_mol_dictionary(atom, bonds, atom_lib)
+            identifier, mol = self.build_mol_dictionary(atom, bonds, atom_lib, self.__class__.__name__)
             self.molecules[identifier] = mol
 
 
@@ -297,8 +293,8 @@ class BondSampler(Sampler):
             bonds_A.sort() if bonds_A != None else None
             bonds_B.sort() if bonds_B != None else None
 
-            mol_identifier_A, mol_A = self.build_mol_dictionary(atom_A, bonds_A, atom_lib)
-            mol_identifier_B, mol_B = self.build_mol_dictionary(atom_B, bonds_B, atom_lib)
+            mol_identifier_A, mol_A = self.build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
+            mol_identifier_B, mol_B = self.build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)
             self.molecules[mol_identifier_A] = mol_A
             self.molecules[mol_identifier_B] = mol_B
 

@@ -63,9 +63,9 @@ class AngleSampler(AtomSampler):
                 hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
                 self.data[identifier] = {"num_frames": 0, "num_angles": 0, "mean_angle": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
-        atom_types = particles.particle_types.array
-        positions = particles.positions.array
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        atom_types = frame.particles.particle_types.array
+        positions = frame.particles.positions.array
         for identifier, bonds_info in self.molecules.items():
             atom_indices = mol_index[identifier]
             angles = []
@@ -135,4 +135,4 @@ class AngleSampler(AtomSampler):
                 combined_data[identifier]["std_mean"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["std_hist"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-        utils.save_object(combined_data, self.folder + "/combined.obj")
+        utils.save_object(combined_data, self.name_out + ".obj")

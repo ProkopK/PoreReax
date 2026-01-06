@@ -197,9 +197,9 @@ class DensitySampler(AtomSampler):
                 self.dimension, self.direction, num_frames, self.num_bins, box, "DensitySampler"
             )
 
-    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
-        charges = particles.get("Charge").array if "Charge" in particles else np.zeros(particles.count)
-        positions = particles.positions.array
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
+        positions = frame.particles.positions.array
 
         for identifier in self.molecules:
             atom_indices = mol_index[identifier]
@@ -219,7 +219,7 @@ class DensitySampler(AtomSampler):
             atom_positions = positions[atom_indices]
             # Record density using helper
             _record_density(
-                self.data[identifier], self.dimension, atom_positions, frame, self.num_bins, self.box
+                self.data[identifier], self.dimension, atom_positions, frame_id, self.num_bins, self.box
             )
 
     def __get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
@@ -268,7 +268,7 @@ class DensitySampler(AtomSampler):
         data_list = super().join_samplers(num_cores)
         # Use helper to join data
         combined_data = _join_data(data_list, self.dimension, self.num_bins)
-        utils.save_object(combined_data, self.folder + "/combined.obj")
+        utils.save_object(combined_data, self.name_out + ".obj")
 
 
 class BondDensitySampler(BondSampler):
@@ -327,10 +327,10 @@ class BondDensitySampler(BondSampler):
                 self.dimension, self.direction, num_frames, self.num_bins, box, "BondDensitySampler"
             )
 
-    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
-        bond_topology = particles.bonds.topology.array
-        bond_periodic_images = particles.bonds.pbc_vectors.array
-        positions = particles.positions.array
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        bond_topology = frame.particles.bonds.topology.array
+        bond_periodic_images = frame.particles.bonds.pbc_vectors.array
+        positions = frame.particles.positions.array
         
         for identifier in self.bonds:
             bond_indices = bond_index[identifier]
@@ -355,7 +355,7 @@ class BondDensitySampler(BondSampler):
             
             # Record density using helper
             _record_density(
-                self.data[identifier], self.dimension, bond_midpoints, frame, self.num_bins, self.box
+                self.data[identifier], self.dimension, bond_midpoints, frame_id, self.num_bins, self.box
             )
 
     def join_samplers(self, num_cores):
@@ -370,4 +370,4 @@ class BondDensitySampler(BondSampler):
         data_list = super().join_samplers(num_cores)
         # Use helper to join data
         combined_data = _join_data(data_list, self.dimension, self.num_bins)
-        utils.save_object(combined_data, self.folder + "/combined.obj")
+        utils.save_object(combined_data, self.name_out + ".obj")

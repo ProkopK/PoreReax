@@ -1,7 +1,9 @@
 import numpy as np
 import porereax.utils as utils
-from porereax.meta_sampler import Sampler
 import matplotlib.pyplot as plt
+import os
+
+from porereax.meta_sampler import Sampler
 
 
 class MoleculeStructureSampler(Sampler):
@@ -20,9 +22,9 @@ class MoleculeStructureSampler(Sampler):
             for atom_type in atom_lib.values():
                 self.data["structure_counts"][atom_type] = {}
 
-    def sample(self, frame: int, mol_index: dict, mol_bonds: dict, bond_index: dict, particles: object, bond_enum: object):
-        atom_types = particles.particle_types.array
-        bond_topology = particles.bonds.topology.array
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        atom_types = frame.particles.particle_types.array
+        bond_topology = frame.particles.bonds.topology.array
         if self.dimension == "MoleculeStructure":
             for atom_type in self.data["structure_counts"]:
                 atoms = np.where(atom_types == atom_type)[0]
@@ -43,8 +45,9 @@ class MoleculeStructureSampler(Sampler):
         combined_data = {}
         type_to_name = {v: k for k, v in self.atom_lib.items()}
         for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self.folder + f"/proc_{process_id}.pkl"
+            file_path = self.name_out + f"_proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
+            os.remove(file_path)
             for identifier, data in proc_data.items():
                 if identifier == "input_params":
                     combined_data[identifier] = data
@@ -62,7 +65,7 @@ class MoleculeStructureSampler(Sampler):
                             if name not in combined_data[atom]:
                                 combined_data[atom][name] = 0
                             combined_data[atom][name] += count
-        utils.save_object(combined_data, self.folder + "/combined.obj")
+        utils.save_object(combined_data, self.name_out + ".obj")
 
 
 def plot(link_data: str, identifier):

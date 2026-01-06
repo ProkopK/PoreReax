@@ -644,16 +644,13 @@ class Sample:
 
             # Sampling
             for sampler in self.samplers:
-                sampler.sample(frame=frame_idx-self.start_frame,
+                sampler.sample(frame_id=frame_idx-self.start_frame,
                                mol_index=molecule_idx,
                                mol_bonds=molecule_bonds,
                                bond_index=bond_idx,
-                               particles=frame.particles,
+                               frame=frame,
                                bond_enum=bond_enum,
                 )
 
         for sampler in self.samplers:
-            input_params, data = sampler.get_data()
-            data.update({"input_params": input_params})
-            file_name = sampler.file_out
-            utils.save_object(data, file_name)
+            sampler.save_object()
