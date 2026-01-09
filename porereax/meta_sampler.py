@@ -162,10 +162,12 @@ class Sampler:
         """
         if atom in atom_lib:
             atom_id = atom_lib[atom]
+        elif atom == "X":
+            atom_id = "X"
         else:
             raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
         bonds.sort() if bonds != None else None
-        identifier = atom + "+" + "_".join(bonds) if bonds != None else atom
+        identifier = atom + "(" + "+".join(bonds) + ")" if bonds != None else atom
         if bonds != None:
             bond_permutations = Sampler.permutate_bonds(bonds, atom_lib, class_name)
         else:

@@ -12,6 +12,7 @@ import porereax.charge as charge
 import porereax.angle as angle
 import porereax.bond_length as bond_length
 import porereax.molecule_structure as molecule_structure
+import porereax.rdf as rdf
 
 from porereax.sample import Sample
 
@@ -27,6 +28,7 @@ __all__ = [
     "angle",
     "bond_length",
     "molecule_structure",
+    "rdf",
     "Sample",
     "__version__",
 ]

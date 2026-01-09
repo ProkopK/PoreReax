@@ -13,13 +13,13 @@ import numpy as np
 import multiprocessing as mp
 import os
 import sys
-import porereax.utils as utils
 
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler, BondDensitySampler
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
 from porereax.molecule_structure import MoleculeStructureSampler
+from porereax.rdf import RdfSampler
 from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
 
 
@@ -102,6 +102,7 @@ class Sample:
                                "angle_samplers": [],
                                "bond_length_samplers": [],
                                "molecule_structure_samplers": [],
+                               "rdf_samplers": [],
                                }
         self.samplers = []
         self.molecules = {}
@@ -185,7 +186,7 @@ class Sample:
 
         return num_particles, num_frames, box
 
-    def __add_sampler(self, sampler: Sampler):
+    def _add_sampler(self, sampler: Sampler):
         """
         Add a sampler to the Sample instance.
 
@@ -346,6 +347,32 @@ class Sample:
                   "dimension": dimension,}
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
+    def add_rdf_sampling(self, name_out, dimension, pairs, num_bins=200, r_max=10.0):
+        """
+        Add a RdfSampler to the Sample instance.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        dimension : str
+            Sampling dimension. Supported: "Histogram".
+        pairs : list
+            List of atom pairs to sample. Each pair is defined as a tuple of two dictionaries in the format:
+            ({"atom": "A", "bonds": [...]}, {"atom": "B", "bonds": [...]}) where A and B are atom identifiers,
+            and bonds are lists of atom identifiers that atoms A and B are bonded to, respectively.
+        num_bins : int, optional
+            Number of bins for histogram sampling.
+        r_max : float, optional
+            Maximum distance for RDF calculation.
+        """
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "pairs": pairs,
+                  "num_bins": num_bins,
+                  "r_max": r_max,}
+        self.sampler_inputs["rdf_samplers"].append(inputs)
+
     def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
@@ -362,11 +389,11 @@ class Sample:
             self.molecules.update(mols)
             bonds = sampler.get_bonds()
             self.bonds.update(bonds)
-            self.__add_sampler(sampler)
+            self._add_sampler(sampler)
         def add_atom_sampler(sampler: AtomSampler):
             mols = sampler.get_mols()
             self.molecules.update(mols)
-            self.__add_sampler(sampler)
+            self._add_sampler(sampler)
         for sampler_type in sampler_inputs:
             for sampler in sampler_inputs[sampler_type]:
                 if sampler_type == "charge_samplers":
@@ -439,6 +466,18 @@ class Sample:
                                                             masses=self.masses,
                                                             num_frames=self.num_frames,
                                                             box=self.box)
+                    add_atom_sampler(sampler_instance)
+                elif sampler_type == "rdf_samplers":
+                    sampler_instance = RdfSampler(name_out=sampler["name_out"],
+                                                  dimension=sampler["dimension"],
+                                                  pairs=sampler["pairs"],
+                                                  process_id=process_id,
+                                                  atom_lib=self.name_to_type,
+                                                  masses=self.masses,
+                                                  num_frames=self.num_frames,
+                                                  box=self.box,
+                                                  num_bins=sampler["num_bins"],
+                                                  r_max=sampler["r_max"])
                     add_atom_sampler(sampler_instance)
 
     def sample(self, is_parallel=True, num_cores=0):

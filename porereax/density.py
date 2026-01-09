@@ -46,7 +46,7 @@ def _validate_condition_range(conditions: dict, condition_name: str, sampler_nam
 def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_bins: int, box: np.ndarray, sampler_name: str):
     """
     Setup the data structure for a given dimension.
-    
+
     Returns
     -------
     dict
@@ -70,7 +70,7 @@ def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_b
 def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: int, num_bins: int, box: np.ndarray):
     """
     Record density data for the current frame.
-    
+
     Parameters
     ----------
     data : dict
@@ -87,7 +87,7 @@ def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: in
         Simulation box dimensions.
     """
     data["num_frames"] += 1
-    
+
     if dimension == "Time":
         data["densities"][frame] = positions.shape[0]
     elif dimension == "Cartesian1D":
@@ -102,7 +102,7 @@ def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: in
 def _join_data(data_list: dict, dimension: str, num_bins: int):
     """
     Join data from multiple samplers after parallel processing.
-    
+
     Parameters
     ----------
     data_list : dict
@@ -111,7 +111,7 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
         Sampling dimension.
     num_bins : int
         Number of bins.
-        
+
     Returns
     -------
     dict
@@ -125,7 +125,7 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
         combined_data[identifier] = {}
         num_frames = np.sum(data_list[identifier]["num_frames"])
         combined_data[identifier]["num_frames"] = num_frames
-        
+
         if dimension == "Time":
             combined_data[identifier]["densities"] = np.concatenate(data_list[identifier]["densities"])
         elif dimension == "Cartesian1D":
@@ -185,7 +185,7 @@ class DensitySampler(AtomSampler):
         _validate_conditions(conditions, "DensitySampler")
         _validate_condition_range(conditions, "Charge", "DensitySampler")
         _validate_condition_range(conditions, "Angle", "DensitySampler")
-        
+
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
@@ -215,7 +215,7 @@ class DensitySampler(AtomSampler):
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
                 angle_mask = np.any(angle_mask, axis=1)
                 atom_indices = atom_indices[angle_mask]
-            
+
             atom_positions = positions[atom_indices]
             # Record density using helper
             _record_density(
@@ -315,7 +315,7 @@ class BondDensitySampler(BondSampler):
         _validate_num_bins(num_bins, "BondDensitySampler")
         _validate_conditions(conditions, "BondDensitySampler")
         _validate_condition_range(conditions, "Bond Length", "BondDensitySampler")
-        
+
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
@@ -331,20 +331,20 @@ class BondDensitySampler(BondSampler):
         bond_topology = frame.particles.bonds.topology.array
         bond_periodic_images = frame.particles.bonds.pbc_vectors.array
         positions = frame.particles.positions.array
-        
+
         for identifier in self.bonds:
             bond_indices = bond_index[identifier]
             if bond_indices.size == 0:
                 continue
-            
+
             bonds = bond_topology[bond_indices]
             bond_positions = positions[bonds]
-            
+
             # Calculate bond midpoints
             bond_midpoints = (bond_positions[:, 0, :] + bond_positions[:, 1, :]) / 2.0
             periodic_shifts = bond_periodic_images[bond_indices] * self.box
             bond_midpoints += periodic_shifts / 2.0 # TODO: Check if this is correct
-            
+
             # Apply Bond Length condition if specified
             if "Bond Length" in self.conditions:
                 min_length, max_length = self.conditions["Bond Length"]
@@ -352,7 +352,7 @@ class BondDensitySampler(BondSampler):
                 bond_lengths = np.linalg.norm(bond_vectors, axis=1)
                 length_mask = (bond_lengths >= min_length) & (bond_lengths <= max_length)
                 bond_midpoints = bond_midpoints[length_mask]
-            
+
             # Record density using helper
             _record_density(
                 self.data[identifier], self.dimension, bond_midpoints, frame_id, self.num_bins, self.box
