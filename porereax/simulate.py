@@ -19,7 +19,7 @@ Example
 >>> gro_charges = {'Si': 2.4, 'O': -1.2, 'H': 0.6, 'OM': -0.8}
 >>> atom_masses = {'Si': 28.085, 'O': 15.999, 'H': 1.008}
 >>> sim = Simulate(gro_lib, gro_charges, atom_masses, 'system.gro')
->>> sim.add_force_field('ffield.reax')
+>>> sim.set_force_field('ffield.reax')
 >>> sim.add_sim('nvt', nsteps=100000, temp=300)
 >>> sim.generate()
 """
@@ -61,6 +61,8 @@ class Simulate():
         Path to the job submission template file.
     submit_cmd : str or None
         Command to submit jobs (e.g., 'sbatch', 'qsub').
+    lamps_command : str or None
+        Custom command to run LAMMPS.
     force_field : str or None
         Path to the ReaxFF force field parameter file.
     sim : list
@@ -157,11 +159,12 @@ class Simulate():
 
         self.job_file = None
         self.submit_cmd = None
+        self.lamps_command = None
         self.force_field = None
         self.force_field_atoms = None
         self.sim = []
 
-    def add_job_file(self, file_path, sumbit_command):
+    def set_job_file(self, file_path, sumbit_command, lammps_command=None):
         """
         Specify a custom job submission template file and command.
 
@@ -177,6 +180,9 @@ class Simulate():
         sumbit_command : str
             Command to submit jobs to the scheduler (e.g., "sbatch" for SLURM,
             "qsub" for PBS/Torque). Must be a non-empty string.
+        lammps_command : str, optional
+            Custom command to run LAMMPS. If None, a default MPI command will be used.
+            Use placeholders {input_file} and {log_file} for input and log file names.
 
         Raises
         ------
@@ -189,19 +195,21 @@ class Simulate():
         -----
         If this method is not called, a default SLURM template will be used with
         'sbatch' as the submission command.
+        If lammps_command is not provided, a default MPI command will be used.
 
         Example
         -------
-        >>> sim.add_job_file('/path/to/custom.job', 'sbatch')
+        >>> sim.set_job_file('/path/to/custom.job', 'sbatch', 'mpirun lmp -in {input_file} -log {log_file}')
         """
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Job file {file_path} not found.")
         if not isinstance(sumbit_command, str) or sumbit_command == "":
             raise ValueError("submit_cmd must be a not empty string.")
         self.submit_cmd = sumbit_command
+        self.lamps_command = lammps_command
         self.job_file = file_path
 
-    def add_force_field(self, force_field):
+    def set_force_field(self, force_field):
         """
         Specify a custom ReaxFF force field parameter file.
 
@@ -223,7 +231,7 @@ class Simulate():
 
         Example
         -------
-        >>> sim.add_force_field('/path/to/ffield.reax')
+        >>> sim.set_force_field('/path/to/ffield.reax')
         """
         if not os.path.isfile(force_field):
             raise FileNotFoundError(f"Force field file {force_field} not found.")
@@ -320,7 +328,7 @@ class Simulate():
         Example
         -------
         >>> sim = Simulate(gro_lib, gro_charges, atom_masses, 'system.gro')
-        >>> sim.add_force_field('ffield.reax')
+        >>> sim.set_force_field('ffield.reax')
         >>> sim.add_sim('nvt', nsteps=100000, temp=300)
         >>> sim.generate()
         Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.
@@ -343,6 +351,8 @@ class Simulate():
         if self.job_file is None:
             self.job_file = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
             self.submit_cmd = "sbatch"
+        if self.lamps_command is None:
+            self.lamps_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
         with open(self.job_file, 'r') as f:
             job_template = Template(f.read())
 
@@ -354,20 +364,24 @@ class Simulate():
 
         atoms = ' '.join(self.type_to_name[k] for k in range(1, self.num_atom_types + 1))
 
+        file_name = f"reax_run_0"
         # Create initial LAMMPS input file
-        with open(os.path.join(self.path, "reax_run_0.lmp"), 'w') as f:
+        with open(os.path.join(self.path, f"{file_name}.lmp"), 'w') as f:
             file_content = lmp_initial_template.render(
                 atoms=atoms
             )
             f.write(file_content)
         # Create job file for initial run
-        with open(os.path.join(self.path, "reax_run_0.job"), 'w') as f:
+        with open(os.path.join(self.path, f"{file_name}.job"), 'w') as f:
             file_content = job_template.render(
                 SIMULATIONNODES=1,
                 SIMULATIONTASKSPERNODE=10,
                 SIMULATIONTIME="0:30:00",
                 SIMULATIONLABEL=f"{self.name}_initial",
-                LAMMPS_COMMAND="mpirun lmp -in reax_run_0.lmp -log reax_run_0.log -k on -sf kk -pk kokkos neigh half newton on comm host",
+                LAMMPS_COMMAND=self.lamps_command.format(
+                    input_file=f"{file_name}.lmp",
+                    log_file=f"{file_name}.log"
+                ),
             )
             f.write(file_content)
             if self.sim:
@@ -394,9 +408,12 @@ class Simulate():
                 file_content = job_template.render(
                     SIMULATIONNODES=step["nodes"],
                     SIMULATIONTASKSPERNODE=step["tasks_per_node"],
-                    SIMULATIONTIME=["wall_time"],
+                    SIMULATIONTIME=step["wall_time"],
                     SIMULATIONLABEL=f"{self.name}_run_{step_idx+1}",
-                    LAMMPS_COMMAND=f"mpirun lmp -in reax_run_{step_idx+1}.lmp -log reax_run_{step_idx+1}.log -k on -sf kk -pk kokkos neigh half newton on comm host",
+                    LAMMPS_COMMAND=self.lamps_command.format(
+                        input_file=f"{file_name}.lmp",
+                        log_file=f"{file_name}.log"
+                    ),
                 )
                 f.write(file_content)
                 if step_idx+1<len(self.sim):
