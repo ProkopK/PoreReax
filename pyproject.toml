@@ -12,11 +12,12 @@ description = "A tool for generating and analysing reactive pore simulations usi
 readme = "README.md"
 license = {text = "GNU General Public License v3.0"}
 keywords = ["pore", "ReaxFF", "LAMMPS", "molecular dynamics", "simulation", "analysis"]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "ovito",
-    "matplotlib"
+    "matplotlib",
+    "jinja2",
 ]
 
 [tool.setuptools.packages.find]
