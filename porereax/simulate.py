@@ -338,7 +338,7 @@ class Simulate():
         if self.force_field is None:
             self.force_field = os.path.join(os.path.dirname(__file__), "templates", "reax.ffield")
             print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
-        os.system(f"cp {self.force_field} {os.path.join(self.path, "reax.ffield")}")
+        os.system(f"cp {self.force_field} {os.path.join(self.path, 'reax.ffield')}")
 
         if self.job_file is None:
             self.job_file = os.path.join(os.path.dirname(__file__), "templates", "reax.job")

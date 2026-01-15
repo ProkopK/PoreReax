@@ -15,7 +15,8 @@ keywords = ["pore", "ReaxFF", "LAMMPS", "molecular dynamics", "simulation", "ana
 requires-python = ">=3.8"
 dependencies = [
     "numpy",
-    "ovito"
+    "ovito",
+    "matplotlib"
 ]
 
 [tool.setuptools.packages.find]
