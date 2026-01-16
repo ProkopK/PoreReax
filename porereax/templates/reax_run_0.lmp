@@ -7,7 +7,7 @@ atom_style full
 read_data system.data
 
 pair_style reaxff NULL safezone 3.0 mincap 150
-pair_coeff * * ffield.reax {{ atoms }}
+pair_coeff * * reax.ffield {{ atoms }}
 fix myqeq all qeq/reaxff 1 0.0 10.0 1.0e-6 reaxff maxiter 400
 
 fix myspec_initial all reaxff/species 1 1 1 initial.species element {{ atoms }}

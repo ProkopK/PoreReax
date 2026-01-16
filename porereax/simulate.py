@@ -340,7 +340,7 @@ class Simulate():
         LAMMPS data file written to /path/to/system.data
         """
         # Create and convert gro to lammps data
-        self.__create_input_file(os.path.join(self.path, "system.data"))
+        self._create_input_file(os.path.join(self.path, "system.data"))
 
         # Copy force field file
         if self.force_field is None:
@@ -353,46 +353,20 @@ class Simulate():
             self.submit_cmd = "sbatch"
         if self.lamps_command is None:
             self.lamps_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+
         with open(self.job_file, 'r') as f:
             job_template = Template(f.read())
-
-        with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_0.lmp"), 'r') as f:
-            lmp_initial_template = Template(f.read())
-
         with open(os.path.join(os.path.dirname(__file__), "templates", "reax_run_n.lmp"), 'r') as f:
             lmp_step_template = Template(f.read())
 
         atoms = ' '.join(self.type_to_name[k] for k in range(1, self.num_atom_types + 1))
 
-        file_name = f"reax_run_0"
-        # Create initial LAMMPS input file
-        with open(os.path.join(self.path, f"{file_name}.lmp"), 'w') as f:
-            file_content = lmp_initial_template.render(
-                atoms=atoms
-            )
-            f.write(file_content)
-        # Create job file for initial run
-        with open(os.path.join(self.path, f"{file_name}.job"), 'w') as f:
-            file_content = job_template.render(
-                SIMULATIONNODES=1,
-                SIMULATIONTASKSPERNODE=10,
-                SIMULATIONTIME="0:30:00",
-                SIMULATIONLABEL=f"{self.name}_initial",
-                LAMMPS_COMMAND=self.lamps_command.format(
-                    input_file=f"{file_name}.lmp",
-                    log_file=f"{file_name}.log"
-                ),
-            )
-            f.write(file_content)
-            if self.sim:
-                f.write(f"\n\n{self.submit_cmd} reax_run_1.job\n")
-
         for step_idx, step in enumerate(self.sim):
-            file_name = f"reax_run_{step_idx+1}"
+            file_name = f"reax_run_{step_idx}"
             lmp_file = os.path.join(self.path, f"{file_name}.lmp")
             with open(lmp_file, 'w') as f:
                 file_content = lmp_step_template.render(
-                    SIMNUMBER=step_idx + 1,
+                    SIMNUMBER=step_idx,
                     TIMESTEP=step["dt"],
                     THERMO_FREQ=step["thermo_freq"],
                     DUMP_FREQ=step["dump_freq"],
@@ -409,15 +383,15 @@ class Simulate():
                     SIMULATIONNODES=step["nodes"],
                     SIMULATIONTASKSPERNODE=step["tasks_per_node"],
                     SIMULATIONTIME=step["wall_time"],
-                    SIMULATIONLABEL=f"{self.name}_run_{step_idx+1}",
+                    SIMULATIONLABEL=f"{self.name}_run_{step_idx}",
                     LAMMPS_COMMAND=self.lamps_command.format(
                         input_file=f"{file_name}.lmp",
                         log_file=f"{file_name}.log"
                     ),
                 )
                 f.write(file_content)
-                if step_idx+1<len(self.sim):
-                    f.write(f"\n\n{self.submit_cmd} reax_run_{step_idx+1}.job\n")
+                if step_idx<len(self.sim):
+                    f.write(f"\n\n{self.submit_cmd} reax_run_{step_idx}.job\n")
 
         # Create ana files
         with open(os.path.join(os.path.dirname(__file__), "templates", "ana.py"), 'r') as f:
@@ -430,7 +404,7 @@ class Simulate():
             )
             f.write(file_content)
 
-    def __line_mapper(self, line):
+    def _line_mapper(self, line):
         """
         Parse a line from a GROMACS structure file and extract atom information.
 
@@ -484,7 +458,7 @@ class Simulate():
         vz = float(line[60:68].strip()) / 100
         return res_id, res_name, atom_name, x, y, z, vx, vy, vz
 
-    def __read_gro_file(self):
+    def _read_gro_file(self):
         """
         Read and parse a GROMACS structure file.
 
@@ -499,7 +473,7 @@ class Simulate():
               Converted from nm in the .gro file.
             - gro_data (list): List of tuples, where each tuple contains parsed
               atom information (res_id, res_name, atom_name, x, y, z, vx, vy, vz)
-              as returned by __line_mapper method.
+              as returned by _line_mapper method.
 
         Notes
         -----
@@ -513,11 +487,11 @@ class Simulate():
         box_dims = [float(dim) * 10 for dim in lines[-1].strip().split()]
         print("Box dimensions (Angstroms):", box_dims)
 
-        gro_data = [self.__line_mapper(line) for line in lines[2:-1]]
+        gro_data = [self._line_mapper(line) for line in lines[2:-1]]
 
         return box_dims, gro_data
 
-    def __write_lammps_header(self, file, num_atoms, box_dims):
+    def _write_lammps_header(self, file, num_atoms, box_dims):
         """
         Write the header section of a LAMMPS data file.
 
@@ -550,10 +524,10 @@ class Simulate():
         file.write(f"{0.0:8.3f} {box_dims[1]:8.3f} ylo yhi\n")
         file.write(f"{0.0:8.3f} {box_dims[2]:8.3f} zlo zhi\n\n")
         file.write("Masses\n\n")
-        for atom_type, mass in self.atom_masses.items():
-            file.write(f"{atom_type} {mass:8.3f}\n")
+        for atom_name, mass in self.atom_masses.items():
+            file.write(f"{self.name_to_type[atom_name]} {mass:8.3f}\n")
 
-    def __write_lammps_data(self, file, gro_data):
+    def _write_lammps_data(self, file, gro_data):
         """
         Write the Atoms and Velocities sections of a LAMMPS data file.
 
@@ -566,7 +540,7 @@ class Simulate():
         file : file object
             Open file object in write mode where atom data will be written.
         gro_data : list
-            List of tuples with atom data as returned by __read_gro_file method.
+            List of tuples with atom data as returned by _read_gro_file method.
             Each tuple contains: (res_id, res_name, atom_name, x, y, z, vx, vy, vz).
 
         Raises
@@ -605,7 +579,7 @@ class Simulate():
         for atom_type, count in atom_count.items():
             print(f"  Type {self.type_to_name[atom_type]}: {count} atoms")
 
-    def __create_input_file(self, file_path):
+    def _create_input_file(self, file_path):
         """
         Create a complete LAMMPS data file from GROMACS structure file.
 
@@ -625,10 +599,10 @@ class Simulate():
         - Prints box dimensions, total charge, and atom counts to stdout
         - The created file is in LAMMPS 'charge' atom style format
         """
-        box_dims, gro_data = self.__read_gro_file()
+        box_dims, gro_data = self._read_gro_file()
         gro_data = [data for data in gro_data if self.gro_lib.get(data[2], 0) != ""] # Filter out ghost particles e.g. from tip4p water model
         num_atoms = len(gro_data)
         with open(file_path, 'w') as file:
-            self.__write_lammps_header(file, num_atoms, box_dims)
-            self.__write_lammps_data(file, gro_data)
+            self._write_lammps_header(file, num_atoms, box_dims)
+            self._write_lammps_data(file, gro_data)
         print(f"LAMMPS data file written to {file_path}")
