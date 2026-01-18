@@ -66,18 +66,3 @@ class MoleculeStructureSampler(Sampler):
                                 combined_data[atom][name] = 0
                             combined_data[atom][name] += count
         utils.save_object(combined_data, self.name_out + ".obj")
-
-
-def plot(link_data: str, identifier):
-    data = utils.load_object(link_data)
-    num_frames = data["num_frames"]
-    if identifier not in data:
-        raise ValueError(f"Identifier {identifier} not found in data.")
-    structure_counts = data[identifier]
-    structures = list(structure_counts.keys())
-    counts = np.array([structure_counts[s] for s in structures]) / num_frames
-    fig, ax = plt.subplots()
-    ax.bar(structures, counts)
-    ax.set_xlabel("Molecule Structure")
-    ax.xaxis.set_tick_params(rotation=90)
-    ax.set_ylabel("Average Count per Frame")

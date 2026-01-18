@@ -21,7 +21,7 @@ for sim in range(1, num_sims + 1):
         # {"atom": "a"},
         # {"atom": "b"},
         # {"atom": "c"},
-        # {"atom": "a", "bonds": ["b", "c"]},
+        # {"atom": "a", "bonds": ["b", "b", "c"]},
         ]
     bonds = [
         # {"bond": "a-b", "bonds_A": ["b", "b", "b"], "bonds_B": ["c"]},
@@ -33,7 +33,7 @@ for sim in range(1, num_sims + 1):
     sampler.add_bond_length_sampling(f"run_{sim}_bond_length", "Histogram", bonds=bonds, num_bins=200)
 
     sampler.add_angle_sampling(f"run_{sim}_angle_all", "Histogram", atoms=atoms, num_bins=180, angle="all")
-    # sampler.add_angle_sampling(f"run_{sim}_angle_b-a-b", "Histogram", atoms=atoms, num_bins=90, angle="b-a-b")
+    # sampler.add_angle_sampling(f"run_{sim}_angle_b-a-c", "Histogram", atoms=atoms, num_bins=90, angle="b-a-c")
 
     sampler.add_density_sampling(f"run_{sim}_density_cart_1d_z", "Cartesian1D", atoms=atoms, num_bins=800)
     sampler.add_density_sampling(f"run_{sim}_density_cart_2d_xy", "Cartesian2D", atoms=atoms, num_bins=200, direction="xy")

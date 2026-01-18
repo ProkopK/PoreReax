@@ -6,7 +6,7 @@ import pickle
 import porereax.utils as utils
 
 
-def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]):
+def _plot_setup(link_data: str, axis: Axes | bool = True, identifiers: list = None, colors: list = None):
     """
     Set up a matplotlib figure and axis for plotting.
 
@@ -34,6 +34,10 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
     colors : list
         The list of colors to be used for plotting.
     """
+    if identifiers is None:
+        identifiers = []
+    if colors is None:
+        colors = []
     data = utils.load_object(link_data)
     if axis == True:
         fig, ax = plt.subplots()
@@ -45,7 +49,7 @@ def plot_setup(link_data: str, axis: Axes | bool=True, identifiers=[], colors=[]
 
     return fig, ax, data, identifiers, colors
 
-def plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, std_mean: float = None):
+def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, std_mean: float = None):
     """
     Plot a histogram curve on the given axis.
 
@@ -77,9 +81,21 @@ def plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data:
     if std_data is not None:
         upper_bound = hist_data + std_data
         lower_bound = hist_data - std_data
-        axis.fill_between(bin_centers, lower_bound, upper_bound, color=color, alpha=0.3)
+        axis.fill_between(bin_centers, 
+            lower_bound, 
+            upper_bound, 
+            color=color, 
+            alpha=0.3)
     if mean_data is not None:
         axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
+    if std_mean is not None:
+        axis.fill_betweenx(
+            axis.get_ylim(),
+            mean_data - std_mean,
+            mean_data + std_mean,
+            color=color,
+            alpha=0.2
+        )
 
 def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, density=False, plot_kwargs = {}):
     """
@@ -108,7 +124,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     -------
     None
     """
-    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
+    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
 
     sampler_type = data["input_params"]["sampler_type"]
     if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler"]:
@@ -146,7 +162,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         std_hist = data[identifier]["std_hist"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
         std_mean = data[identifier]["std_mean"] if std and mean else None
-        plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
+        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
     ax.set_xlabel(x_label)
     if density == False:
         ax.set_ylabel("Counts")
@@ -178,7 +194,7 @@ def plot_1d_hist(link_data: str, axis: Axes | bool=True, identifiers = [], color
     -------
     None
     """
-    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
+    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
 
     if data["input_params"]["dimension"] != "Cartesian1D":
         print("Data dimension is not 'Cartesian1D'. Cannot plot histogram.")
@@ -192,7 +208,7 @@ def plot_1d_hist(link_data: str, axis: Axes | bool=True, identifiers = [], color
         bin_edges = data[identifier]["bin_edges"]
         hist = data[identifier]["hist"]
         std_hist = data[identifier]["std_hist"] if std else None
-        plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
+        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
 
     ax.set_xlabel(f"{data['input_params']['direction']} Position / nm")
     ax.set_ylabel("Density / atoms")
@@ -214,7 +230,7 @@ def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     dt : int, optional
         Time interval between frames in femtoseconds (default is 50 fs).
     """
-    fig, ax, data, identifiers, colors = plot_setup(link_data, axis, identifiers, colors)
+    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
     if data["input_params"]["dimension"] != "Time":
         return
     for i, identifier in enumerate(identifiers):
@@ -266,3 +282,62 @@ def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
         plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
     plt.axis('scaled')
     plt.colorbar(label='Density / atoms')
+
+def plot_mol_structure(link_data: str, identifier):
+    data = utils.load_object(link_data)
+    num_frames = data["num_frames"]
+    if identifier not in data:
+        raise ValueError(f"Identifier {identifier} not found in data.")
+    structure_counts = data[identifier]
+    structures = list(structure_counts.keys())
+    counts = np.array([structure_counts[s] for s in structures]) / num_frames
+    fig, ax = plt.subplots()
+    ax.bar(structures, counts)
+    ax.set_xlabel("Molecule Structure")
+    ax.xaxis.set_tick_params(rotation=90)
+    ax.set_ylabel("Average Count per Frame")
+
+def plot_rdf(link_data: str, axis: Axes | bool = True, identifiers=[], colors=[], std=False, plot_kwargs={}):
+    """
+    Plot RDF from sampled data.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file containing sampled RDF data.
+    axis : Axes or bool, optional
+        Matplotlib Axes to plot on. If True, a new figure and axes are created.
+    identifiers : list, optional
+        List of pair identifiers to plot. If empty, all pairs are plotted.
+    colors : list, optional
+        List of colors for plotting.
+    std : bool, optional
+        Whether to plot standard deviation error bars.
+    plot_kwargs : dict, optional
+        Additional keyword arguments for the plot function.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
+
+    if data["input_params"]["dimension"] != "Histogram":
+        print("Data dimension is not 'Histogram'. Cannot plot RDF.")
+        return
+
+    for i, identifier in enumerate(identifiers):
+        if identifier == "input_params":
+            continue
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+
+        bin_edges = data[identifier]["bin_edges"]
+        hist = data[identifier]["hist"]
+        std_hist = data[identifier]["std_hist"] if std else None
+
+        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist)
+
+    ax.set_xlabel("Distance r / Å")
+    ax.set_ylabel("g(r)")

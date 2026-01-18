@@ -179,7 +179,7 @@ class DensitySampler(AtomSampler):
             - "Charge": tuple (min_charge, max_charge)
             - "Angle": tuple (min_angle, max_angle) using angle type all
         """
-        # Validate parameters using helper
+        # Validate parameters
         _validate_dimension(dimension, "DensitySampler")
         _validate_num_bins(num_bins, "DensitySampler")
         _validate_conditions(conditions, "DensitySampler")
@@ -191,7 +191,7 @@ class DensitySampler(AtomSampler):
         self.conditions = conditions
         super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction, conditions=conditions)
 
-        # Setup data using helper
+        # Setup data
         for identifier in self.molecules:
             self.data[identifier] = _setup_data_structure(
                 self.dimension, self.direction, num_frames, self.num_bins, box, "DensitySampler"
@@ -217,7 +217,7 @@ class DensitySampler(AtomSampler):
                 atom_indices = atom_indices[angle_mask]
 
             atom_positions = positions[atom_indices]
-            # Record density using helper
+            # Record density
             _record_density(
                 self.data[identifier], self.dimension, atom_positions, frame_id, self.num_bins, self.box
             )
@@ -266,7 +266,6 @@ class DensitySampler(AtomSampler):
             Number of parallel processes used.
         """
         data_list = super().join_samplers(num_cores)
-        # Use helper to join data
         combined_data = _join_data(data_list, self.dimension, self.num_bins)
         utils.save_object(combined_data, self.name_out + ".obj")
 
@@ -310,7 +309,7 @@ class BondDensitySampler(BondSampler):
             Additional conditions for sampling.
             - "Bond Length": tuple (min_length, max_length)
         """
-        # Validate parameters using helper
+        # Validate parameters
         _validate_dimension(dimension, "BondDensitySampler")
         _validate_num_bins(num_bins, "BondDensitySampler")
         _validate_conditions(conditions, "BondDensitySampler")
@@ -321,7 +320,7 @@ class BondDensitySampler(BondSampler):
         self.conditions = conditions
         super().__init__(name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction, conditions=conditions)
 
-        # Setup data using helper
+        # Setup data
         for identifier in self.bonds:
             self.data[identifier] = _setup_data_structure(
                 self.dimension, self.direction, num_frames, self.num_bins, box, "BondDensitySampler"
@@ -353,7 +352,7 @@ class BondDensitySampler(BondSampler):
                 length_mask = (bond_lengths >= min_length) & (bond_lengths <= max_length)
                 bond_midpoints = bond_midpoints[length_mask]
 
-            # Record density using helper
+            # Record density
             _record_density(
                 self.data[identifier], self.dimension, bond_midpoints, frame_id, self.num_bins, self.box
             )
@@ -368,6 +367,5 @@ class BondDensitySampler(BondSampler):
             Number of parallel processes used.
         """
         data_list = super().join_samplers(num_cores)
-        # Use helper to join data
         combined_data = _join_data(data_list, self.dimension, self.num_bins)
         utils.save_object(combined_data, self.name_out + ".obj")

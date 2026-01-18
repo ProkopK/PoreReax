@@ -390,8 +390,8 @@ class Simulate():
                     ),
                 )
                 f.write(file_content)
-                if step_idx<len(self.sim):
-                    f.write(f"\n\n{self.submit_cmd} reax_run_{step_idx}.job\n")
+                if step_idx+1<len(self.sim):
+                    f.write(f"\n\n{self.submit_cmd} reax_run_{step_idx+1}.job\n")
 
         # Create ana files
         with open(os.path.join(os.path.dirname(__file__), "templates", "ana.py"), 'r') as f:
