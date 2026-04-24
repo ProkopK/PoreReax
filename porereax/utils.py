@@ -43,6 +43,25 @@ def load_object(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
+def load_yaml(file_path: str) -> dict:
+    """
+    Load a YAML file and return its contents as a dictionary.
+
+    Parameters
+    ----------
+    file_path : str
+        The path to the YAML file.
+
+    Returns
+    -------
+    dict
+        The contents of the YAML file as a dictionary.
+    """
+    import yaml
+    with open(file_path, 'r') as f:
+        data = yaml.safe_load(f)
+    return data
+
 def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
     """
     Apply the minimal image convention to a vector given the simulation box dimensions.

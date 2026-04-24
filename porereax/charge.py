@@ -9,16 +9,16 @@ It provides:
 
 
 import numpy as np
-from porereax.meta_sampler import AtomSampler
 import porereax.utils as utils
-from matplotlib.axes import Axes
+
+from porereax.meta_sampler import AtomSampler
 
 
 class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, range: tuple):
         """
         Sampler for atomic charges.
 
@@ -56,7 +56,7 @@ class ChargeSampler(AtomSampler):
             raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self.num_bins = num_bins
         self.range = range
-        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, range=range)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, range=range)
 
         # Setup data
         for identifier, bonds_info in self.molecules.items():
@@ -66,9 +66,11 @@ class ChargeSampler(AtomSampler):
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
+        positions = frame.particles.positions.array
+        position_mask = self.region(positions)
         for identifier in self.molecules:
-            atom_indices = mol_index[identifier]
-            atom_charges = charges[atom_indices]
+            mol_mask = mol_index[identifier] & position_mask
+            atom_charges = charges[mol_mask]
             hist, _ = np.histogram(atom_charges, bins=self.num_bins, range=self.range)
             self.data[identifier]["hist"] += hist
             self.data[identifier]["num_frames"] += 1

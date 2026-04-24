@@ -10,13 +10,14 @@ import numpy as np
 import os
 import itertools
 import porereax.utils as utils
+import porereax.regions as regions
 
 
 class Sampler:
     """
     Base class for samplers.
     """
-    def __init__(self, name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters):
+    def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters):
         """
         Base sampler class.
 
@@ -26,6 +27,9 @@ class Sampler:
             Name of the output directory of the sampler data
         dimension : str
             Dimension along which to sample.
+        region : str or function
+            Region specification for sampling.
+            Can be a string defining a geometric region or a function that takes coordinates and returns a boolean mask.
         process_id : int
             Process ID for parallel processing.
         atom_lib : dict
@@ -36,11 +40,15 @@ class Sampler:
             Total number of frames to sample.
         box : np.ndarray
             Simulation box dimensions.
+        system : dict or None
+            System properties for sampling, if applicable.
         **parameters : dict
             Additional parameters for the sampler.
         """
         if not isinstance(name_out, str) or name_out == "":
             raise ValueError(f"{self.__class__.__name__} requires a valid 'name_out' string parameter.")
+        if not isinstance(region, str) and not callable(region):
+            raise ValueError(f"{self.__class__.__name__} requires a valid 'region' parameter as a string or callable function.")
         if not isinstance(process_id, int):
             raise ValueError(f"{self.__class__.__name__} requires an integer 'process_id' parameter.")
         if not isinstance(atom_lib, dict):
@@ -51,18 +59,31 @@ class Sampler:
             raise ValueError(f"{self.__class__.__name__} requires a positive integer 'num_frames' parameter.")
         if not isinstance(box, np.ndarray) or box.shape != (3,):
             raise ValueError(f"{self.__class__.__name__} requires a numpy array 'box' parameter with shape (3,).")
+        if system is not None and not isinstance(system, dict):
+            raise ValueError(f"{self.__class__.__name__} requires a dictionary 'system' parameter or None.")
         self.name_out = name_out
         self.file_out = name_out + f"_proc_{process_id}.pkl"
         self.dimension = dimension
+        if isinstance(region, str):
+            region = regions.get_region_function(region, box, system)
+        test_coords = np.array([[0.0, 0.0, 0.0]])
+        try:
+            mask = region(test_coords)
+            if not isinstance(mask, np.ndarray) or mask.dtype != bool or mask.shape != (1,):
+                raise ValueError(f"Region function for {self.__class__.__name__} must return a boolean numpy array of shape (N,) for input coordinates of shape (N, 3).")
+        except Exception as e:
+            raise ValueError(f"Error in region function for {self.__class__.__name__}: {e}")
+        self.region = region
         self.process_id = process_id
         self.atom_lib = atom_lib
         self.masses = masses
         self.num_frames = num_frames
         self.box = box
+        self.system = system
         self.molecules = {}
         self.data = {}
         self.input = {}
-        self.input.update({"name_out": name_out, "dimension": dimension, "box": box, "sampler_type": self.__class__.__name__})
+        self.input.update({"name_out": name_out, "dimension": dimension, "region": region, "box": box, "system": system, "sampler_type": self.__class__.__name__})
         self.input.update(parameters)
 
     def save_object(self):
@@ -191,7 +212,7 @@ class AtomSampler(Sampler):
     """
     Base class for samplers that sample atoms with optional bonded atoms.
     """
-    def __init__(self, name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, **parameters):
+    def __init__(self, name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters):
         """
         Sampler for atoms with optional bonded atoms.
 
@@ -199,12 +220,12 @@ class AtomSampler(Sampler):
         ----------
         name_out : str
             Name of the output directory of the sampler data
-        dimension : str
-            Dimension along which to sample.
         atoms : list
             List of atoms to sample, each specified as a dictionary with keys:
             - "atom": str, the atom type
             - "bonds": list, optional, list of bonded atom types
+        dimension : str
+            Dimension along which to sample.
         process_id : int
             Process ID for parallel processing.
         atom_lib : dict
@@ -218,7 +239,7 @@ class AtomSampler(Sampler):
         **parameters : dict
             Additional parameters for the sampler.
         """
-        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
+        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters)
         if not isinstance(atoms, list) or len(atoms) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of atoms.")
         for atom_info in atoms:
@@ -236,7 +257,7 @@ class BondSampler(Sampler):
     """
     Sampler class for bonds.
     """
-    def __init__(self, name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, **parameters):
+    def __init__(self, name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters):
         """
         Sampler for bonds.
 
@@ -244,13 +265,15 @@ class BondSampler(Sampler):
         ----------
         name_out : str
             Name of the output directory of the sampler data
-        dimension : str
-            Dimension along which to sample.
         bonds : list
             List of bonds to sample, each specified as a dictionary with keys:
             - "bond": str, the bond in format "A-B"
             - "bonds_A": list, optional, list of bonded atom types for atom A
             - "bonds_B": list, optional, list of bonded atom types for atom B
+        dimension : str
+            Dimension along which to sample.
+        region : str or function
+            Region specification for sampling.
         process_id : int
             Process ID for parallel processing.
         atom_lib : dict
@@ -264,7 +287,7 @@ class BondSampler(Sampler):
         **parameters : dict
             Additional parameters for the sampler.
         """
-        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box, **parameters)
+        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters)
         if not isinstance(bonds, list) or len(bonds) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
         self.bonds = {}

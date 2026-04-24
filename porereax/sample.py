@@ -13,7 +13,9 @@ import numpy as np
 import multiprocessing as mp
 import os
 import sys
+import porereax.utils as utils
 
+from typing import List, Dict, Tuple, Callable
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler, BondDensitySampler
 from porereax.angle import AngleSampler
@@ -54,8 +56,8 @@ class Sample:
         if "ovito" in sys.modules:
             print("Please remove ovito from loaded modules before using Sample class.")
             sys.exit(1)
-        with mp.Pool() as pool:
-            num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, )).get()
+        with mp.Pool(1) as pool:
+            num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, atom_lib, )).get()
 
         print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
 
@@ -135,10 +137,23 @@ class Sample:
         self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
         self.num_frames = len(self.frames)
 
-        # TODO system
+        self.system_props = {} if system is not None else None
+        self.reservour = None # TODO : implement reservour handling
+        if system is not None:
+            system_data = utils.load_yaml(system)
+            self.reservour = system_data["system"]["reservour"]
+            for pore_id in system_data:
+                if pore_id[:5] == "shape":
+                    if system_data[pore_id]["shape"] == "CYLINDER":
+                        if system_data[pore_id]["parameter"]["central"] != [0, 0, 1]:
+                            raise NotImplementedError("Only CYLINDER pores with central axis along z (0,0,1) are supported.")
+                        self.system_props[pore_id] = {"type": "CYLINDER",}
+                        self.system_props[pore_id]["center"] = np.array(system_data[pore_id]["parameter"]["centroid"])
+                        self.system_props[pore_id]["radius"] = system_data[pore_id]["parameter"]["diameter"]
+                        self.system_props[pore_id]["length"] = system_data[pore_id]["parameter"]["length"]
 
     @staticmethod
-    def get_trajectory_data(trajectory_file, bond_file):
+    def get_trajectory_data(trajectory_file, bond_file, atom_lib):
         """
         Extract trajectory metadata using Ovito.
 
@@ -148,6 +163,8 @@ class Sample:
             Path to the trajectory file.
         bond_file : str, optional
             Path to the bond file.
+        atom_lib : dict
+            Library mapping atom names to types.
 
         Returns
         -------
@@ -179,6 +196,10 @@ class Sample:
             raise ValueError("No particles found in the trajectory file.")
         if first_frame.particles.bonds is None:
             raise ValueError("No bonds found. Ensure bond_file is provided or the trajectory contains bond data.")
+        type_set = set(first_frame.particles.particle_types.array)
+        atom_type_set = set(atom_lib.values())
+        if type_set != atom_type_set:
+            raise ValueError("Atom types in trajectory do not match those in atom_lib.")
 
         num_particles = first_frame.particles.count
         num_frames = pipeline.source.num_frames
@@ -186,20 +207,7 @@ class Sample:
 
         return num_particles, num_frames, box
 
-    def _add_sampler(self, sampler: Sampler):
-        """
-        Add a sampler to the Sample instance.
-
-        Parameters
-        ----------
-        sampler : Sampler
-            An instance of a Sampler subclass to be added
-        """
-        if not isinstance(sampler, Sampler):
-            raise TypeError("sampler must be an instance of Sampler class.")
-        self.samplers.append(sampler)
-
-    def add_charge_sampling(self, name_out, dimension, atoms, num_bins=800, range=(-2.0, 2.0)):
+    def add_charge_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=800, range=(-2.0, 2.0)):
         """
         Add a ChargeSampler to the Sample instance.
 
@@ -207,23 +215,26 @@ class Sample:
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Histogram".
         atoms : list
             List of atom identifiers to sample.
+        region : str or function, optional
+            Region to sample charges from. Supported: "Box" or a user-defined 
+            function that takes atom positions as input and returns a boolean mask.
         num_bins : int, optional
             Number of bins for histogram sampling.
         range : tuple, optional
             Range (min, max) for histogram sampling.
         """
+        dimension = "Histogram"
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "atoms": atoms,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "range": range,}
         self.sampler_inputs["charge_samplers"].append(inputs)
 
-    def add_density_sampling(self, name_out, dimension, atoms, num_bins=200, direction="z", conditions={}):
+    def add_density_sampling(self, name_out: str, atoms: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add a DensitySampler to the Sample instance.
 
@@ -245,14 +256,15 @@ class Sample:
             - "Charge": tuple (min_charge, max_charge) to filter atoms by charge.
         """
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "atoms": atoms,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "direction": direction,
                   "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
 
-    def add_bond_density_sampling(self, name_out, dimension, bonds, num_bins=200, direction="z", conditions={}):
+    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add a BondDensitySampler to the Sample instance.
 
@@ -276,14 +288,15 @@ class Sample:
             - "Bond Order": tuple (min_order, max_order) to filter bonds by bond order.
         """
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "bonds": bonds,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "direction": direction,
                   "conditions": conditions,}
         self.sampler_inputs["bond_density_samplers"].append(inputs)
 
-    def add_angle_sampling(self, name_out, dimension, atoms, num_bins=180, angle="all"):
+    def add_angle_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=180, angle="all"):
         """
         Add an AngleSampler to the Sample instance.
 
@@ -300,14 +313,16 @@ class Sample:
         angle : str, optional
             Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
         """
+        dimension = "Histogram"
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "atoms": atoms,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
-    def add_bond_length_sampling(self, name_out, dimension, bonds, num_bins=200, range=(0.0, 3.0)):
+    def add_bond_length_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, range=(0.0, 3.0)):
         """
         Add a BondLengthSampler to the Sample instance.
 
@@ -327,13 +342,14 @@ class Sample:
             Range (min, max) in Angstroms for histogram sampling.
         """
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "bonds": bonds,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_molecule_structure_sampling(self, name_out):
+    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box"):
         """
         Add a MoleculeStructureSampler to the Sample instance.
 
@@ -344,10 +360,11 @@ class Sample:
         """
         dimension = "MoleculeStructure"
         inputs = {"name_out": name_out,
-                  "dimension": dimension,}
+                  "dimension": dimension,
+                  "region": region,}
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
-    def add_rdf_sampling(self, name_out, dimension, pairs, num_bins=200, r_max=10.0):
+    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, r_max=10.0):
         """
         Add a RdfSampler to the Sample instance.
 
@@ -366,12 +383,27 @@ class Sample:
         r_max : float, optional
             Maximum distance for RDF calculation.
         """
+        dimension = "Histogram"
         inputs = {"name_out": name_out,
-                  "dimension": dimension,
                   "pairs": pairs,
+                  "dimension": dimension,
+                  "region": region,
                   "num_bins": num_bins,
                   "r_max": r_max,}
         self.sampler_inputs["rdf_samplers"].append(inputs)
+
+    def _add_sampler(self, sampler: Sampler):
+        """
+        Add a sampler to the Sample instance.
+
+        Parameters
+        ----------
+        sampler : Sampler
+            An instance of a Sampler subclass to be added
+        """
+        if not isinstance(sampler, Sampler):
+            raise TypeError("sampler must be an instance of Sampler class.")
+        self.samplers.append(sampler)
 
     def init_samplers(self, sampler_inputs, process_id):
         """
@@ -398,84 +430,98 @@ class Sample:
             for sampler in sampler_inputs[sampler_type]:
                 if sampler_type == "charge_samplers":
                     sampler_instance = ChargeSampler(name_out=sampler["name_out"],
-                                                     dimension=sampler["dimension"],
                                                      atoms=sampler["atoms"],
+                                                     dimension=sampler["dimension"],
+                                                     region=sampler["region"],
                                                      process_id=process_id,
                                                      atom_lib=self.name_to_type,
                                                      masses=self.masses,
                                                      num_frames=self.num_frames,
                                                      box=self.box,
+                                                     system=self.system_props,
                                                      num_bins=sampler["num_bins"],
                                                      range=sampler["range"])
                     add_atom_sampler(sampler_instance)
                 elif sampler_type == "density_samplers":
                     sampler_instance = DensitySampler(name_out=sampler["name_out"],
-                                                      dimension=sampler["dimension"],
                                                       atoms=sampler["atoms"],
+                                                      dimension=sampler["dimension"],
+                                                      region=sampler["region"],
                                                       process_id=process_id,
                                                       atom_lib=self.name_to_type,
                                                       masses=self.masses,
                                                       num_frames=self.num_frames,
                                                       box=self.box,
+                                                      system=self.system_props,
                                                       num_bins=sampler["num_bins"],
                                                       direction=sampler["direction"],
                                                       conditions=sampler["conditions"])
                     add_atom_sampler(sampler_instance)
                 elif sampler_type == "bond_density_samplers":
                     sampler_instance = BondDensitySampler(name_out=sampler["name_out"],
-                                                          dimension=sampler["dimension"],
                                                           bonds=sampler["bonds"],
+                                                          dimension=sampler["dimension"],
+                                                          region=sampler["region"],
                                                           process_id=process_id,
                                                           atom_lib=self.name_to_type,
                                                           masses=self.masses,
                                                           num_frames=self.num_frames,
                                                           box=self.box,
+                                                          system=self.system_props,
                                                           num_bins=sampler["num_bins"],
                                                           direction=sampler["direction"],
                                                           conditions=sampler["conditions"])
                     add_bond_sampler(sampler_instance)
                 elif sampler_type == "angle_samplers":
                     sampler_instance = AngleSampler(name_out=sampler["name_out"],
-                                                    dimension=sampler["dimension"],
                                                     atoms=sampler["atoms"],
+                                                    dimension=sampler["dimension"],
+                                                    region=sampler["region"],
                                                     process_id=process_id,
                                                     atom_lib=self.name_to_type,
                                                     masses=self.masses,
                                                     num_frames=self.num_frames,
                                                     box=self.box,
+                                                    system=self.system_props,
                                                     num_bins=sampler["num_bins"],
                                                     angle=sampler["angle"])
                     add_atom_sampler(sampler_instance)
                 elif sampler_type == "bond_length_samplers":
                     sampler_instance = BondLengthSampler(name_out=sampler["name_out"],
-                                                         dimension=sampler["dimension"],
                                                          bonds=sampler["bonds"],
+                                                         dimension=sampler["dimension"],
+                                                         region=sampler["region"],
                                                          process_id=process_id,
                                                          atom_lib=self.name_to_type,
                                                          masses=self.masses,
                                                          num_frames=self.num_frames,
                                                          box=self.box,
+                                                         system=self.system_props,
                                                          num_bins=sampler["num_bins"],
                                                          range=sampler["range"])
                     add_bond_sampler(sampler_instance)
                 elif sampler_type == "molecule_structure_samplers":
                     sampler_instance = MoleculeStructureSampler(name_out=sampler["name_out"],
                                                             dimension=sampler["dimension"],
+                                                            region=sampler["region"],
                                                             process_id=process_id,
                                                             atom_lib=self.name_to_type,
                                                             masses=self.masses,
                                                             num_frames=self.num_frames,
-                                                            box=self.box)
+                                                            box=self.box,
+                                                            system=self.system_props)
                     add_atom_sampler(sampler_instance)
                 elif sampler_type == "rdf_samplers":
                     sampler_instance = RdfSampler(name_out=sampler["name_out"],
-                                                  dimension=sampler["dimension"],
                                                   pairs=sampler["pairs"],
+                                                  dimension=sampler["dimension"],
+                                                  region=sampler["region"],
                                                   process_id=process_id,
                                                   atom_lib=self.name_to_type,
                                                   masses=self.masses,
                                                   num_frames=self.num_frames,
                                                   box=self.box,
+                                                  system=self.system_props,
                                                   num_bins=sampler["num_bins"],
                                                   r_max=sampler["r_max"])
                     add_atom_sampler(sampler_instance)
@@ -528,10 +574,12 @@ class Sample:
                                                                            )) for process_id in range(num_cores)]
                 pool.close()
                 pool.join()
-            print([r.get() for r in results])
+            # print([r.get() for r in results])
+            print("Parallel sampling completed.")
         else:
             print("Starting serial sampling...")
             self.sample_helper()
+            print("Serial sampling completed.")
 
         for sampler in self.samplers:
             sampler.join_samplers(num_cores=num_cores if is_parallel else 1)
@@ -596,21 +644,21 @@ class Sample:
             self.pipeline.modifiers.append(bond_modifier)
 
         # Prepare molecule indexing
+        # Example: for one atom type: [('O', None), ('O()', [[]]), ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
         molecules_per_atom_type = {}
         for atom_type in self.type_to_name:
             molecules_per_atom_type[atom_type] = []
             for identifier in self.molecules:
                 if self.molecules[identifier]["atom"] == atom_type:
                     bonds = self.molecules[identifier]["bonds"]
-                    molecules_per_atom_type[atom_type].append((bonds, identifier))
-            # Sort by number of bonds (fewest first)
-            molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1]))
+                    molecules_per_atom_type[atom_type].append((identifier, bonds))
+            # Sort molecules: first those without bond constraints, then by increasing number of bond constraints
+            molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1][0]) if x[1] is not None else -1)
+            # Remove atom types without registered molecules
             if molecules_per_atom_type[atom_type] == []:
                 molecules_per_atom_type.pop(atom_type)
-        # List for each molecule, which atoms belong to it
-        molecule_idx = {}
-        # List for each molecule, the bonded atoms of each atom
-        molecule_bonds = {}
+        molecule_idx = {} # Mask, that indicates for each molecule, which atoms belong to it. Shape: (num_particles, ) type: bool
+        molecule_bonds = {} # Mapping of molecule to the id of atoms it is bonded to. Shape: (num_particles, num_bonds_per_molecule) type: int
         for identifier in self.molecules:
             molecule_idx[identifier] = np.zeros(self.num_particles, dtype=bool)
             if self.molecules[identifier]["bonds"] != None:
@@ -631,15 +679,15 @@ class Sample:
 
             # Reset molecule indices
             for mol in molecule_idx:
-                molecule_idx[mol] = np.zeros(self.num_particles, dtype=bool)
-                molecule_bonds[mol] = np.zeros((self.num_particles, molecule_bonds[mol].shape[1], ), dtype=int)
+                molecule_idx[mol][:] = 0
+                molecule_bonds[mol][:] = 0
 
             # Identify molecules
             for atom_type in molecules_per_atom_type:
                 atoms = np.where(atom_types == atom_type)[0]
-                # Molecule registered without bond constraints; it should be first because of sorting
-                if molecules_per_atom_type[atom_type][0][0] == None:
-                    molecule_idx[molecules_per_atom_type[atom_type][0][1]][atoms] = 1
+                # Molecule registered without bond constraints; it is first because of sorting
+                if molecules_per_atom_type[atom_type][0][1] == None:
+                    molecule_idx[molecules_per_atom_type[atom_type][0][0]][atoms] = 1
                     # No other molecules of this atom type
                     if len(molecules_per_atom_type[atom_type]) == 1:
                         continue
@@ -649,13 +697,10 @@ class Sample:
                     particles = bond_topology[bonds].flatten()
                     other_particles = particles[particles != atom]
                     other_types = list(atom_types[other_particles])
-                    for bond_permutations, identifier in molecules_per_atom_type[atom_type]:
+                    for identifier, bond_permutations in molecules_per_atom_type[atom_type]:
                         if bond_permutations != None and other_types in bond_permutations:
                             molecule_idx[identifier][atom] = 1
                             molecule_bonds[identifier][atom] = other_particles
-            for mol in molecule_idx:
-                molecule_idx[mol] = np.where(molecule_idx[mol])[0]
-                molecule_bonds[mol] = molecule_bonds[mol][molecule_idx[mol]]
 
             # Reset bond indices
             for identifier in self.bonds:
@@ -673,10 +718,10 @@ class Sample:
                     mol_A = bond_info["mol_A"]
                     mol_B = bond_info["mol_B"]
                     if ((type_a == bond_def[0] and type_b == bond_def[1])):
-                        if atom_a in molecule_idx[mol_A] and atom_b in molecule_idx[mol_B]:
+                        if molecule_idx[mol_A][atom_a] and molecule_idx[mol_B][atom_b]:
                             bond_idx[identifier][bond_id] = 1
                     elif ((type_a == bond_def[1] and type_b == bond_def[0])):
-                        if atom_a in molecule_idx[mol_B] and atom_b in molecule_idx[mol_A]:
+                        if molecule_idx[mol_A][atom_b] and molecule_idx[mol_B][atom_a]:
                             bond_idx[identifier][bond_id] = 1
             for identifier in bond_idx:
                 bond_idx[identifier] = np.where(bond_idx[identifier])[0]

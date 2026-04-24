@@ -18,6 +18,7 @@ dependencies = [
     "ovito",
     "matplotlib",
     "jinja2",
+    "yaml",
 ]
 
 [tool.setuptools]

@@ -7,7 +7,7 @@ class BondLengthSampler(BondSampler):
     """
     Sampler class for bond lengths and bond orders between bonded atom pairs.
     """
-    def __init__(self, name_out: str, dimension: str, bonds: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, range: tuple):
         valid_dimensions = ["Bond Length", "Bond Order"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"BondLengthSampler does not support dimension {dimension}")
@@ -19,7 +19,7 @@ class BondLengthSampler(BondSampler):
             raise ValueError("BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self.num_bins = num_bins
         self.range = range
-        super().__init__(name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, range=range)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, range=range)
 
         # Setup data
         for identifier in self.bonds:
@@ -30,18 +30,20 @@ class BondLengthSampler(BondSampler):
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
-        bond_orders = frame.particles.get("Bond Order").array if "Bond Order" in frame.particles else np.zeros(frame.particles.bonds.count)
+        position_mask = self.region(positions)
         for identifier in self.bonds:
-            bonds = bond_topology[bond_index[identifier]]
-            if bonds.size == 0:
-                continue
+            bond_mask = np.zeros(bond_topology.shape[0], dtype=bool)
+            bond_mask[bond_index[identifier]] = True
+            bond_mask &= position_mask[bond_topology[:, 0]] & position_mask[bond_topology[:, 1]]
+            bonds = bond_topology[bond_mask]
             position = positions[bonds]
             if self.dimension == "Bond Length":
                 bond_lengths = np.linalg.norm(utils.min_image_convention(position[:, 0, :] - position[:, 1, :], self.box), axis=1)
                 hist, _ = np.histogram(bond_lengths, bins=self.num_bins, range=self.range)
                 self.data[identifier]["mean"] += np.sum(bond_lengths)
-            if self.dimension == "Bond Order":
-                bond_order = bond_orders[bond_index[identifier]]
+            elif self.dimension == "Bond Order":
+                bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(frame.particles.bonds.count)
+                bond_order = bond_orders[bond_mask]
                 hist, _ = np.histogram(bond_order, bins=self.num_bins, range=self.range)
                 self.data[identifier]["mean"] += np.sum(bond_order)
             self.data[identifier]["hist"] += hist

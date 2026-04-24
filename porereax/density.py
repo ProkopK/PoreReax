@@ -146,7 +146,7 @@ class DensitySampler(AtomSampler):
     """
     Sampler class for atomic densities.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for atomic densities.
 
@@ -189,7 +189,7 @@ class DensitySampler(AtomSampler):
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
-        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
         for identifier in self.molecules:
@@ -200,29 +200,30 @@ class DensitySampler(AtomSampler):
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
         positions = frame.particles.positions.array
-
+        position_mask = self.region(positions)
         for identifier in self.molecules:
-            atom_indices = mol_index[identifier]
+            mol_mask = mol_index[identifier] & position_mask
             # Apply conditions
             if "Charge" in self.conditions:
                 min_charge, max_charge = self.conditions["Charge"]
-                atom_charges = charges[atom_indices]
+                atom_charges = charges[mol_mask]
                 charge_mask = (atom_charges >= min_charge) & (atom_charges <= max_charge)
-                atom_indices = atom_indices[charge_mask]
+                mol_mask = mol_mask & charge_mask
             if "Angle" in self.conditions:
-                angles = self.__get_atom_angles(atom_indices, positions, mol_bonds[identifier])
+                atom_indices = np.where(mol_mask)[0]
+                angles = self._get_atom_angles(atom_indices, positions, mol_bonds[identifier])
                 min_angle, max_angle = self.conditions["Angle"]
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
                 angle_mask = np.any(angle_mask, axis=1)
-                atom_indices = atom_indices[angle_mask]
+                mol_mask = mol_mask & angle_mask
 
-            atom_positions = positions[atom_indices]
+            atom_positions = positions[mol_mask]
             # Record density
             _record_density(
                 self.data[identifier], self.dimension, atom_positions, frame_id, self.num_bins, self.box
             )
 
-    def __get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
+    def _get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
         """
         Calculate angles for atoms based on their bonded neighbors.
 
@@ -274,7 +275,7 @@ class BondDensitySampler(BondSampler):
     """
     Sampler class for bond densities.
     """
-    def __init__(self, name_out: str, dimension: str, bonds: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for bond densities.
 
@@ -318,7 +319,7 @@ class BondDensitySampler(BondSampler):
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
-        super().__init__(name_out, dimension, bonds, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
         for identifier in self.bonds:
@@ -357,7 +358,7 @@ class BondDensitySampler(BondSampler):
                 self.data[identifier], self.dimension, bond_midpoints, frame_id, self.num_bins, self.box
             )
 
-    def join_samplers(self, num_cores):
+    def join_samplers(self, num_cores: int) -> None:
         """
         Join data from multiple samplers after parallel processing.
 

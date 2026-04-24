@@ -1,14 +1,14 @@
 import numpy as np
-from porereax.meta_sampler import AtomSampler
 import porereax.utils as utils
-from matplotlib.axes import Axes
+
+from porereax.meta_sampler import AtomSampler
 
 
 class AngleSampler(AtomSampler):
     """
     Sampler class for angles formed by three atoms.
     """
-    def __init__(self, name_out: str, dimension: str, atoms: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, angle: str):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, angle: str):
         """
         Sampler for angles formed by three atoms.
 
@@ -29,7 +29,7 @@ class AngleSampler(AtomSampler):
         num_frames : int
             Total number of frames to sample.
         box : np.ndarray
-            Simulation box dimensions.
+            Simulation box dimension
         num_bins : int
             Number of bins for histogram sampling.
         angle : str
@@ -55,7 +55,7 @@ class AngleSampler(AtomSampler):
         self.angle = angle
         self.num_bins = num_bins
         self.range = (0, 180)
-        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=self.num_bins, range=self.range, angle=self.angle)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=self.num_bins, range=self.range, angle=self.angle)
 
         # Setup data
         for identifier, atoms_info in self.molecules.items():
@@ -66,10 +66,13 @@ class AngleSampler(AtomSampler):
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
+        position_mask = self.region(positions)
         for identifier, bonds_info in self.molecules.items():
-            atom_indices = mol_index[identifier]
-            angles = []
-            bonded_atoms = mol_bonds[identifier]
+            mol_mask = position_mask & mol_index[identifier]
+            if not np.any(mol_mask):
+                continue
+            atom_indices = np.where(mol_mask)[0]
+            bonded_atoms = mol_bonds[identifier][atom_indices]
             if bonded_atoms.shape[1] < 2:
                 continue
             if self.angle:
@@ -79,6 +82,7 @@ class AngleSampler(AtomSampler):
                 if bonds_info["atom"] != atom_b_type:
                     continue
                 bonded_types = atom_types[bonded_atoms]
+            angles = []
             for i in range(bonded_atoms.shape[1]):
                 for j in range(bonded_atoms.shape[1]):
                     if i == j:

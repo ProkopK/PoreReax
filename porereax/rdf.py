@@ -20,7 +20,7 @@ class RdfSampler(AtomSampler):
     """
     Sampler class for radial distribution functions (RDF).
     """
-    def __init__(self, name_out: str, dimension: str, pairs: list, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float):
+    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float, system: dict):
         """
         Sampler for radial distribution functions.
 
@@ -74,7 +74,7 @@ class RdfSampler(AtomSampler):
             atoms.append(atom1)
             atoms.append(atom2)
 
-        super().__init__(name_out, dimension, atoms, process_id, atom_lib, masses, num_frames, box, num_bins=num_bins, r_max=r_max)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, r_max=r_max)
 
         # Build pair identifiers
         self.pairs = []
@@ -107,7 +107,7 @@ class RdfSampler(AtomSampler):
         frame_id : int
             Frame number.
         mol_index : dict
-            Dictionary mapping identifiers to atom indices.
+            Dictionary mapping identifiers boolean masks for atoms.
         mol_bonds : dict
             Dictionary mapping identifiers to bonded atom arrays.
         bond_index : dict
@@ -119,17 +119,20 @@ class RdfSampler(AtomSampler):
         """
         from ovito.data import CutoffNeighborFinder
 
-        positions = frame.particles.positions.array
-
         # Create CutoffNeighborFinder for efficient neighbor search
         finder = CutoffNeighborFinder(self.r_max, frame)
+
+        positions = frame.particles.positions.array
+        position_mask = self.region(positions)
 
         for identifier_A, identifier_B in self.pairs:
             pair_key = f"{identifier_A}-{identifier_B}"
 
             # Get atom indices for both types
-            atom_indices_A = mol_index[identifier_A]
-            atom_indices_B = mol_index[identifier_B]
+            atom_mask_A = mol_index[identifier_A] & position_mask
+            atom_mask_B = mol_index[identifier_B] & position_mask
+            atom_indices_A = np.where(atom_mask_A)[0]
+            atom_indices_B = np.where(atom_mask_B)[0]
 
             if atom_indices_A.size == 0 or atom_indices_B.size == 0:
                 continue

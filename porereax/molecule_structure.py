@@ -10,11 +10,11 @@ class MoleculeStructureSampler(Sampler):
     """
     Sampler class for molecule structure analysis.
     """
-    def __init__(self, name_out: str, dimension: str, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray):
+    def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict):
         valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"MoleculeStructureSampler does not support dimension {dimension}")
-        super().__init__(name_out, dimension, process_id, atom_lib, masses, num_frames, box)
+        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system)
 
         # Setup data
         if self.dimension == "MoleculeStructure":
@@ -25,6 +25,8 @@ class MoleculeStructureSampler(Sampler):
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
+        positions = frame.particles.positions.array
+        position_mask = self.region(positions)
         if self.dimension == "MoleculeStructure":
             for atom_type in self.data["structure_counts"]:
                 atoms = np.where(atom_types == atom_type)[0]
@@ -34,9 +36,10 @@ class MoleculeStructureSampler(Sampler):
                     other_particles = particles[particles != atom]
                     other_types = np.sort(atom_types[other_particles])
                     key = tuple(other_types)
-                    if key not in self.data["structure_counts"][atom_type]:
-                        self.data["structure_counts"][atom_type][key] = 0
-                    self.data["structure_counts"][atom_type][key] += 1
+                    if position_mask[atom] == True:
+                        if key not in self.data["structure_counts"][atom_type]:
+                            self.data["structure_counts"][atom_type][key] = 0
+                        self.data["structure_counts"][atom_type][key] += 1
             self.data["num_frames"] += 1
 
     def join_samplers(self, num_cores):

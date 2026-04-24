@@ -6,6 +6,7 @@ PoreReax is a Python package designed for analyzing and setting up reactive mole
 import porereax.simulate as simulate
 import porereax.utils as utils
 import porereax.plot as plot
+import porereax.regions as regions
 
 import porereax.density as density
 import porereax.charge as charge
@@ -23,6 +24,7 @@ __all__ = [
     "simulate",
     "utils",
     "plot",
+    "regions",
     "density",
     "charge",
     "angle",
