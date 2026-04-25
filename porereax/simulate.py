@@ -159,7 +159,7 @@ class Simulate():
 
         self.job_file = None
         self.submit_cmd = None
-        self.lamps_command = None
+        self.lammps_command = None
         self.force_field = None
         self.force_field_atoms = None
         self.sim = []
@@ -201,12 +201,19 @@ class Simulate():
         -------
         >>> sim.set_job_file('/path/to/custom.job', 'sbatch', 'mpirun lmp -in {input_file} -log {log_file}')
         """
+        if file_path is None:
+            file_path = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
+        if sumbit_command is None:
+            sumbit_command = "sbatch"
+        if lammps_command is None:
+            lammps_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Job file {file_path} not found.")
         if not isinstance(sumbit_command, str) or sumbit_command == "":
             raise ValueError("submit_cmd must be a not empty string.")
         self.submit_cmd = sumbit_command
-        self.lamps_command = lammps_command
+        self.lammps_command = lammps_command
         self.job_file = file_path
 
     def set_force_field(self, force_field):
@@ -233,6 +240,10 @@ class Simulate():
         -------
         >>> sim.set_force_field('/path/to/ffield.reax')
         """
+        if force_field is None:
+            force_field = os.path.join(os.path.dirname(__file__), "templates", "reax.ffield")
+            print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
+
         if not os.path.isfile(force_field):
             raise FileNotFoundError(f"Force field file {force_field} not found.")
         self.force_field = force_field
@@ -343,16 +354,10 @@ class Simulate():
         self._create_input_file(os.path.join(self.path, "system.data"))
 
         # Copy force field file
-        if self.force_field is None:
-            self.force_field = os.path.join(os.path.dirname(__file__), "templates", "reax.ffield")
-            print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
+        self.set_force_field(None)
         os.system(f"cp {self.force_field} {os.path.join(self.path, 'reax.ffield')}")
 
-        if self.job_file is None:
-            self.job_file = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
-            self.submit_cmd = "sbatch"
-        if self.lamps_command is None:
-            self.lamps_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+        self.set_job_file(None, None, None)
 
         with open(self.job_file, 'r') as f:
             job_template = Template(f.read())
@@ -384,7 +389,7 @@ class Simulate():
                     SIMULATIONTASKSPERNODE=step["tasks_per_node"],
                     SIMULATIONTIME=step["wall_time"],
                     SIMULATIONLABEL=f"{self.name}_run_{step_idx}",
-                    LAMMPS_COMMAND=self.lamps_command.format(
+                    LAMMPS_COMMAND=self.lammps_command.format(
                         input_file=f"{file_name}.lmp",
                         log_file=f"{file_name}.log"
                     ),
@@ -579,7 +584,7 @@ class Simulate():
         for atom_type, count in atom_count.items():
             print(f"  Type {self.type_to_name[atom_type]}: {count} atoms")
 
-    def _create_input_file(self, file_path):
+    def _create_input_file(self, out_path):
         """
         Create a complete LAMMPS data file from GROMACS structure file.
 
@@ -589,8 +594,8 @@ class Simulate():
 
         Parameters
         ----------
-        file_path : str
-            Path where the LAMMPS data file should be written.
+        out_path : str
+            Path where the output LAMMPS data file should be written.
 
         Notes
         -----
@@ -602,7 +607,7 @@ class Simulate():
         box_dims, gro_data = self._read_gro_file()
         gro_data = [data for data in gro_data if self.gro_lib.get(data[2], 0) != ""] # Filter out ghost particles e.g. from tip4p water model
         num_atoms = len(gro_data)
-        with open(file_path, 'w') as file:
+        with open(out_path, 'w') as file:
             self._write_lammps_header(file, num_atoms, box_dims)
             self._write_lammps_data(file, gro_data)
-        print(f"LAMMPS data file written to {file_path}")
+        print(f"LAMMPS data file written to {out_path}")
