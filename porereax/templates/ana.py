@@ -45,7 +45,9 @@ for sim in range(num_sims):
     sampler.add_density_sampling(f"run_{sim}_density_cart_2d_xy_cond_ang", atoms=atoms, dimension="Cartesian2D", num_bins=200, direction="xy", conditions={"Angle": (75, 125)})
 
     sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_1d", bonds, "Cartesian1D", num_bins=800)
+    sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_2d_xy", bonds, "Cartesian2D", num_bins=800, direction="xy")
+    sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_2d_xy_cond_len", bonds, "Cartesian2D", num_bins=800, direction="xy", conditions={"Bond Length": (1.5, 2.0)})
 
-    sampler.add_rdf_sampling(f"run_{sim}_rdf", pairs, r_max=10.0, num_bins=200
+    sampler.add_rdf_sampling(f"run_{sim}_rdf", pairs, r_max=10.0, num_bins=200)
 
     sampler.sample(is_parallel=True)
