@@ -198,19 +198,19 @@ class DensitySampler(AtomSampler):
             )
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
-        charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
         for identifier in self.molecules:
             mol_mask = mol_index[identifier] & position_mask
             # Apply conditions
             if "Charge" in self.conditions:
+                charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
                 min_charge, max_charge = self.conditions["Charge"]
-                atom_charges = charges[mol_mask]
-                charge_mask = (atom_charges >= min_charge) & (atom_charges <= max_charge)
+                charge_mask = (charges >= min_charge) & (charges <= max_charge)
                 mol_mask = mol_mask & charge_mask
             if "Angle" in self.conditions:
-                atom_indices = np.where(mol_mask)[0]
+                # atom_indices = np.where(mol_mask)[0]
+                atom_indices = np.arange(positions.shape[0])
                 angles = self._get_atom_angles(atom_indices, positions, mol_bonds[identifier])
                 min_angle, max_angle = self.conditions["Angle"]
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
