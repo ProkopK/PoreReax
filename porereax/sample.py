@@ -285,7 +285,7 @@ class Sample:
         conditions : dict, optional
             Dictionary of conditions to filter bonds during sampling.
             Supported conditions:
-            - "Bond Order": tuple (min_order, max_order) to filter bonds by bond order.
+            - "Bond Length": tuple (min_len, max_len) to filter bonds by bond order.
         """
         inputs = {"name_out": name_out,
                   "bonds": bonds,
@@ -331,7 +331,7 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         dimension : str
-            Sampling dimension. Supported: "Histogram".
+            Sampling dimension. Supported: "Bond Length" and "Bond Order"
         bonds : list
             List of bonds to sample. Each bond is defined as a dictionary in the format:
             {"bond": "a-b", "bonds_A": [...], "bonds_B": [...]} where a and b are atom identifiers,
