@@ -290,9 +290,9 @@ class Simulate():
         Example
         -------
         >>> # Add equilibration run
-        >>> sim.add_sim('nvt', nsteps=50000, temp=300, dt=0.5)
-        >>> # Add production run
         >>> sim.add_sim('npt', nsteps=500000, temp=300, pressure=1, dt=0.5)
+        >>> # Add production run
+        >>> sim.add_sim('nvt', nsteps=50000, temp=300, dt=0.5)
         """
         self.sim.append({
             "type": type,

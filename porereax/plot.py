@@ -1,7 +1,6 @@
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 
 import porereax.utils as utils
 
@@ -127,7 +126,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
     fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
 
     sampler_type = data["input_params"]["sampler_type"]
-    if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler"]:
+    if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler", "BondDensitySampler", "DensitySampler", "RdfSampler"]:
         print(f"Warning: plot_hist is not implemented for sampler type {sampler_type}.")
         return
 
@@ -149,6 +148,23 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         x_label = "Angle / degrees"
         y_label = "Counts per Angle"
 
+    elif sampler_type == "BondDensitySampler" or sampler_type == "DensitySampler":
+        if data["input_params"]["dimension"] != "Cartesian1D":
+            print("Warning: plot_hist is only implemented for Cartesian1D density data. If using Cartesian2D or Time, consider using plot_2d_hist or plot_time instead.")
+            return
+        density_normalization = None
+        x_label = f"{data['input_params']['direction']} Position / nm"
+        y_label = "Density / atoms"
+        mean = False
+        density = True
+
+    elif sampler_type == "RdfSampler":
+        density_normalization = None
+        x_label = "Distance r / Å"
+        y_label = "g(r)"
+        mean = False
+        density = True
+
     for i, identifier in enumerate(identifiers):
         if identifier == "input_params":
             continue
@@ -157,7 +173,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
             continue
         bin_edges = data[identifier]["bin_edges"]
         hist = data[identifier]["hist"]
-        if density:
+        if density and density_normalization:
             hist = hist / data[identifier][density_normalization]
         std_hist = data[identifier]["std_hist"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
@@ -168,50 +184,6 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         ax.set_ylabel("Counts")
     else:
         ax.set_ylabel(y_label)
-
-def plot_1d_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, plot_kwargs = {}):
-    """
-    Plot 1D density histogram from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file containing sampled density data.
-    axis : Axes or bool, optional
-        Matplotlib Axes to plot on. If True, a new figure and axes are created.
-    identifiers : list, optional
-        List of molecule identifiers to plot. If empty, all identifiers are plotted.
-    colors : list, optional
-        List of colors for plotting.
-    std : bool, optional
-        Whether to plot standard deviation error bars.
-    mean : bool, optional
-        Whether to plot mean lines.
-    plot_kwargs : dict, optional
-        Additional keyword arguments for the plot function.
-
-    Returns
-    -------
-    None
-    """
-    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
-
-    if data["input_params"]["dimension"] != "Cartesian1D":
-        print("Data dimension is not 'Cartesian1D'. Cannot plot histogram.")
-        return
-    for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
-        if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
-            continue
-        bin_edges = data[identifier]["bin_edges"]
-        hist = data[identifier]["hist"]
-        std_hist = data[identifier]["std_hist"] if std else None
-        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], {}, std_hist)
-
-    ax.set_xlabel(f"{data['input_params']['direction']} Position / nm")
-    ax.set_ylabel("Density / atoms")
 
 def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=50):
     """
@@ -296,48 +268,3 @@ def plot_mol_structure(link_data: str, identifier):
     ax.set_xlabel("Molecule Structure")
     ax.xaxis.set_tick_params(rotation=90)
     ax.set_ylabel("Average Count per Frame")
-
-def plot_rdf(link_data: str, axis: Axes | bool = True, identifiers=[], colors=[], std=False, plot_kwargs={}):
-    """
-    Plot RDF from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file containing sampled RDF data.
-    axis : Axes or bool, optional
-        Matplotlib Axes to plot on. If True, a new figure and axes are created.
-    identifiers : list, optional
-        List of pair identifiers to plot. If empty, all pairs are plotted.
-    colors : list, optional
-        List of colors for plotting.
-    std : bool, optional
-        Whether to plot standard deviation error bars.
-    plot_kwargs : dict, optional
-        Additional keyword arguments for the plot function.
-
-    Returns
-    -------
-    None
-    """
-    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
-
-    if data["input_params"]["dimension"] != "Histogram":
-        print("Data dimension is not 'Histogram'. Cannot plot RDF.")
-        return
-
-    for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
-        if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
-            continue
-
-        bin_edges = data[identifier]["bin_edges"]
-        hist = data[identifier]["hist"]
-        std_hist = data[identifier]["std_hist"] if std else None
-
-        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist)
-
-    ax.set_xlabel("Distance r / Å")
-    ax.set_ylabel("g(r)")
