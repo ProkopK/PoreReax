@@ -10,10 +10,8 @@ It provides:
 
 import numpy as np
 import porereax.utils as utils
-import porereax.plot as plot_utils
 
 from porereax.meta_sampler import AtomSampler, Sampler
-from matplotlib.axes import Axes
 
 
 class RdfSampler(AtomSampler):

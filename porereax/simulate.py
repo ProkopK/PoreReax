@@ -25,6 +25,7 @@ Example
 """
 
 import os
+import shutil
 
 from jinja2 import Template
 
@@ -164,7 +165,7 @@ class Simulate():
         self.force_field_atoms = None
         self.sim = []
 
-    def set_job_file(self, file_path, sumbit_command, lammps_command=None):
+    def set_job_file(self, file_path, submit_command, lammps_command=None):
         """
         Specify a custom job submission template file and command.
 
@@ -177,7 +178,7 @@ class Simulate():
         file_path : str
             Path to the job submission template file. Must be a valid file that exists.
             The template should be compatible with your HPC scheduler (SLURM, PBS, etc.).
-        sumbit_command : str
+        submit_command : str
             Command to submit jobs to the scheduler (e.g., "sbatch" for SLURM,
             "qsub" for PBS/Torque). Must be a non-empty string.
         lammps_command : str, optional
@@ -189,7 +190,7 @@ class Simulate():
         FileNotFoundError
             If the specified job file does not exist.
         ValueError
-            If sumbit_command is not a non-empty string.
+            If submit_command is not a non-empty string.
 
         Notes
         -----
@@ -203,16 +204,16 @@ class Simulate():
         """
         if file_path is None:
             file_path = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
-        if sumbit_command is None:
-            sumbit_command = "sbatch"
+        if submit_command is None:
+            submit_command = "sbatch"
         if lammps_command is None:
             lammps_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
 
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Job file {file_path} not found.")
-        if not isinstance(sumbit_command, str) or sumbit_command == "":
-            raise ValueError("submit_cmd must be a not empty string.")
-        self.submit_cmd = sumbit_command
+        if not isinstance(submit_command, str) or submit_command == "":
+            raise ValueError("submit_command must be a non-empty string.")
+        self.submit_cmd = submit_command
         self.lammps_command = lammps_command
         self.job_file = file_path
 
@@ -248,7 +249,7 @@ class Simulate():
             raise FileNotFoundError(f"Force field file {force_field} not found.")
         self.force_field = force_field
 
-    def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, taskes_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
+    def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, tasks_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
         """
         Add a simulation step to the workflow.
 
@@ -273,7 +274,7 @@ class Simulate():
             Time step in femtoseconds. Default is 0.5 fs.
         nodes : int, optional
             Number of compute nodes to request for this job. Default is 1.
-        taskes_per_node : int, optional
+        tasks_per_node : int, optional
             Number of MPI tasks per node. Default is 64.
         wall_time : str, optional
             Maximum wall time for the job in HH:MM:SS format. Default is "20:00:00".
@@ -303,7 +304,7 @@ class Simulate():
             "thermo_freq": thermo_freq,
             "dump_freq": dump_freq,
             "nodes": nodes,
-            "tasks_per_node": taskes_per_node,
+            "tasks_per_node": tasks_per_node,
             "wall_time": wall_time,
         })
 
@@ -355,7 +356,7 @@ class Simulate():
 
         # Copy force field file
         self.set_force_field(None)
-        os.system(f"cp {self.force_field} {os.path.join(self.path, 'reax.ffield')}")
+        shutil.copy2(self.force_field, os.path.join(self.path, 'reax.ffield'))
 
         self.set_job_file(None, None, None)
 

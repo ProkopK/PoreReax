@@ -5,7 +5,7 @@ This module defines base Sampler classes, including BondSampler and AtomSampler,
 which can be extended for specific sampling tasks.
 """
 
-
+import abc
 import numpy as np
 import os
 import itertools
@@ -13,7 +13,7 @@ import porereax.utils as utils
 import porereax.regions as regions
 
 
-class Sampler:
+class Sampler(abc.ABC):
     """
     Base class for samplers.
     """
@@ -61,6 +61,7 @@ class Sampler:
             raise ValueError(f"{self.__class__.__name__} requires a numpy array 'box' parameter with shape (3,).")
         if system is not None and not isinstance(system, dict):
             raise ValueError(f"{self.__class__.__name__} requires a dictionary 'system' parameter or None.")
+
         self.name_out = name_out
         self.file_out = name_out + f"_proc_{process_id}.pkl"
         self.dimension = dimension
@@ -90,8 +91,9 @@ class Sampler:
         self.data.update({"input_params": self.input})
         utils.save_object(self.data, self.file_out)
 
-    def sample(self, **parameters):
-        print(f"Unknown sampler type: {type(self.__class__.__name__)}. Skipping...")
+    @abc.abstractmethod
+    def sample(self, frame_id, mol_index, mol_bonds, bond_index, frame, bond_enum):
+        """Sample data for the current frame. Must be implemented by subclasses."""
 
     def join_samplers(self, num_cores):
         """
@@ -187,9 +189,9 @@ class Sampler:
             atom_id = "X"
         else:
             raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
-        bonds.sort() if bonds != None else None
-        identifier = atom + "(" + "+".join(bonds) + ")" if bonds != None else atom
-        if bonds != None:
+        bonds = sorted(bonds) if bonds is not None else None
+        identifier = atom + "(" + "+".join(bonds) + ")" if bonds is not None else atom
+        if bonds is not None:
             bond_permutations = Sampler.permutate_bonds(bonds, atom_lib, class_name)
         else:
             bond_permutations = None
@@ -305,18 +307,22 @@ class BondSampler(Sampler):
             atom_A, atom_B = bond.split("-")
             bonds_A = bond_info.get("bonds_A", None)
             bonds_B = bond_info.get("bonds_B", None)
-            bonds_A = bonds_A.copy() if bonds_A != None else None
-            bonds_B = bonds_B.copy() if bonds_B != None else None
-            bonds_A.sort() if bonds_A != None else None
-            bonds_B.sort() if bonds_B != None else None
-            bond_info_A = "(" + "_".join(bonds_A) + ")" if bonds_A != None else ""
-            bond_info_B = "(" + "_".join(bonds_B) + ")" if bonds_B != None else ""
+            bonds_A = bonds_A.copy() if bonds_A is not None else None
+            bonds_B = bonds_B.copy() if bonds_B is not None else None
+            if bonds_A is not None:
+                bonds_A.sort()
+            if bonds_B is not None:
+                bonds_B.sort()
+            bond_info_A = "(" + "_".join(bonds_A) + ")" if bonds_A is not None else ""
+            bond_info_B = "(" + "_".join(bonds_B) + ")" if bonds_B is not None else ""
             identifier = bond_info_A + atom_A + "-" + atom_B + bond_info_B
 
-            bonds_A.append(atom_B) if bonds_A != None else None
-            bonds_B.append(atom_A) if bonds_B != None else None
-            bonds_A.sort() if bonds_A != None else None
-            bonds_B.sort() if bonds_B != None else None
+            if bonds_A is not None:
+                bonds_A.append(atom_B)
+                bonds_A.sort()
+            if bonds_B is not None:
+                bonds_B.append(atom_A)
+                bonds_B.sort()
 
             mol_identifier_A, mol_A = self.build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
             mol_identifier_B, mol_B = self.build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)

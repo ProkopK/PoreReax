@@ -54,8 +54,11 @@ class Sample:
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         """
         if "ovito" in sys.modules:
-            print("Please remove ovito from loaded modules before using Sample class.")
-            sys.exit(1)
+            raise RuntimeError(
+                "The 'ovito' module is already imported. Please remove it from the "
+                "loaded modules before creating a Sample instance to avoid conflicts "
+                "during parallel processing."
+            )
         with mp.Pool(1) as pool:
             num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, atom_lib, )).get()
 
@@ -106,6 +109,17 @@ class Sample:
                                "molecule_structure_samplers": [],
                                "rdf_samplers": [],
                                }
+        # Registry mapping sampler_inputs key -> (SamplerClass, kind, extra_kwarg_keys)
+        self._SAMPLER_REGISTRY = {
+            "charge_samplers":            (ChargeSampler,           "atom", ["atoms", "num_bins", "range"]),
+            "density_samplers":           (DensitySampler,          "atom", ["atoms", "num_bins", "direction", "conditions"]),
+            "bond_density_samplers":      (BondDensitySampler,      "bond", ["bonds", "num_bins", "direction", "conditions"]),
+            "angle_samplers":             (AngleSampler,            "atom", ["atoms", "num_bins", "angle"]),
+            "bond_length_samplers":       (BondLengthSampler,       "bond", ["bonds", "num_bins", "range"]),
+            "molecule_structure_samplers":(MoleculeStructureSampler,"atom", []),
+            "rdf_samplers":               (RdfSampler,              "atom", ["pairs", "num_bins", "r_max"]),
+        }
+
         self.samplers = []
         self.molecules = {}
         self.bonds = {}
@@ -138,10 +152,10 @@ class Sample:
         self.num_frames = len(self.frames)
 
         self.system_props = {} if system is not None else None
-        self.reservour = None # TODO : implement reservour handling
+        self.reservoir = None # TODO : implement reservoir handling
         if system is not None:
             system_data = utils.load_yaml(system)
-            self.reservour = system_data["system"]["reservour"]
+            self.reservoir = system_data["system"]["reservoir"]
             for pore_id in system_data:
                 if pore_id[:5] == "shape":
                     if system_data[pore_id]["shape"] == "CYLINDER":
@@ -417,114 +431,40 @@ class Sample:
             Process ID for parallel sampling.
         """
         def add_bond_sampler(sampler: BondSampler):
-            mols = sampler.get_mols()
-            self.molecules.update(mols)
-            bonds = sampler.get_bonds()
-            self.bonds.update(bonds)
+            self.molecules.update(sampler.get_mols())
+            self.bonds.update(sampler.get_bonds())
             self._add_sampler(sampler)
+
         def add_atom_sampler(sampler: AtomSampler):
-            mols = sampler.get_mols()
-            self.molecules.update(mols)
+            self.molecules.update(sampler.get_mols())
             self._add_sampler(sampler)
-        for sampler_type in sampler_inputs:
-            for sampler in sampler_inputs[sampler_type]:
-                if sampler_type == "charge_samplers":
-                    sampler_instance = ChargeSampler(name_out=sampler["name_out"],
-                                                     atoms=sampler["atoms"],
-                                                     dimension=sampler["dimension"],
-                                                     region=sampler["region"],
-                                                     process_id=process_id,
-                                                     atom_lib=self.name_to_type,
-                                                     masses=self.masses,
-                                                     num_frames=self.num_frames,
-                                                     box=self.box,
-                                                     system=self.system_props,
-                                                     num_bins=sampler["num_bins"],
-                                                     range=sampler["range"])
-                    add_atom_sampler(sampler_instance)
-                elif sampler_type == "density_samplers":
-                    sampler_instance = DensitySampler(name_out=sampler["name_out"],
-                                                      atoms=sampler["atoms"],
-                                                      dimension=sampler["dimension"],
-                                                      region=sampler["region"],
-                                                      process_id=process_id,
-                                                      atom_lib=self.name_to_type,
-                                                      masses=self.masses,
-                                                      num_frames=self.num_frames,
-                                                      box=self.box,
-                                                      system=self.system_props,
-                                                      num_bins=sampler["num_bins"],
-                                                      direction=sampler["direction"],
-                                                      conditions=sampler["conditions"])
-                    add_atom_sampler(sampler_instance)
-                elif sampler_type == "bond_density_samplers":
-                    sampler_instance = BondDensitySampler(name_out=sampler["name_out"],
-                                                          bonds=sampler["bonds"],
-                                                          dimension=sampler["dimension"],
-                                                          region=sampler["region"],
-                                                          process_id=process_id,
-                                                          atom_lib=self.name_to_type,
-                                                          masses=self.masses,
-                                                          num_frames=self.num_frames,
-                                                          box=self.box,
-                                                          system=self.system_props,
-                                                          num_bins=sampler["num_bins"],
-                                                          direction=sampler["direction"],
-                                                          conditions=sampler["conditions"])
-                    add_bond_sampler(sampler_instance)
-                elif sampler_type == "angle_samplers":
-                    sampler_instance = AngleSampler(name_out=sampler["name_out"],
-                                                    atoms=sampler["atoms"],
-                                                    dimension=sampler["dimension"],
-                                                    region=sampler["region"],
-                                                    process_id=process_id,
-                                                    atom_lib=self.name_to_type,
-                                                    masses=self.masses,
-                                                    num_frames=self.num_frames,
-                                                    box=self.box,
-                                                    system=self.system_props,
-                                                    num_bins=sampler["num_bins"],
-                                                    angle=sampler["angle"])
-                    add_atom_sampler(sampler_instance)
-                elif sampler_type == "bond_length_samplers":
-                    sampler_instance = BondLengthSampler(name_out=sampler["name_out"],
-                                                         bonds=sampler["bonds"],
-                                                         dimension=sampler["dimension"],
-                                                         region=sampler["region"],
-                                                         process_id=process_id,
-                                                         atom_lib=self.name_to_type,
-                                                         masses=self.masses,
-                                                         num_frames=self.num_frames,
-                                                         box=self.box,
-                                                         system=self.system_props,
-                                                         num_bins=sampler["num_bins"],
-                                                         range=sampler["range"])
-                    add_bond_sampler(sampler_instance)
-                elif sampler_type == "molecule_structure_samplers":
-                    sampler_instance = MoleculeStructureSampler(name_out=sampler["name_out"],
-                                                            dimension=sampler["dimension"],
-                                                            region=sampler["region"],
-                                                            process_id=process_id,
-                                                            atom_lib=self.name_to_type,
-                                                            masses=self.masses,
-                                                            num_frames=self.num_frames,
-                                                            box=self.box,
-                                                            system=self.system_props)
-                    add_atom_sampler(sampler_instance)
-                elif sampler_type == "rdf_samplers":
-                    sampler_instance = RdfSampler(name_out=sampler["name_out"],
-                                                  pairs=sampler["pairs"],
-                                                  dimension=sampler["dimension"],
-                                                  region=sampler["region"],
-                                                  process_id=process_id,
-                                                  atom_lib=self.name_to_type,
-                                                  masses=self.masses,
-                                                  num_frames=self.num_frames,
-                                                  box=self.box,
-                                                  system=self.system_props,
-                                                  num_bins=sampler["num_bins"],
-                                                  r_max=sampler["r_max"])
-                    add_atom_sampler(sampler_instance)
+        
+        common_kwargs = dict(
+            process_id=process_id,
+            atom_lib=self.name_to_type,
+            masses=self.masses,
+            num_frames=self.num_frames,
+            box=self.box,
+            system=self.system_props,
+        )
+
+        for sampler_type, sampler_configs in sampler_inputs.items():
+            if sampler_type not in self._SAMPLER_REGISTRY:
+                raise ValueError(f"Unknown sampler type: '{sampler_type}'")
+            SamplerClass, kind, extra_keys = self._SAMPLER_REGISTRY[sampler_type]
+            for cfg in sampler_configs:
+                kwargs = dict(
+                    name_out=cfg["name_out"],
+                    dimension=cfg["dimension"],
+                    region=cfg["region"],
+                    **common_kwargs,
+                    **{k: cfg[k] for k in extra_keys},
+                )
+                instance = SamplerClass(**kwargs)
+                if kind == "bond":
+                    add_bond_sampler(instance)
+                else:
+                    add_atom_sampler(instance)
 
     def sample(self, is_parallel=True, num_cores=0):
         """
@@ -655,13 +595,13 @@ class Sample:
             # Sort molecules: first those without bond constraints, then by increasing number of bond constraints
             molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1][0]) if x[1] is not None else -1)
             # Remove atom types without registered molecules
-            if molecules_per_atom_type[atom_type] == []:
+            if not molecules_per_atom_type[atom_type]:
                 molecules_per_atom_type.pop(atom_type)
         molecule_idx = {} # Mask, that indicates for each molecule, which atoms belong to it. Shape: (num_particles, ) type: bool
         molecule_bonds = {} # Mapping of molecule to the id of atoms it is bonded to. Shape: (num_particles, num_bonds_per_molecule) type: int
         for identifier in self.molecules:
             molecule_idx[identifier] = np.zeros(self.num_particles, dtype=bool)
-            if self.molecules[identifier]["bonds"] != None:
+            if self.molecules[identifier]["bonds"] is not None:
                 molecule_bonds[identifier] = np.zeros((self.num_particles, len(self.molecules[identifier]["bonds"][0]), ), dtype=int)
             else:
                 molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), )
@@ -686,7 +626,7 @@ class Sample:
             for atom_type in molecules_per_atom_type:
                 atoms = np.where(atom_types == atom_type)[0]
                 # Molecule registered without bond constraints; it is first because of sorting
-                if molecules_per_atom_type[atom_type][0][1] == None:
+                if molecules_per_atom_type[atom_type][0][1] is None:
                     molecule_idx[molecules_per_atom_type[atom_type][0][0]][atoms] = 1
                     # No other molecules of this atom type
                     if len(molecules_per_atom_type[atom_type]) == 1:
@@ -698,7 +638,7 @@ class Sample:
                     other_particles = particles[particles != atom]
                     other_types = list(atom_types[other_particles])
                     for identifier, bond_permutations in molecules_per_atom_type[atom_type]:
-                        if bond_permutations != None and other_types in bond_permutations:
+                        if bond_permutations is not None and other_types in bond_permutations:
                             molecule_idx[identifier][atom] = 1
                             molecule_bonds[identifier][atom] = other_particles
 

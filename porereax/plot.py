@@ -38,13 +38,13 @@ def _plot_setup(link_data: str, axis: Axes | bool = True, identifiers: list = No
     if colors is None:
         colors = []
     data = utils.load_object(link_data)
-    if axis == True:
+    if axis is True:
         fig, ax = plt.subplots()
     else:
         fig = None
         ax = axis
-    identifiers = data.keys() if identifiers == [] else identifiers
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if colors == [] else colors
+    identifiers = data.keys() if not identifiers else identifiers
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if not colors else colors
 
     return fig, ax, data, identifiers, colors
 
@@ -180,7 +180,7 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         std_mean = data[identifier]["std_mean"] if std and mean else None
         _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
     ax.set_xlabel(x_label)
-    if density == False:
+    if not density:
         ax.set_ylabel("Counts")
     else:
         ax.set_ylabel(y_label)
