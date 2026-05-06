@@ -1,3 +1,10 @@
+"""
+Module for sampling bond angles between triplets of bonded atoms.
+
+Provides the AngleSampler class which histograms bond angles (in degrees) for
+specified central atoms and optional A-B-C triplet filters.
+"""
+
 import numpy as np
 import porereax.utils as utils
 

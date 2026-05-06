@@ -1,3 +1,10 @@
+"""
+Module for sampling molecular structure (bonding environment) statistics.
+
+Provides the MoleculeStructureSampler class which counts how many times each
+atom type appears with a given set of bonded neighbours, per frame.
+"""
+
 import numpy as np
 import porereax.utils as utils
 import matplotlib.pyplot as plt
@@ -36,7 +43,7 @@ class MoleculeStructureSampler(Sampler):
                     other_particles = particles[particles != atom]
                     other_types = np.sort(atom_types[other_particles])
                     key = tuple(other_types)
-                    if position_mask[atom] == True:
+                    if position_mask[atom]:
                         if key not in self.data["structure_counts"][atom_type]:
                             self.data["structure_counts"][atom_type][key] = 0
                         self.data["structure_counts"][atom_type][key] += 1

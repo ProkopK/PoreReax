@@ -1,13 +1,14 @@
 """
-Module providing utility functions for sampling molecular data.
+Module providing utility functions for the PoreReax package.
 
-This module defines base Sampler classes, including BondSampler and AtomSampler,
-which can be extended for specific sampling tasks. It also includes functions
-for saving and loading Python objects using pickle.
+This module includes functions for saving and loading Python objects using
+pickle, loading YAML configuration files, and common mathematical operations
+such as the minimum-image convention.
 """
 
 
 import pickle
+import yaml
 from matplotlib.axes import Axes
 import numpy as np
 
@@ -57,7 +58,6 @@ def load_yaml(file_path: str) -> dict:
     dict
         The contents of the YAML file as a dictionary.
     """
-    import yaml
     with open(file_path, 'r') as f:
         data = yaml.safe_load(f)
     return data
