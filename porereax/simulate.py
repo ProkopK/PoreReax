@@ -487,7 +487,7 @@ class Simulate():
         - Prints box dimensions to stdout for user verification
         """
         with open(self.structure_file, 'r') as file:
-            lines = file.readlines()
+            lines = [l for l in file.readlines() if l.strip()]
 
         box_dims = [float(dim) * 10 for dim in lines[-1].strip().split()]
         print(f"Box dimensions (Angstroms): [{', '.join(f'{dim:.3f}' for dim in box_dims)}]")
