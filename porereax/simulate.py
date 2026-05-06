@@ -63,7 +63,8 @@ class Simulate():
     submit_cmd : str or None
         Command to submit jobs (e.g., 'sbatch', 'qsub').
     lamps_command : str or None
-        Custom command to run LAMMPS.    force_field : str or None
+        Custom command to run LAMMPS.
+    force_field : str or None
         Path to the ReaxFF force field parameter file.
     sim : list
         List of simulation steps to execute.
