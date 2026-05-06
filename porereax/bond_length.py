@@ -1,3 +1,10 @@
+"""
+Module for sampling bond lengths and bond orders between bonded atom pairs.
+
+Provides the BondLengthSampler class which histograms bond lengths (in Angstroms)
+or ReaxFF bond orders for specified atom-pair types.
+"""
+
 import numpy as np
 from porereax.meta_sampler import BondSampler
 import porereax.utils as utils
