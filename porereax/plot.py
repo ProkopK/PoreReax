@@ -253,7 +253,7 @@ def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
         plt.xlabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
         plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
     plt.axis('scaled')
-    plt.colorbar(label='Density / atoms')
+    plt.colorbar(label='Density / Counts per frame')
 
 def plot_mol_structure(link_data: str, identifier):
     data = utils.load_object(link_data)

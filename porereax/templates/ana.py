@@ -9,8 +9,8 @@ warnings.filterwarnings('ignore', message='.*OVITO.*PyPI')
 num_sims = {{ NUMSIMS }}
 
 for sim in range(num_sims):
-    bond_file = f"reax_run_{sim}.bonds"
-    traj_file = f"reax_run_{sim}.lammpstrj"
+    bond_file = f"run_{sim}.bonds"
+    traj_file = f"run_{sim}.lammpstrj"
 
     atom_lib = {{ NAME_TO_TYPE }}
     masses = {{ ATOM_MASSES }}
