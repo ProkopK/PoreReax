@@ -218,9 +218,12 @@ class DensitySampler(AtomSampler):
                 mol_mask = mol_mask & angle_mask
 
             atom_positions = positions[mol_mask]
-            # Record density
             _record_density(
-                self.data[identifier], self.dimension, atom_positions, frame_id, self.num_bins, self.box
+                self.data[identifier], 
+                self.dimension, atom_positions, 
+                frame_id, 
+                self.num_bins, 
+                self.box
             )
 
     def _get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
@@ -241,7 +244,7 @@ class DensitySampler(AtomSampler):
         angles : np.ndarray
             Calculated angles in degrees for the central atoms.
         """
-        angles = np.zeros((bonded_atoms.shape[0], bonded_atoms.shape[1] * bonded_atoms.shape[1]- bonded_atoms.shape[1]))
+        angles = np.zeros((bonded_atoms.shape[0], bonded_atoms.shape[1] * (bonded_atoms.shape[1] - 1)))
         for i in range(bonded_atoms.shape[1]):
             for j in range(bonded_atoms.shape[1]):
                 if i == j:
@@ -254,7 +257,7 @@ class DensitySampler(AtomSampler):
                 cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
                 cos_angle = np.clip(cos_angle, -1.0, 1.0)
                 angle_deg = np.degrees(np.arccos(cos_angle))
-                angles[:, i * (bonded_atoms.shape[1]-1) + j - (1 if j > i else 0)] = angle_deg
+                angles[:, i * (bonded_atoms.shape[1] - 1) + j - (1 if j > i else 0)] = angle_deg
         return np.array(angles)
 
     def join_samplers(self, num_cores):
@@ -355,7 +358,12 @@ class BondDensitySampler(BondSampler):
 
             # Record density
             _record_density(
-                self.data[identifier], self.dimension, bond_midpoints, frame_id, self.num_bins, self.box
+                self.data[identifier], 
+                self.dimension, 
+                bond_midpoints, 
+                frame_id, 
+                self.num_bins, 
+                self.box
             )
 
     def join_samplers(self, num_cores: int) -> None:

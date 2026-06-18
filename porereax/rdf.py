@@ -86,15 +86,14 @@ class RdfSampler(AtomSampler):
         # Setup data structures for each pair
         for identifier_A, identifier_B in self.pairs:
             pair_key = f"{identifier_A}-{identifier_B}"
-            if self.dimension == "Histogram":
-                hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0, self.r_max))
-                self.data[pair_key] = {
-                    "num_frames": 0,
-                    "num_atoms_A": 0,
-                    "num_atoms_B": 0,
-                    "hist": hist,
-                    "bin_edges": bin_edges,
-                }
+            hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0, self.r_max))
+            self.data[pair_key] = {
+                "num_frames": 0,
+                "num_atoms_A": 0, # needed for normalization
+                "num_atoms_B": 0, # needed for normalization
+                "hist": hist,
+                "bin_edges": bin_edges,
+            }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         """

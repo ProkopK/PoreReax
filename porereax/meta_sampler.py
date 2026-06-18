@@ -17,6 +17,7 @@ class Sampler(abc.ABC):
     """
     Base class for samplers.
     """
+
     def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system, **parameters):
         """
         Base sampler class.
@@ -98,6 +99,7 @@ class Sampler(abc.ABC):
     def join_samplers(self, num_cores):
         """
         Join sampler data from multiple processes.
+
         Parameters
         ----------
         num_cores : int

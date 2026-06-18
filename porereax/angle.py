@@ -66,9 +66,15 @@ class AngleSampler(AtomSampler):
 
         # Setup data
         for identifier, atoms_info in self.molecules.items():
-            if self.dimension == "Histogram":
-                hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
-                self.data[identifier] = {"num_frames": 0, "num_angles": 0, "mean_angle": 0.0, "hist": hist, "bin_edges": bin_edges, }
+            hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
+            self.data[identifier] = {
+                "num_frames": 0, 
+                "num_angles": 0, 
+                "mean_angle": 0.0, 
+                "hist": hist, 
+                "bin_edges": 
+                bin_edges, 
+            }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array

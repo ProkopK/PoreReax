@@ -17,6 +17,7 @@ class MoleculeStructureSampler(Sampler):
     """
     Sampler class for molecule structure analysis.
     """
+
     def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict):
         valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
@@ -24,30 +25,28 @@ class MoleculeStructureSampler(Sampler):
         super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system)
 
         # Setup data
-        if self.dimension == "MoleculeStructure":
-            self.data = {"num_frames": 0, "structure_counts": {}}
-            for atom_type in atom_lib.values():
-                self.data["structure_counts"][atom_type] = {}
+        self.data = {"num_frames": 0, "structure_counts": {}}
+        for atom_type in atom_lib.values():
+            self.data["structure_counts"][atom_type] = {}
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
-        if self.dimension == "MoleculeStructure":
-            for atom_type in self.data["structure_counts"]:
-                atoms = np.where(atom_types == atom_type)[0]
-                for atom in atoms:
-                    bonds = list(bond_enum.bonds_of_particle(atom))
-                    particles = bond_topology[bonds].flatten()
-                    other_particles = particles[particles != atom]
-                    other_types = np.sort(atom_types[other_particles])
-                    key = tuple(other_types)
-                    if position_mask[atom]:
-                        if key not in self.data["structure_counts"][atom_type]:
-                            self.data["structure_counts"][atom_type][key] = 0
-                        self.data["structure_counts"][atom_type][key] += 1
-            self.data["num_frames"] += 1
+        for atom_type in self.data["structure_counts"]:
+            atoms = np.where(atom_types == atom_type)[0]
+            for atom in atoms:
+                bonds = list(bond_enum.bonds_of_particle(atom))
+                particles = bond_topology[bonds].flatten()
+                other_particles = particles[particles != atom]
+                other_types = np.sort(atom_types[other_particles])
+                key = tuple(other_types)
+                if position_mask[atom]:
+                    if key not in self.data["structure_counts"][atom_type]:
+                        self.data["structure_counts"][atom_type][key] = 0
+                    self.data["structure_counts"][atom_type][key] += 1
+        self.data["num_frames"] += 1
 
     def join_samplers(self, num_cores):
         if self.process_id != -1:

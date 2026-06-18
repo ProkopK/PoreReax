@@ -8,6 +8,9 @@ version = "0.0.1"
 authors = [
     {name = "Karl Prokop", email = "st184141@stud.uni-stuttgart.de"}
 ]
+maintainers = [
+    {name = "Karl Prokop", email = "st184141@stud.uni-stuttgart.de"}
+]
 description = "A tool for generating and analysing reactive pore simulations using ReaxFF and LAMMPS."
 readme = "README.md"
 license = {text = "GNU General Public License v3.0"}
@@ -20,6 +23,18 @@ dependencies = [
     "jinja2",
     "pyyaml",
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+[project.urls]
+Homepage = "https://github.com/ProkopK/PoreReax"
+Repository = "https://github.com/ProkopK/PoreReax"
+Issues = "https://github.com/ProkopK/PoreReax/issues"
 
 [tool.setuptools]
 include-package-data = true
@@ -29,3 +44,4 @@ porereax = ["templates/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["./"]
+include = ["porereax*"]

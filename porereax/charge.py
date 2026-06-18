@@ -60,9 +60,8 @@ class ChargeSampler(AtomSampler):
 
         # Setup data
         for identifier, bonds_info in self.molecules.items():
-            if self.dimension == "Histogram":
-                hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
-                self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
+            hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
+            self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
@@ -74,7 +73,7 @@ class ChargeSampler(AtomSampler):
             hist, _ = np.histogram(atom_charges, bins=self.num_bins, range=self.range)
             self.data[identifier]["hist"] += hist
             self.data[identifier]["num_frames"] += 1
-            self.data[identifier]["num_atoms"] += mol_index[identifier].shape[0]
+            self.data[identifier]["num_atoms"] += atom_charges.shape[0]
             self.data[identifier]["mean_charge"] += np.sum(atom_charges)
 
     def join_samplers(self, num_cores):

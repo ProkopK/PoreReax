@@ -617,6 +617,7 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
+            # Molecule information
             # Reset molecule indices
             for mol in molecule_idx:
                 molecule_idx[mol][:] = 0
@@ -642,6 +643,7 @@ class Sample:
                             molecule_idx[identifier][atom] = 1
                             molecule_bonds[identifier][atom] = other_particles
 
+            # Bond information
             # Reset bond indices
             for identifier in self.bonds:
                 bond_idx[identifier] = np.zeros(bond_count, dtype=bool)
