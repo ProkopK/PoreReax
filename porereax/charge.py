@@ -18,7 +18,7 @@ class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, range: tuple):
         """
         Sampler for atomic charges.
 
@@ -56,7 +56,7 @@ class ChargeSampler(AtomSampler):
             raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self.num_bins = num_bins
         self.range = range
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, range=range)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
 
         # Setup data
         for identifier, bonds_info in self.molecules.items():

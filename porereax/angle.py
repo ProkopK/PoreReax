@@ -15,7 +15,7 @@ class AngleSampler(AtomSampler):
     """
     Sampler class for angles formed by three atoms.
     """
-    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, angle: str):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, angle: str):
         """
         Sampler for angles formed by three atoms.
 
@@ -62,7 +62,7 @@ class AngleSampler(AtomSampler):
         self.angle = angle
         self.num_bins = num_bins
         self.range = (0, 180)
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=self.num_bins, range=self.range, angle=self.angle)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self.num_bins, range=self.range, angle=self.angle)
 
         # Setup data
         for identifier, atoms_info in self.molecules.items():

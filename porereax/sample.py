@@ -16,6 +16,7 @@ import sys
 import porereax.utils as utils
 
 from typing import List, Dict, Tuple, Callable
+from numpy.typing import NDArray
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler, BondDensitySampler
 from porereax.angle import AngleSampler
@@ -99,7 +100,7 @@ class Sample:
         """
         self.trajectory_file = trajectory_file
         self.bond_file = bond_file
-        self.system = system
+        self.system = system # is only used to pass to the subprocesses but not used there
 
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": [],
@@ -151,20 +152,22 @@ class Sample:
         self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
         self.num_frames = len(self.frames)
 
-        self.system_props = {} if system is not None else None
-        self.reservoir = None # TODO : implement reservoir handling
+        pore_properties = {}
+        resv_properties = {}
         if system is not None:
             system_data = utils.load_yaml(system)
-            self.reservoir = system_data["system"]["reservoir"]
-            for pore_id in system_data:
-                if pore_id[:5] == "shape":
-                    if system_data[pore_id]["shape"] == "CYLINDER":
-                        if system_data[pore_id]["parameter"]["central"] != [0, 0, 1]:
+            for pore_name in system_data:
+                if pore_name[:5] == "shape":
+                    pore_id = int(pore_name.split("_")[1])
+                    if system_data[pore_name]["shape"] == "CYLINDER":
+                        if system_data[pore_name]["parameter"]["central"] != [0, 0, 1]:
                             raise NotImplementedError("Only CYLINDER pores with central axis along z (0,0,1) are supported.")
-                        self.system_props[pore_id] = {"type": "CYLINDER",}
-                        self.system_props[pore_id]["center"] = np.array(system_data[pore_id]["parameter"]["centroid"])
-                        self.system_props[pore_id]["radius"] = system_data[pore_id]["parameter"]["diameter"]
-                        self.system_props[pore_id]["length"] = system_data[pore_id]["parameter"]["length"]
+                        pore_properties[pore_id] = {"type": "CYLINDER",}
+                        pore_properties[pore_id]["center"] = np.array(system_data[pore_name]["parameter"]["centroid"])
+                        pore_properties[pore_id]["radius"] = system_data[pore_name]["parameter"]["diameter"]
+                        pore_properties[pore_id]["length"] = system_data[pore_name]["parameter"]["length"]
+            resv_properties = system_data["system"]["reservoir"]
+        self.system_properties = {"pores": pore_properties, "reservoir": resv_properties} if system is not None else None
 
     @staticmethod
     def get_trajectory_data(trajectory_file, bond_file, atom_lib):
@@ -221,7 +224,7 @@ class Sample:
 
         return num_particles, num_frames, box
 
-    def add_charge_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=800, range=(-2.0, 2.0)):
+    def add_charge_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=800, range=(-2.0, 2.0)):
         """
         Add a ChargeSampler to the Sample instance.
 
@@ -248,7 +251,7 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["charge_samplers"].append(inputs)
 
-    def add_density_sampling(self, name_out: str, atoms: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, direction="z", conditions={}):
+    def add_density_sampling(self, name_out: str, atoms: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add a DensitySampler to the Sample instance.
 
@@ -278,7 +281,7 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
 
-    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, direction="z", conditions={}):
+    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add a BondDensitySampler to the Sample instance.
 
@@ -310,7 +313,7 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["bond_density_samplers"].append(inputs)
 
-    def add_angle_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=180, angle="all"):
+    def add_angle_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=180, angle="all"):
         """
         Add an AngleSampler to the Sample instance.
 
@@ -336,7 +339,7 @@ class Sample:
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
-    def add_bond_length_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, range=(0.0, 3.0)):
+    def add_bond_length_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, range=(0.0, 3.0)):
         """
         Add a BondLengthSampler to the Sample instance.
 
@@ -363,7 +366,7 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[np.ndarray], np.ndarray] = "Box"):
+    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box"):
         """
         Add a MoleculeStructureSampler to the Sample instance.
 
@@ -378,7 +381,7 @@ class Sample:
                   "region": region,}
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
-    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[np.ndarray], np.ndarray] = "Box", num_bins=200, r_max=10.0):
+    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, r_max=10.0):
         """
         Add a RdfSampler to the Sample instance.
 
@@ -430,22 +433,13 @@ class Sample:
         process_id : int
             Process ID for parallel sampling.
         """
-        def add_bond_sampler(sampler: BondSampler):
-            self.molecules.update(sampler.get_mols())
-            self.bonds.update(sampler.get_bonds())
-            self._add_sampler(sampler)
-
-        def add_atom_sampler(sampler: AtomSampler):
-            self.molecules.update(sampler.get_mols())
-            self._add_sampler(sampler)
-        
         common_kwargs = dict(
             process_id=process_id,
             atom_lib=self.name_to_type,
             masses=self.masses,
             num_frames=self.num_frames,
             box=self.box,
-            system=self.system_props,
+            system_properties=self.system_properties,
         )
 
         for sampler_type, sampler_configs in sampler_inputs.items():
@@ -461,10 +455,12 @@ class Sample:
                     **{k: cfg[k] for k in extra_keys},
                 )
                 instance = SamplerClass(**kwargs)
+
+                # Add sampler instance to the list of samplers
                 if kind == "bond":
-                    add_bond_sampler(instance)
-                else:
-                    add_atom_sampler(instance)
+                    self.bonds.update(instance.get_bonds())
+                self.molecules.update(instance.get_mols())
+                self._add_sampler(instance)
 
     def sample(self, is_parallel=True, num_cores=0):
         """
@@ -488,6 +484,7 @@ class Sample:
         max_cores = min(avail_cores, cluster_tasks, self.num_frames) if cluster_tasks else min(avail_cores-1, self.num_frames)
         num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
 
+        # Run initialization of samplers in the main process to catch any potential issues before spawning subprocesses
         self.init_samplers(self.sampler_inputs, process_id=-1)
 
         if is_parallel and num_cores > 1:

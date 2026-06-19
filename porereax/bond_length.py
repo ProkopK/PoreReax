@@ -14,7 +14,7 @@ class BondLengthSampler(BondSampler):
     """
     Sampler class for bond lengths and bond orders between bonded atom pairs.
     """
-    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, range: tuple):
         valid_dimensions = ["Bond Length", "Bond Order"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"BondLengthSampler does not support dimension {dimension}")
@@ -26,7 +26,7 @@ class BondLengthSampler(BondSampler):
             raise ValueError("BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self.num_bins = num_bins
         self.range = range
-        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, range=range)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
 
         # Setup data
         for identifier in self.bonds:

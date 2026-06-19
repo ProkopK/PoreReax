@@ -18,7 +18,7 @@ class RdfSampler(AtomSampler):
     """
     Sampler class for radial distribution functions (RDF).
     """
-    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float, system: dict):
+    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float, system_properties: dict):
         """
         Sampler for radial distribution functions.
 
@@ -72,7 +72,7 @@ class RdfSampler(AtomSampler):
             atoms.append(atom1)
             atoms.append(atom2)
 
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, r_max=r_max)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, r_max=r_max)
 
         # Build pair identifiers
         self.pairs = []

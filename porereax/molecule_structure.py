@@ -18,11 +18,11 @@ class MoleculeStructureSampler(Sampler):
     Sampler class for molecule structure analysis.
     """
 
-    def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict):
+    def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict):
         valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"MoleculeStructureSampler does not support dimension {dimension}")
-        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system)
+        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
 
         # Setup data
         self.data = {"num_frames": 0, "structure_counts": {}}

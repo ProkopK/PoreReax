@@ -146,7 +146,7 @@ class DensitySampler(AtomSampler):
     """
     Sampler class for atomic densities.
     """
-    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for atomic densities.
 
@@ -189,7 +189,7 @@ class DensitySampler(AtomSampler):
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
         for identifier in self.molecules:
@@ -278,7 +278,7 @@ class BondDensitySampler(BondSampler):
     """
     Sampler class for bond densities.
     """
-    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for bond densities.
 
@@ -322,7 +322,7 @@ class BondDensitySampler(BondSampler):
         self.num_bins = num_bins
         self.direction = direction
         self.conditions = conditions
-        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
         for identifier in self.bonds:

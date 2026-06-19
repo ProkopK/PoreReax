@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def get_region_function(region, box, system):
+def get_region_function(region, box, system_properties):
     """
     Retrieve the region function based on the provided region identifier.
 
@@ -11,7 +11,7 @@ def get_region_function(region, box, system):
         The region identifier defining the region.
     box : np.ndarray
         Simulation box dimensions.
-    system : dict or None
+    system_properties : dict or None
         System properties for defining regions, if applicable.
 
     Returns
