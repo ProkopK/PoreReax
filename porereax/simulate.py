@@ -89,7 +89,7 @@ class Simulate():
             self._structure_file = os.path.join(os.path.split(self._path)[0], "nvt", "nvt.gro")
         else:
             self._name = os.path.basename(self._path)
-            self._structure_file = structure_file
+            self._structure_file = os.path.abspath(structure_file)
         if not os.path.isfile(self._structure_file):
             raise FileNotFoundError(f"Structure file {self._structure_file} not found.")
 
@@ -231,8 +231,6 @@ class Simulate():
         if not os.path.isfile(ffield):
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
-        print(f"Using force field file: {self._force_field}")
-
 
     def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, tasks_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
         """
