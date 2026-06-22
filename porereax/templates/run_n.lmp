@@ -27,6 +27,20 @@ fix npt all npt temp {{ TEMP }} {{ TEMP }} 100.0 iso {{ PRESS }} {{ PRESS }} 100
 {% elif SIMULATIONTYPE == "nve" %}
 fix nve all nve
 {% endif %}
+{% if IMAGE_DUMP_ENABLED %}
+variable img_xmin equal xlo+0.25*(xhi-xlo)
+variable img_xmax equal xhi-0.25*(xhi-xlo)
+variable img_ymin equal ylo+0.25*(yhi-ylo)
+variable img_ymax equal yhi-0.25*(yhi-ylo)
+variable img_zmin equal zlo+0.25*(zhi-zlo)
+variable img_zmax equal zhi-0.25*(zhi-zlo)
+region image_half block {{ IMAGE_REGION_BLOCK }} units box
+dump imagedump all image {{ IMAGE_DUMP_FREQ }} reax_run_{{ SIMNUMBER }}_image_*.png type type adiam {{ IMAGE_SPHERE_SIZE }} size {{ IMAGE_WIDTH }} {{ IMAGE_HEIGHT }} view {{ IMAGE_VIEW_THETA }} {{ IMAGE_VIEW_PHI }} center s {{ IMAGE_CENTER_X }} {{ IMAGE_CENTER_Y }} {{ IMAGE_CENTER_Z }} zoom {{ IMAGE_ZOOM }}
+dump_modify imagedump region image_half
+{% for line in IMAGE_COLOR_LINES %}
+{{ line }}
+{% endfor %}
+{% endif %}
 run {{ NSTEPS }}
 
 undump trajdump
@@ -39,6 +53,9 @@ unfix npt
 unfix nve
 {% elif SIMULATIONTYPE == "nvt" %}
 unfix nvt
+{% endif %}
+{% if IMAGE_DUMP_ENABLED %}
+undump imagedump
 {% endif %}
 write_restart run_{{ SIMNUMBER }}.data
 

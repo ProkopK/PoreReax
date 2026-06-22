@@ -25,10 +25,14 @@ Example
 """
 
 import os
+import re
 import shutil
 
 from jinja2 import Template
 
+
+_LAMMPS_COLOR_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+_HEX_COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}")
 
 class Simulate():
     """
@@ -133,6 +137,7 @@ class Simulate():
         self._lammps_command = None
         self._force_field = None
         self._sim = []
+        self.image_dump = None
 
     def set_job_file(self, file_path, submit_command, lammps_command=None):
         """
@@ -232,6 +237,129 @@ class Simulate():
         if not os.path.isfile(ffield):
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
+
+    def set_image_dump(self, plane="xy", dump_freq=None, sphere_size=0.8, zoom=1.6, image_width=1200, image_height=1200, atom_colors=None):
+        """
+        Enable image rendering during LAMMPS simulations.
+        Parameters
+        ----------
+        plane : str or None, optional
+            Viewing plane for the snapshot. Supported values are "xy", "xz", "yz".
+            Set to None to disable image generation.
+        dump_freq : int or None, optional
+            Frequency (in steps) for image output. If None, uses each simulation
+            step's trajectory dump frequency.
+        sphere_size : float, optional
+            Diameter of rendered atom spheres.
+        zoom : float, optional
+            Camera zoom factor for rendered images.
+        image_width : int, optional
+            Output image width in pixels.
+        image_height : int, optional
+            Output image height in pixels.
+        atom_colors : dict or None, optional
+            Optional mapping of atom names to LAMMPS color names
+            (example: {"Si": "yellow", "O": "red"}).
+        """
+        if plane is None:
+            self.image_dump = None
+            return
+        if not hasattr(self, "name_to_type"):
+            raise ValueError("Atom type mapping is not initialized. Set up simulation atom mappings first.")
+
+        if plane not in {"xy", "xz", "yz"}:
+            raise ValueError("plane must be one of: 'xy', 'xz', 'yz'.")
+        if dump_freq is not None and (isinstance(dump_freq, bool) or not isinstance(dump_freq, int) or dump_freq <= 0):
+            raise ValueError("dump_freq must be a positive integer or None.")
+        if not isinstance(sphere_size, (int, float)) or sphere_size <= 0:
+            raise ValueError("sphere_size must be a positive number.")
+        if not isinstance(zoom, (int, float)) or zoom <= 0:
+            raise ValueError("zoom must be a positive number.")
+        if not isinstance(image_width, int) or image_width <= 0:
+            raise ValueError("image_width must be a positive integer.")
+        if not isinstance(image_height, int) or image_height <= 0:
+            raise ValueError("image_height must be a positive integer.")
+        if atom_colors is not None:
+            if not isinstance(atom_colors, dict):
+                raise ValueError("atom_colors must be provided as a dictionary.")
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in atom_colors.items()):
+                raise ValueError("atom_colors keys and values must be strings.")
+            unknown_atoms = [atom for atom in atom_colors if atom not in self.name_to_type]
+            if unknown_atoms:
+                raise ValueError(f"Unknown atom names in atom_colors: {', '.join(unknown_atoms)}.")
+            if not all(_LAMMPS_COLOR_NAME_RE.fullmatch(color) or _HEX_COLOR_RE.fullmatch(color) for color in atom_colors.values()):
+                raise ValueError(
+                    "atom_colors values must be valid LAMMPS color identifiers or #RRGGBB colors."
+                )
+
+        self.image_dump = {
+            "plane": plane,
+            "dump_freq": dump_freq,
+            "sphere_size": sphere_size,
+            "zoom": zoom,
+            "image_width": image_width,
+            "image_height": image_height,
+            "atom_colors": atom_colors or {},
+        }
+
+    def _image_dump_template_data(self, step):
+        if self.image_dump is None:
+            return {
+                "IMAGE_DUMP_ENABLED": False,
+                "IMAGE_DUMP_FREQ": 0,
+                "IMAGE_SPHERE_SIZE": 0.8,
+                "IMAGE_ZOOM": 1.6,
+                "IMAGE_WIDTH": 1200,
+                "IMAGE_HEIGHT": 1200,
+                "IMAGE_VIEW_THETA": 0,
+                "IMAGE_VIEW_PHI": 0,
+                "IMAGE_CENTER_X": 0.5,
+                "IMAGE_CENTER_Y": 0.5,
+                "IMAGE_CENTER_Z": 0.5,
+                "IMAGE_REGION_BLOCK": "EDGE EDGE EDGE EDGE EDGE EDGE",
+                "IMAGE_COLOR_LINES": [],
+            }
+
+        plane_settings = {
+            "xy": {
+                "theta": 0,
+                "phi": 0,
+                "region_block": "EDGE EDGE EDGE EDGE v_img_zmin v_img_zmax",
+            },
+            "xz": {
+                "theta": 90,
+                "phi": 0,
+                "region_block": "EDGE EDGE v_img_ymin v_img_ymax EDGE EDGE",
+            },
+            "yz": {
+                "theta": 90,
+                "phi": 90,
+                "region_block": "v_img_xmin v_img_xmax EDGE EDGE EDGE EDGE",
+            },
+        }
+        view = plane_settings[self.image_dump["plane"]]
+        color_lines = []
+        for atom_name, color in self.image_dump["atom_colors"].items():
+            atom_type = self.name_to_type.get(atom_name)
+            if atom_type is None:
+                raise ValueError(f"Unknown atom name '{atom_name}' in atom_colors.")
+            color_lines.append(f"dump_modify imagedump acolor {atom_type} {color}")
+
+        return {
+            "IMAGE_DUMP_ENABLED": True,
+            "IMAGE_DUMP_FREQ": self.image_dump["dump_freq"] or step["dump_freq"],
+            "IMAGE_SPHERE_SIZE": self.image_dump["sphere_size"],
+            "IMAGE_ZOOM": self.image_dump["zoom"],
+            "IMAGE_WIDTH": self.image_dump["image_width"],
+            "IMAGE_HEIGHT": self.image_dump["image_height"],
+            "IMAGE_VIEW_THETA": view["theta"],
+            "IMAGE_VIEW_PHI": view["phi"],
+            "IMAGE_CENTER_X": 0.5,
+            "IMAGE_CENTER_Y": 0.5,
+            "IMAGE_CENTER_Z": 0.5,
+            "IMAGE_REGION_BLOCK": view["region_block"],
+            "IMAGE_COLOR_LINES": color_lines,
+        }
 
     def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, tasks_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
         """
@@ -366,7 +494,8 @@ class Simulate():
                     SIMULATIONTYPE=step["type"],
                     TEMP=step["temp"],
                     PRESS=step["pressure"],
-                    NSTEPS=step["nsteps"]
+                    NSTEPS=step["nsteps"],
+                    **self._image_dump_template_data(step),
                 )
                 f.write(file_content)
             job_file = os.path.join(self._path, f"{file_name}.job")
