@@ -27,20 +27,28 @@ fix npt all npt temp {{ TEMP }} {{ TEMP }} 100.0 iso {{ PRESS }} {{ PRESS }} 100
 {% elif SIMULATIONTYPE == "nve" %}
 fix nve all nve
 {% endif %}
-{% if IMAGE_DUMP_ENABLED %}
+{% if IMAGE_DUMP_ENABLED -%}
 variable img_xmin equal xlo+0.25*(xhi-xlo)
 variable img_xmax equal xhi-0.25*(xhi-xlo)
 variable img_ymin equal ylo+0.25*(yhi-ylo)
 variable img_ymax equal yhi-0.25*(yhi-ylo)
 variable img_zmin equal zlo+0.25*(zhi-zlo)
 variable img_zmax equal zhi-0.25*(zhi-zlo)
-region image_half block {{ IMAGE_REGION_BLOCK }} units box
-dump imagedump all image {{ IMAGE_DUMP_FREQ }} reax_run_{{ SIMNUMBER }}_image_*.png type type adiam {{ IMAGE_SPHERE_SIZE }} size {{ IMAGE_WIDTH }} {{ IMAGE_HEIGHT }} view {{ IMAGE_VIEW_THETA }} {{ IMAGE_VIEW_PHI }} center s {{ IMAGE_CENTER_X }} {{ IMAGE_CENTER_Y }} {{ IMAGE_CENTER_Z }} zoom {{ IMAGE_ZOOM }}
-dump_modify imagedump region image_half
-{% for line in IMAGE_COLOR_LINES %}
-{{ line }}
-{% endfor %}
+region image_half_xy block ${img_xmin} ${img_xmax} ${img_ymin} ${img_ymax} INF INF units box
+region image_half_xz block ${img_xmin} ${img_xmax} INF INF ${img_zmin} ${img_zmax} units box
+region image_half_yz block INF INF ${img_ymin} ${img_ymax} ${img_zmin} ${img_zmax} units box
+{% for image in IMAGE_DUMPS %}
+dump imagedump_{{ image.dump_id }} all image {{ image.dump_freq }} figures/run_{{ SIMNUMBER }}_image_{{ image.dump_id }}_{{ image.plane }}-*.jpg {{ image.type }} type size {{ image.image_width }} {{ image.image_height }} view {{ image.view_theta }} {{ image.view_phi }} center s {{ image.center_x }} {{ image.center_y }} {{ image.center_z }} zoom {{ image.zoom }}
+dump_modify imagedump_{{ image.dump_id }} region {{ image.region_id }}
+{%- if image.color_modify %}
+{{ image.color_modify }}
+{%- endif -%}
+{%- if image.size_modify %}
+{{ image.size_modify }}
+{%- endif -%}
+{% endfor -%}
 {% endif %}
+
 run {{ NSTEPS }}
 
 undump trajdump
@@ -54,8 +62,10 @@ unfix nve
 {% elif SIMULATIONTYPE == "nvt" %}
 unfix nvt
 {% endif %}
-{% if IMAGE_DUMP_ENABLED %}
-undump imagedump
-{% endif %}
+{% if IMAGE_DUMP_ENABLED -%}
+{% for image in IMAGE_DUMPS -%}
+undump imagedump_{{ image.dump_id }}
+{% endfor %}
+{% endif -%}
 write_restart run_{{ SIMNUMBER }}.data
 
