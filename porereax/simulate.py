@@ -101,7 +101,8 @@ class Simulate():
         if not all(isinstance(v, str) for v in gro_lib.values()):
             raise ValueError("All values in gro_lib must be strings representing atom names in the reaxFF force field.")
         self._gro_lib = gro_lib
-        self._type_to_name = dict(enumerate(set([v for v in gro_lib.values() if v != ""]), start=1))
+        gro_lib_values = sorted(set(v for v in gro_lib.values() if v != ""))
+        self._type_to_name = dict(enumerate(gro_lib_values, start=1))
         self._name_to_type = {v: k for k, v in self._type_to_name.items()}
         self._num_atom_types = max(self._type_to_name.keys())
 
