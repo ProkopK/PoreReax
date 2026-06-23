@@ -234,13 +234,14 @@ class Simulate():
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
 
-    def set_image_dump(self, plane="xy", dump_freq=None, zoom=2, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None):
+    def set_image_dump(self, plane="xy", dump_freq=None, zoom=1.5, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None, kwargs=None):
         """
         Enable image rendering during LAMMPS simulations.
         Parameters
         ----------
         plane : str or None, optional
-            Viewing plane for the snapshot. Supported values are "xy", "xz", "yz".
+            Viewing plane for the snapshot. Supported values are 
+            "xy", "xz", "yz". Default is "xy".
         dump_freq : int, optional
             Frequency (in steps) for writing image snapshots.
             If None, uses the same frequency as the trajectory dump.
@@ -261,6 +262,9 @@ class Simulate():
             map atom colors by their partial charges using a color gradient.
             If provided, this overrides atom_colors. 
             Example: "-1 2 ca 0.0 3 min royalblue 0 green max orangered"
+        kwargs : str or None, optional
+            Additional keyword arguments for the LAMMPS dump command. 
+            This can be used to pass extra options to the dump command.
         """
         if not isinstance(plane, str) or plane not in {"xy", "xz", "yz"}:
             raise ValueError("plane must be one of: 'xy', 'xz', 'yz'.")
@@ -290,6 +294,8 @@ class Simulate():
                 raise ValueError(f"Unknown atom names in atom_sizes: {', '.join(unknown_atoms)}.")
         if map_by_charge is not None and not isinstance(map_by_charge, str):
             raise ValueError("map_by_charge must be a string representing an amap string or None.")
+        if kwargs is not None and not isinstance(kwargs, str):
+            raise ValueError("kwargs must be a string or None.")
 
         if self.image_dump is None:
             self.image_dump = []
@@ -302,6 +308,7 @@ class Simulate():
             "atom_colors": atom_colors or {},
             "atom_sizes": atom_sizes or {},
             "map_by_charge": map_by_charge,
+            "kwargs": kwargs,
         })
 
     def _image_dump_template_data(self, step):
@@ -318,11 +325,11 @@ class Simulate():
             },
             "xz": {
                 "theta": 90,
-                "phi": 0,
+                "phi": 90,
             },
             "yz": {
                 "theta": 90,
-                "phi": 90,
+                "phi": 0,
             },
         }
         image_dumps = []
@@ -355,6 +362,7 @@ class Simulate():
                 "color_modify": color_modify if dump["atom_colors"] or dump["map_by_charge"] else "",
                 "size_modify": size_modify if dump["atom_sizes"] else "",
                 "type": "type" if not dump["map_by_charge"] else "q",
+                "kwargs": dump["kwargs"] if dump["kwargs"] else "",
             })
 
         return {"IMAGE_DUMP_ENABLED": True, "IMAGE_DUMPS": image_dumps}
