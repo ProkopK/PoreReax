@@ -234,9 +234,14 @@ class Simulate():
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
 
-    def set_image_dump(self, plane="xy", dump_freq=None, zoom=1.5, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None, kwargs=None):
+    def add_image_dump(self, plane="xy", dump_freq=None, zoom=1.5, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None, kwargs=None):
         """
-        Enable image rendering during LAMMPS simulations.
+        Add an image rendering during LAMMPS simulations.
+        It allows for the generation of image snapshots of the simulation at
+        specified intervals, with customizable viewing planes, zoom levels, 
+        and atom visualizations.
+        Multiple image dumps can be added to the simulation workflow with different settings.
+
         Parameters
         ----------
         plane : str or None, optional
@@ -312,6 +317,19 @@ class Simulate():
         })
 
     def _image_dump_template_data(self, step):
+        """
+        Generate template data for image dump settings in LAMMPS input scripts.
+
+        Parameters
+        ----------
+        step : dict
+            Dictionary containing simulation step parameters, including dump frequency.
+
+        Returns
+        -------
+        dict
+            Dictionary containing image dump settings for use in Jinja2 templates.
+        """
         if self.image_dump is None:
             return {
                 "IMAGE_DUMP_ENABLED": False,
