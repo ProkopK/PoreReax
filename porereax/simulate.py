@@ -133,6 +133,7 @@ class Simulate():
         self._lammps_command = None
         self._force_field = None
         self._sim = []
+        self.image_dump = None
 
     def set_job_file(self, file_path, submit_command, lammps_command=None):
         """
@@ -232,6 +233,157 @@ class Simulate():
         if not os.path.isfile(ffield):
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
+
+    def add_image_dump(self, plane="xy", dump_freq=None, zoom=1.5, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None, kwargs=None):
+        """
+        Add an image rendering during LAMMPS simulations.
+        It allows for the generation of image snapshots of the simulation at
+        specified intervals, with customizable viewing planes, zoom levels, 
+        and atom visualizations.
+        Multiple image dumps can be added to the simulation workflow with different settings.
+
+        Parameters
+        ----------
+        plane : str or None, optional
+            Viewing plane for the snapshot. Supported values are 
+            "xy", "xz", "yz". Default is "xy".
+        dump_freq : int, optional
+            Frequency (in steps) for writing image snapshots.
+            If None, uses the same frequency as the trajectory dump.
+        zoom : float, optional
+            Camera zoom factor for rendered images.
+        image_width : int, optional
+            Output image width in pixels.
+        image_height : int, optional
+            Output image height in pixels.
+        atom_colors : dict or None, optional
+            Optional mapping of atom names to LAMMPS color names
+            (example: {"Si": "yellow", "O": "red"}).
+        atom_sizes : dict or None, optional
+            Optional mapping of atom names to relative sphere sizes for rendering
+            (example: {"Si": 1.0, "O": 0.8}).
+        map_by_charge : str or None, optional
+            If not None, must be a string representing an amap string to
+            map atom colors by their partial charges using a color gradient.
+            If provided, this overrides atom_colors. 
+            Example: "-1 2 ca 0.0 3 min royalblue 0 green max orangered"
+        kwargs : str or None, optional
+            Additional keyword arguments for the LAMMPS dump command. 
+            This can be used to pass extra options to the dump command.
+        """
+        if not isinstance(plane, str) or plane not in {"xy", "xz", "yz"}:
+            raise ValueError("plane must be one of: 'xy', 'xz', 'yz'.")
+        if dump_freq is not None and (isinstance(dump_freq, bool) or not isinstance(dump_freq, int) or dump_freq <= 0):
+            raise ValueError("dump_freq must be a positive integer or None.")
+        if not isinstance(zoom, (int, float)) or zoom <= 0:
+            raise ValueError("zoom must be a positive number.")
+        if not isinstance(image_width, int) or image_width <= 0:
+            raise ValueError("image_width must be a positive integer.")
+        if not isinstance(image_height, int) or image_height <= 0:
+            raise ValueError("image_height must be a positive integer.")
+        if atom_colors is not None:
+            if not isinstance(atom_colors, dict):
+                raise ValueError("atom_colors must be provided as a dictionary.")
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in atom_colors.items()):
+                raise ValueError("atom_colors keys and values must be strings.")
+            unknown_atoms = [atom for atom in atom_colors if atom not in self._name_to_type]
+            if unknown_atoms:
+                raise ValueError(f"Unknown atom names in atom_colors: {', '.join(unknown_atoms)}.")
+        if atom_sizes is not None:
+            if not isinstance(atom_sizes, dict):
+                raise ValueError("atom_sizes must be provided as a dictionary.")
+            if not all(isinstance(k, str) and isinstance(v, (int, float)) and v > 0 for k, v in atom_sizes.items()):
+                raise ValueError("atom_sizes keys must be strings and values must be positive numbers.")
+            unknown_atoms = [atom for atom in atom_sizes if atom not in self._name_to_type]
+            if unknown_atoms:
+                raise ValueError(f"Unknown atom names in atom_sizes: {', '.join(unknown_atoms)}.")
+        if map_by_charge is not None and not isinstance(map_by_charge, str):
+            raise ValueError("map_by_charge must be a string representing an amap string or None.")
+        if kwargs is not None and not isinstance(kwargs, str):
+            raise ValueError("kwargs must be a string or None.")
+
+        if self.image_dump is None:
+            self.image_dump = []
+        self.image_dump.append({
+            "plane": plane,
+            "dump_freq": dump_freq,
+            "zoom": zoom,
+            "image_width": image_width,
+            "image_height": image_height,
+            "atom_colors": atom_colors or {},
+            "atom_sizes": atom_sizes or {},
+            "map_by_charge": map_by_charge,
+            "kwargs": kwargs,
+        })
+
+    def _image_dump_template_data(self, step):
+        """
+        Generate template data for image dump settings in LAMMPS input scripts.
+
+        Parameters
+        ----------
+        step : dict
+            Dictionary containing simulation step parameters, including dump frequency.
+
+        Returns
+        -------
+        dict
+            Dictionary containing image dump settings for use in Jinja2 templates.
+        """
+        if self.image_dump is None:
+            return {
+                "IMAGE_DUMP_ENABLED": False,
+                "IMAGE_DUMPS": [],
+            }
+
+        plane_settings = {
+            "xy": {
+                "theta": 0,
+                "phi": 0,
+            },
+            "xz": {
+                "theta": 90,
+                "phi": 90,
+            },
+            "yz": {
+                "theta": 90,
+                "phi": 0,
+            },
+        }
+        image_dumps = []
+        for dump_id, dump in enumerate(self.image_dump):
+            plane = dump["plane"]
+            view = plane_settings[plane]
+            if dump["map_by_charge"]:
+                color_modify = f"dump_modify imagedump_{dump_id} amap {dump['map_by_charge']}"
+            else:
+                color_modify = f"dump_modify imagedump_{dump_id} "
+                for atom_name, color in dump["atom_colors"].items():
+                    color_modify += f"acolor {self._name_to_type[atom_name]} {color} "
+            size_modify = f"dump_modify imagedump_{dump_id} "
+            for atom_name, size in dump["atom_sizes"].items():
+                size_modify += f"adiam {self._name_to_type[atom_name]} {size} "
+
+            image_dumps.append({
+                "plane": plane,
+                "dump_id": dump_id,
+                "region_id": f"image_half_{plane}",
+                "dump_freq": dump["dump_freq"] or step["dump_freq"],
+                "zoom": dump["zoom"],
+                "image_width": dump["image_width"],
+                "image_height": dump["image_height"],
+                "view_theta": view["theta"],
+                "view_phi": view["phi"],
+                "center_x": 0.5,
+                "center_y": 0.5,
+                "center_z": 0.5,
+                "color_modify": color_modify if dump["atom_colors"] or dump["map_by_charge"] else "",
+                "size_modify": size_modify if dump["atom_sizes"] else "",
+                "type": "type" if not dump["map_by_charge"] else "q",
+                "kwargs": dump["kwargs"] if dump["kwargs"] else "",
+            })
+
+        return {"IMAGE_DUMP_ENABLED": True, "IMAGE_DUMPS": image_dumps}
 
     def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, tasks_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
         """
@@ -346,6 +498,10 @@ class Simulate():
         if self._job_file is None or self._submit_cmd is None or self._lammps_command is None:
             self.set_job_file(None, None, None)
 
+        # Setup figure folder
+        if self.image_dump is not None:
+            os.makedirs(os.path.join(self._path, "figures"), exist_ok=True)
+
         with open(self._job_file, 'r') as f:
             job_template = Template(f.read())
         with open(os.path.join(os.path.dirname(__file__), "templates", "run_n.lmp"), 'r') as f:
@@ -356,6 +512,11 @@ class Simulate():
         for step_idx, step in enumerate(self._sim):
             file_name = f"run_{step_idx}"
             lmp_file = os.path.join(self._path, f"{file_name}.lmp")
+            lammps_command = "mkdir -p figures \n" if self.image_dump is not None else ""
+            lammps_command += self._lammps_command.format(
+                input_file=f"{file_name}.lmp",
+                log_file=f"{file_name}.log"
+            )
             with open(lmp_file, 'w') as f:
                 file_content = lmp_step_template.render(
                     SIMNUMBER=step_idx,
@@ -366,7 +527,8 @@ class Simulate():
                     SIMULATIONTYPE=step["type"],
                     TEMP=step["temp"],
                     PRESS=step["pressure"],
-                    NSTEPS=step["nsteps"]
+                    NSTEPS=step["nsteps"],
+                    **self._image_dump_template_data(step),
                 )
                 f.write(file_content)
             job_file = os.path.join(self._path, f"{file_name}.job")
@@ -376,10 +538,7 @@ class Simulate():
                     SIMULATIONTASKSPERNODE=step["tasks_per_node"],
                     SIMULATIONTIME=step["wall_time"],
                     SIMULATIONLABEL=f"{self._name}_run_{step_idx}",
-                    LAMMPS_COMMAND=self._lammps_command.format(
-                        input_file=f"{file_name}.lmp",
-                        log_file=f"{file_name}.log"
-                    ),
+                    LAMMPS_COMMAND=lammps_command,
                 )
                 f.write(file_content)
                 if step_idx+1<len(self._sim):

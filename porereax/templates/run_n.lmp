@@ -27,6 +27,25 @@ fix npt all npt temp {{ TEMP }} {{ TEMP }} 100.0 iso {{ PRESS }} {{ PRESS }} 100
 {% elif SIMULATIONTYPE == "nve" %}
 fix nve all nve
 {% endif %}
+{% if IMAGE_DUMP_ENABLED -%}
+variable img_xmid equal 0.5*(xlo+xhi)
+variable img_ymid equal 0.5*(ylo+yhi)
+variable img_zmid equal 0.5*(zlo+zhi)
+region image_half_xy block INF INF INF INF INF ${img_zmid} units box
+region image_half_xz block INF INF ${img_ymid} INF INF INF units box
+region image_half_yz block INF ${img_xmid} INF INF INF INF units box
+{% for image in IMAGE_DUMPS %}
+dump imagedump_{{ image.dump_id }} all image {{ image.dump_freq }} figures/run_{{ SIMNUMBER }}_image_{{ image.dump_id }}_{{ image.plane }}-*.jpg {{ image.type }} type size {{ image.image_width }} {{ image.image_height }} view {{ image.view_theta }} {{ image.view_phi }} center s {{ image.center_x }} {{ image.center_y }} {{ image.center_z }} zoom {{ image.zoom }} {{ image.kwargs }}
+dump_modify imagedump_{{ image.dump_id }} region {{ image.region_id }}
+{%- if image.color_modify %}
+{{ image.color_modify }}
+{%- endif -%}
+{%- if image.size_modify %}
+{{ image.size_modify }}
+{%- endif -%}
+{% endfor -%}
+{% endif %}
+
 run {{ NSTEPS }}
 
 undump trajdump
@@ -40,5 +59,10 @@ unfix nve
 {% elif SIMULATIONTYPE == "nvt" %}
 unfix nvt
 {% endif %}
+{% if IMAGE_DUMP_ENABLED -%}
+{% for image in IMAGE_DUMPS -%}
+undump imagedump_{{ image.dump_id }}
+{% endfor %}
+{% endif -%}
 write_restart run_{{ SIMNUMBER }}.data
 
