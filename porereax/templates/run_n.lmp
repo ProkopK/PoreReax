@@ -17,7 +17,7 @@ timestep {{ TIMESTEP }}
 thermo {{ THERMO_FREQ }}
 thermo_style custom step temp press pe ke etotal vol density
 dump trajdump all custom {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.lammpstrj id type x y z vx vy vz
-fix myspec all reaxff/species {{ DUMP_FREQ }} 1 {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.species element {{ ATOMS }}
+fix myspec all reaxff/species 1 1 {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.species element {{ ATOMS }}
 fix bond all reaxff/bonds {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.bonds
 fix removeMom all momentum 100 linear 1 1 1 rescale
 {% if SIMULATIONTYPE == "nvt" %}
