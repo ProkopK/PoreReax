@@ -203,7 +203,6 @@ class Sample:
         if bond_file:
             if not os.path.isfile(bond_file):
                 raise FileNotFoundError(f"Bond file '{bond_file}' not found.")
-            bond_modifier = LoadTrajectoryModifier()
             bond_modifier.source.load(bond_file)
             pipeline.modifiers.append(bond_modifier)
 
