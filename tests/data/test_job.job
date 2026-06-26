@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --nodes={{ SIMULATIONNODES }}
+#SBATCH --ntasks-per-node={{ SIMULATIONTASKSPERNODE }}
+#SBATCH --time={{ SIMULATIONTIME }}
+#SBATCH --job-name={{ SIMULATIONLABEL }}
+#SBATCH --cpus-per-task=1
+#SBATCH --error=%x_%j.err
+#SBATCH --output=%x_%j.out
+#SBATCH --partition=compute
+
+cd "${SLURM_SUBMIT_DIR}"
+module purge
+module load lammps
+
+{{ LAMMPS_COMMAND }}
