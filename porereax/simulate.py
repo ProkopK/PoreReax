@@ -173,13 +173,13 @@ class Simulate():
         >>> sim.set_job_file('/path/to/custom.job', 'sbatch', 'mpirun lmp -in {input_file} -log {log_file}')
         """
         # Validate and set job file path
-        if file_path is None and self._job_file is not None:
+        if file_path is None and self._job_file is None:
             f_path = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
         else:
             f_path = os.path.abspath(file_path)
 
         # Validate and set submit command
-        if submit_command is None and self._submit_cmd is not None:
+        if submit_command is None and self._submit_cmd is None:
             s_command = "sbatch"
         else:
             if not isinstance(submit_command, str) or submit_command == "":
@@ -187,7 +187,7 @@ class Simulate():
             s_command = submit_command.strip()
 
         # Validate and set LAMMPS command
-        if lammps_command is None and self._lammps_command is not None:
+        if lammps_command is None and self._lammps_command is None:
             l_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
         else:
             if not isinstance(lammps_command, str) or lammps_command == "":
