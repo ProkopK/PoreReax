@@ -98,8 +98,8 @@ class Sample:
         box : np.ndarray
             Simulation box dimensions.
         """
-        self.trajectory_file = trajectory_file
-        self.bond_file = bond_file
+        self.trajectory_file = os.path.abspath(trajectory_file)
+        self.bond_file = os.path.abspath(bond_file) if bond_file else None
         self.system = system # is only used to pass to the subprocesses but not used there
 
         self.sampler_inputs = {"charge_samplers": [],
@@ -197,12 +197,12 @@ class Sample:
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
-        if not isinstance(trajectory_file, str):
-            raise TypeError("trajectory_file must be a string path to the trajectory file.")
+        if not os.path.isfile(trajectory_file):
+            raise FileNotFoundError(f"Trajectory file '{trajectory_file}' not found.")
         pipeline = import_file(trajectory_file)
         if bond_file:
-            if not isinstance(bond_file, str):
-                raise TypeError("bond_file must be a string path to the bond file.")
+            if not os.path.isfile(bond_file):
+                raise FileNotFoundError(f"Bond file '{bond_file}' not found.")
             bond_modifier = LoadTrajectoryModifier()
             bond_modifier.source.load(bond_file)
             pipeline.modifiers.append(bond_modifier)
