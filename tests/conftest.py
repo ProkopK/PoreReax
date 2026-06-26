@@ -1,6 +1,6 @@
 import pytest
 
-from porereax.simulate import Simulate
+from porereax.simulate import Simulate # type: ignore
 from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
