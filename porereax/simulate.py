@@ -493,7 +493,9 @@ class Simulate():
         # Setup and copy force field file
         if self._force_field is None:
             self.set_force_field(None)
-        shutil.copy2(self._force_field, os.path.join(self._path, 'reax.ffield'))
+        target_force_field = os.path.join(self._path, 'reax.ffield')
+        if os.path.abspath(self._force_field) != os.path.abspath(target_force_field):
+            shutil.copy2(self._force_field, target_force_field)
 
         if self._job_file is None or self._submit_cmd is None or self._lammps_command is None:
             self.set_job_file(None, None, None)
