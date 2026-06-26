@@ -37,7 +37,7 @@ Repository = "https://github.com/ProkopK/PoreReax"
 Issues = "https://github.com/ProkopK/PoreReax/issues"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["porereax*"]
 
 [tool.setuptools.package-data]
