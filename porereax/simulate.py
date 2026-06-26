@@ -28,6 +28,7 @@ import os
 import shutil
 
 from jinja2 import Template
+from importlib.resources import files
 
 
 class Simulate():
@@ -174,7 +175,7 @@ class Simulate():
         """
         # Validate and set job file path
         if file_path is None and self._job_file is None:
-            f_path = os.path.join(os.path.dirname(__file__), "templates", "reax.job")
+            f_path = os.path.abspath(files("porereax").joinpath("templates", "reax.job"))
         else:
             f_path = os.path.abspath(file_path)
 
@@ -225,7 +226,7 @@ class Simulate():
         >>> sim.set_force_field('/path/to/reax.ffield')
         """
         if force_field is None:
-            ffield = os.path.join(os.path.dirname(__file__), "templates", "reax.ffield")
+            ffield = os.path.abspath(files("porereax").joinpath("templates", "reax.ffield"))
             print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
         else:
             ffield = os.path.abspath(force_field)
@@ -506,7 +507,8 @@ class Simulate():
 
         with open(self._job_file, 'r') as f:
             job_template = Template(f.read())
-        with open(os.path.join(os.path.dirname(__file__), "templates", "run_n.lmp"), 'r') as f:
+        run_template_path = os.path.abspath(files("porereax").joinpath("templates", "run_n.lmp"))
+        with open(run_template_path, 'r') as f:
             lmp_step_template = Template(f.read())
 
         atoms = ' '.join(self._type_to_name[k] for k in range(1, self._num_atom_types + 1))
@@ -547,7 +549,8 @@ class Simulate():
                     f.write(f"\n\n{self._submit_cmd} run_{step_idx+1}.job\n")
 
         # Create ana files
-        with open(os.path.join(os.path.dirname(__file__), "templates", "ana.py"), 'r') as f:
+        ana_template_path = os.path.abspath(files("porereax").joinpath("templates", "ana.py"))
+        with open(ana_template_path, 'r') as f:
             ana_template = Template(f.read())
         with open(os.path.join(self._path, "ana.py"), 'w') as f:
             file_content = ana_template.render(

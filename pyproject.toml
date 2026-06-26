@@ -36,12 +36,11 @@ Homepage = "https://github.com/ProkopK/PoreReax"
 Repository = "https://github.com/ProkopK/PoreReax"
 Issues = "https://github.com/ProkopK/PoreReax/issues"
 
-[tool.setuptools]
-include-package-data = true
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["porereax*"]
 
 [tool.setuptools.package-data]
-porereax = ["templates/**/*"]
-
-[tool.setuptools.packages.find]
-where = ["./"]
-include = ["porereax*"]
+porereax = [
+    "templates/**/*",
+]
