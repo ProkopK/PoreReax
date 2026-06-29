@@ -35,7 +35,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
-    "black",
+    "ruff",
 ]
 
 [project.urls]
@@ -55,9 +55,22 @@ source = ["src/porereax"]
 show_missing = true
 skip_covered = false
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ["py310"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.setuptools.packages.find]
 where = ["src"]
