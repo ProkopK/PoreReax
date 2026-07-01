@@ -95,4 +95,25 @@ def get_identifiers(link_data: str):
         List of identifiers present in the data file.
     """
     data = load_object(link_data)
-    return [identifier for identifier in data.keys() if identifier != "input_params"]
+    return [identifier for identifier in data.keys() if identifier != "input_params" and identifier != "num_frames"]
+
+def get_data(link_data: str, identifier: str):
+    """
+    Retrieve the data for a specific identifier from a data file.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file created by a sampler instance.
+    identifier : str
+        The identifier for which to retrieve the data.
+
+    Returns
+    -------
+    dict
+        The data corresponding to the specified identifier.
+    """
+    data = load_object(link_data)
+    if identifier not in data:
+        raise ValueError(f"Identifier '{identifier}' not found in the data file.")
+    return data[identifier]
