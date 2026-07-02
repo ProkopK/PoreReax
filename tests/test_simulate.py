@@ -1,6 +1,6 @@
 import pytest
 
-from porereax.simulate import Simulate # type: ignore
+from porereax.simulate import Simulate
 from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
@@ -46,10 +46,14 @@ def test_simulate_pore_with_setup(simulate_pore, tmp_path):
 
     simulate_pore.add_image_dump()
 
-    simulate_pore.add_image_dump(atom_colors={"Si": "orange", "O": "red", "H": "white"}, 
-    atom_sizes={"Si": 3, "O": 2, "H": 1}, 
-    kwargs="shiny 0.1 box no 0.01")
-    simulate_pore.add_image_dump(map_by_charge="amap -1 2 ca 0.0 3 min royalblue 0 green max orangered")
+    simulate_pore.add_image_dump(
+        atom_colors={"Si": "orange", "O": "red", "H": "white"},
+        atom_sizes={"Si": 3, "O": 2, "H": 1},
+        kwargs="shiny 0.1 box no 0.01",
+    )
+    simulate_pore.add_image_dump(
+        map_by_charge="amap -1 2 ca 0.0 3 min royalblue 0 green max orangered"
+    )
 
     simulate_pore.add_sim("nvt", 20000, 300)
     simulate_pore.add_sim("nvt", 20000, 300)
