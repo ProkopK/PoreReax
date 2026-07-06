@@ -11,6 +11,7 @@ import pickle
 import yaml
 from matplotlib.axes import Axes
 import numpy as np
+import os
 
 
 def save_object(obj, filename):
@@ -27,13 +28,13 @@ def save_object(obj, filename):
     with open(filename, 'wb') as f:
         pickle.dump(obj, f)
 
-def load_object(filename):
+def load_object(file_path):
     """
     Load a Python object from a file using pickle.
 
     Parameters
     ----------
-    filename : str
+    file_path : str
         The path to the file from which the object will be loaded.
 
     Returns
@@ -41,7 +42,10 @@ def load_object(filename):
     any
         The loaded Python object.
     """
-    with open(filename, 'rb') as f:
+    file_path = os.path.abspath(file_path)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"The file {file_path} does not exist.")
+    with open(file_path, 'rb') as f:
         return pickle.load(f)
 
 def load_yaml(file_path: str) -> dict:
@@ -58,6 +62,9 @@ def load_yaml(file_path: str) -> dict:
     dict
         The contents of the YAML file as a dictionary.
     """
+    file_path = os.path.abspath(file_path)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"The file {file_path} does not exist.")
     with open(file_path, 'r') as f:
         data = yaml.safe_load(f)
     return data
