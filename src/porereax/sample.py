@@ -60,7 +60,8 @@ class Sample:
                 "loaded modules before creating a Sample instance to avoid conflicts "
                 "during parallel processing."
             )
-        with mp.Pool(1) as pool:
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(1) as pool:
             num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, atom_lib, )).get()
 
         print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
@@ -496,7 +497,8 @@ class Sample:
                 print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to avoid infinite spawning of subprocesses.")
                 sys.exit(1)
             print(f"Starting parallel sampling with {num_cores} cores...")
-            with mp.Pool(num_cores) as pool:
+            ctx = mp.get_context("spawn")
+            with ctx.Pool(num_cores) as pool:
                 results = [pool.apply_async(self.init_subprocess_sampler, (self.name_to_type,
                                                                            self.masses,
                                                                            self.trajectory_file,
