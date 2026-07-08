@@ -48,7 +48,7 @@ def _plot_setup(link_data: str, axis: Axes | bool = True, identifiers: list = No
 
     return fig, ax, data, identifiers, colors
 
-def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, std_mean: float = None):
+def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, mean_std: float = None):
     """
     Plot a histogram curve on the given axis.
 
@@ -70,11 +70,11 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
         Standard deviation data for shading (default is None).
     mean_data : float, optional
         Mean value to plot as a vertical line (default is None).
-    std_mean : float, optional
+    mean_std : float, optional
         Standard deviation of the mean (default is None).
     """
     plot_kwargs["color"] = color
-    plot_kwargs['label'] = identifier
+    plot_kwargs["label"] = identifier
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
     axis.plot(bin_centers, hist_data, **plot_kwargs)
     if std_data is not None:
@@ -87,11 +87,11 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
             alpha=0.3)
     if mean_data is not None:
         axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
-    if std_mean is not None:
+    if mean_std is not None:
         axis.fill_betweenx(
             axis.get_ylim(),
-            mean_data - std_mean,
-            mean_data + std_mean,
+            mean_data - mean_std,
+            mean_data + mean_std,
             color=color,
             alpha=0.2
         )
@@ -175,10 +175,10 @@ def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors =
         hist = data[identifier]["hist"]
         if density and density_normalization:
             hist = hist / data[identifier][density_normalization]
-        std_hist = data[identifier]["std_hist"] if std else None
+        hist_std = data[identifier]["hist_std"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
-        std_mean = data[identifier]["std_mean"] if std and mean else None
-        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, std_hist, mean_value, std_mean)
+        mean_std = data[identifier]["mean_std"] if std and mean else None
+        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, hist_std, mean_value, mean_std)
     ax.set_xlabel(x_label)
     if not density:
         ax.set_ylabel("Counts")

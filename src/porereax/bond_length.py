@@ -69,12 +69,12 @@ class BondLengthSampler(BondSampler):
             num_bonds = np.sum(data_list[identifier]["num_bonds"])
             hist = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins)
             mean = np.sum(data_list[identifier]["mean"]) / num_bonds if num_bonds > 0 else 0.0
-            std_hist = np.std(data_list[identifier]["hist"], axis=0)
+            hist_std = np.std(data_list[identifier]["hist"], axis=0)
             combined_data[identifier]["num_frames"] = num_frames
             combined_data[identifier]["num_bonds"] = num_bonds
             combined_data[identifier]["mean"] = mean
             combined_data[identifier]["hist"] = hist
-            combined_data[identifier]["std_hist"] = std_hist
-            combined_data[identifier]["std_mean"] = 0 # TODO: fix std calculation
+            combined_data[identifier]["hist_std"] = hist_std
+            combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
             combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
         utils.save_object(combined_data, self.name_out + ".obj")

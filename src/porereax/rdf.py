@@ -204,7 +204,7 @@ class RdfSampler(AtomSampler):
                     combined_data[identifier]["hist"] = np.zeros(self.num_bins)
                 
                 combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self.num_bins)
-                combined_data[identifier]["std_hist"] = np.std(data_list[identifier]["hist"], axis=0)
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
                 combined_data[identifier]["bin_edges"] = bin_edges
 
         utils.save_object(combined_data, self.name_out + ".obj")

@@ -149,7 +149,7 @@ class AngleSampler(AtomSampler):
                 combined_data[identifier]["num_angles"] = num_angles
                 combined_data[identifier]["mean"] = np.sum(data_list[identifier]["mean_angle"]) / num_angles if num_angles > 0 else np.nan
                 combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins) # TODO check normalization
-                combined_data[identifier]["std_mean"] = 0 # TODO: fix std calculation
-                combined_data[identifier]["std_hist"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
+                combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
+                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
         utils.save_object(combined_data, self.name_out + ".obj")
