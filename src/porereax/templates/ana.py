@@ -1,4 +1,4 @@
-import porereax as prx
+from porereax import Sample
 
 import warnings
 warnings.filterwarnings('ignore', message='.*OVITO.*PyPI')
@@ -15,7 +15,7 @@ for sim in range(num_sims):
     atom_lib = {{ NAME_TO_TYPE }}
     masses = {{ ATOM_MASSES }}
 
-    sampler = prx.sample.Sample(atom_lib, masses, traj_file, bond_file, start_end_nthframe=(0,-1,1))
+    sampler = Sample(atom_lib, masses, traj_file, bond_file, start_end_nthframe=(0,-1,1))
     atoms = [
         # {"atom": "a"},
         # {"atom": "b"},
