@@ -1,29 +1,34 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath("../../src"))
+from porereax import __version__
 
-
-# Configuration file for the Sphinx documentation builder.
-#
-# For the full list of built-in configuration values, see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-
-# -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'PoreReax'
 copyright = '2026, Karl Prokop'
 author = 'Karl Prokop'
-
-# -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+release = __version__
+version = __version__
 
 extensions = [
-    "sphinx.ext.autodoc",       # pulls docstrings from your code
-    "sphinx.ext.napoleon",      # lets you write Google/NumPy-style docstrings
-    "sphinx.ext.viewcode",      # adds links to highlighted source code
-    "sphinx.ext.intersphinx",   # links to other projects' docs (e.g. Python, numpy)
-    "sphinx_autodoc_typehints", # shows type hints nicely instead of duplicating in docstring
+    "autoapi.extension",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx_autodoc_typehints",
+]
+
+autoapi_type = "python"
+autoapi_dirs = ["../../src/porereax"]
+autoapi_ignore = ["*/templates/*"]
+autoapi_output_dir = "api"
+autoapi_add_toctree_entry = True
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "special-members",
 ]
 
 napoleon_google_docstring = False
@@ -36,10 +41,6 @@ intersphinx_mapping = {
 templates_path = ['_templates']
 exclude_patterns = []
 
-
-
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
 html_static_path = ['_static']
