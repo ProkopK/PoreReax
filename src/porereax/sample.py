@@ -225,23 +225,43 @@ class Sample:
 
         return num_particles, num_frames, box
 
+    # --------------------------- Add Sampler Methods ---------------------------
+    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box"):
+        """
+        Add sampling for molecule structures to analyze the bonding of atoms and identify substructures.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+        """
+        dimension = "MoleculeStructure"
+        inputs = {"name_out": name_out,
+                  "dimension": dimension,
+                  "region": region,}
+        self.sampler_inputs["molecule_structure_samplers"].append(inputs)
+
     def add_charge_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=800, range=(-2.0, 2.0)):
         """
-        Add a ChargeSampler to the Sample instance.
+        Add sampling for charge distribution of the central atom in the specified atom structures.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         atoms : list
-            List of atom identifiers to sample.
+            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
+            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
         region : str or function, optional
-            Region to sample charges from. Supported: "Box" or a user-defined 
-            function that takes atom positions as input and returns a boolean mask.
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
-            Number of bins for histogram sampling.
+            Number of bins for the histogram. Default is 800.
         range : tuple, optional
-            Range (min, max) for histogram sampling.
+            Range (min, max) in e for which to compute the histogram. Default is (-2.0, 2.0).
         """
         dimension = "Histogram"
         inputs = {"name_out": name_out,
@@ -254,24 +274,34 @@ class Sample:
 
     def add_density_sampling(self, name_out: str, atoms: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
         """
-        Add a DensitySampler to the Sample instance.
+        Add sampling for time or position density distribution of the specified atom structures. For positional sampling the position of the central atom is used.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
+        atoms : list
+            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
+            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
         dimension : str
             Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
-        atoms : list
-            List of atom identifiers to sample.
+            - "Time": Samples the amount of atom structures over time.
+            - "Cartesian1D": Samples the amount of atom structures along a specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of atom structures in a 2D plane (xy, xz, or yz) in the simulation box.
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
-            Number of bins for position sampling. Relevant for Cartesian1D.
+            Number of bins for position sampling. Not used for time sampling.
         direction : str, optional
-            Direction along which to sample. For Cartesian1D, use ("x", "y", or "z").
+            Direction along which to sample. Options depending on the dimension:
+            - For "Cartesian1D": use ("x", "y", or "z").
+            - For "Cartesian2D": use ("xy", "xz", or "yz").
         conditions : dict, optional
             Dictionary of conditions to filter atoms during sampling.
             Supported conditions:
             - "Charge": tuple (min_charge, max_charge) to filter atoms by charge.
+            - "Angle": tuple (min_angle, max_angle) to filter atoms by angle formed with bonded atoms.
         """
         inputs = {"name_out": name_out,
                   "atoms": atoms,
@@ -282,54 +312,26 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
 
-    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
-        """
-        Add a BondDensitySampler to the Sample instance.
-
-        Parameters
-        ----------
-        name_out : str
-            Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
-        bonds : list
-            List of bonds to sample. Each bond is defined as a dictionary in the format:
-            {"bond": "a-b", "bonds_A": [...], "bonds_B": [...]} where a and b are atom identifiers,
-            and bonds_A and bonds_B are lists of atom identifiers that atoms a and b are bonded to, respectively.
-        num_bins : int, optional
-            Number of bins for position sampling. Relevant for Cartesian1D.
-        direction : str, optional
-            Direction along which to sample. For Cartesian1D, use ("x", "y", or "z").
-        conditions : dict, optional
-            Dictionary of conditions to filter bonds during sampling.
-            Supported conditions:
-            - "Bond Length": tuple (min_len, max_len) to filter bonds by bond order.
-        """
-        inputs = {"name_out": name_out,
-                  "bonds": bonds,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "direction": direction,
-                  "conditions": conditions,}
-        self.sampler_inputs["bond_density_samplers"].append(inputs)
-
     def add_angle_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=180, angle="all"):
         """
-        Add an AngleSampler to the Sample instance.
+        Add sampling for angle distribution of the specified atom structures. The angle is defined by the central atom and its bonded atoms. 
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Histogram".
         atoms : list
-            List of atom identifiers to sample.
+            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
+            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
-            Number of bins for histogram sampling.
+            Number of bins for the histogram. Default is 180.
         angle : str, optional
-            Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
+            Angle of interested atoms. Supported: "all", "a-b-c"
+            - "all": Samples all angles formed by the central atom and all of its bonded atoms.
+            - "a-b-c": Samples only the angle formed by the central atom (b) and two specific bonded atoms (a and c), regardless of other bonded atoms d, ... With a, b, c being atom identifiers. 
         """
         dimension = "Histogram"
         inputs = {"name_out": name_out,
@@ -340,6 +342,45 @@ class Sample:
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
+    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
+        """
+        Add sampling for time or position density distribution of the specified bonds. For positional sampling the position of the bond center is used.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        bonds : list
+            List of bonds to sample. Each bond is defined as a dictionary in the format:
+            {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d, ...]}, where a and b are the bonded atoms, and c, d, ... are the atoms bonded to A and B, respectively. With a, b, c, d being atom identifiers. Atom b/a does not need to be added to the "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and "bonds_B" lists does not matter. The "bonds_A" and "bonds_B" lists can be empty to indicate that the atoms a and b are not bonded to any other atoms. If the dictionary does not contain the "bonds_A" or "bonds_B" keys, every bond of type a-b will be sampled regardless of its bonding environment.
+        dimension : str
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+            - "Time": Samples the amount of the specified bonds over time.
+            - "Cartesian1D": Samples the amount of the specified bonds along a specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of the specified bonds in a 2D plane (xy, xz, or yz) in the simulation box.
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+        num_bins : int, optional
+            Number of bins for position sampling. Not used for time sampling.
+        direction : str, optional
+            Direction along which to sample. Options depending on the dimension:
+            - For "Cartesian1D": use ("x", "y", or "z").
+            - For "Cartesian2D": use ("xy", "xz", or "yz").
+        conditions : dict, optional
+            Dictionary of conditions to filter bonds during sampling.
+            Supported conditions:
+            - "Bond Length": tuple (min_len, max_len) to filter bonds by bond length.
+        """
+        inputs = {"name_out": name_out,
+                  "bonds": bonds,
+                  "dimension": dimension,
+                  "region": region,
+                  "num_bins": num_bins,
+                  "direction": direction,
+                  "conditions": conditions,}
+        self.sampler_inputs["bond_density_samplers"].append(inputs)
+
     def add_bond_length_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, range=(0.0, 3.0)):
         """
         Add a BondLengthSampler to the Sample instance.
@@ -348,16 +389,20 @@ class Sample:
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Bond Length" and "Bond Order"
         bonds : list
             List of bonds to sample. Each bond is defined as a dictionary in the format:
-            {"bond": "a-b", "bonds_A": [...], "bonds_B": [...]} where a and b are atom identifiers,
-            and bonds_A and bonds_B are lists of atom identifiers that atoms a and b are bonded to, respectively.
+            {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d, ...]}, where a and b are the bonded atoms, and c, d, ... are the atoms bonded to A and B, respectively. With a, b, c, d being atom identifiers. Atom b/a does not need to be added to the "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and "bonds_B" lists does not matter. The "bonds_A" and "bonds_B" lists can be empty to indicate that the atoms a and b are not bonded to any other atoms. If the dictionary does not contain the "bonds_A" or "bonds_B" keys, every bond of type a-b will be sampled regardless of its bonding environment.
+        dimension : str
+            Sampling dimension. Supported: "Bond Length" and "Bond Order"
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
-            Number of bins for histogram sampling.
+            Number of bins for the histogram. Default is 200.
         range : tuple, optional
-            Range (min, max) in Angstroms for histogram sampling.
+            Range (min, max) for which to compute the histogram. Default is (0.0, 3.0).
+            - For "Bond Length": range is in Angstroms.
+            - For "Bond Order": range is in bond order units defined by the ReaxFF force field.
         """
         inputs = {"name_out": name_out,
                   "bonds": bonds,
@@ -367,22 +412,7 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box"):
-        """
-        Add a MoleculeStructureSampler to the Sample instance.
-
-        Parameters
-        ----------
-        name_out : str
-            Name of the output directory and object file of the sampler data
-        """
-        dimension = "MoleculeStructure"
-        inputs = {"name_out": name_out,
-                  "dimension": dimension,
-                  "region": region,}
-        self.sampler_inputs["molecule_structure_samplers"].append(inputs)
-
-    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, r_max=10.0):
+    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, r_max=7.0):
         """
         Add a RdfSampler to the Sample instance.
 
@@ -390,16 +420,17 @@ class Sample:
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        dimension : str
-            Sampling dimension. Supported: "Histogram".
         pairs : list
             List of atom pairs to sample. Each pair is defined as a tuple of two dictionaries in the format:
             ({"atom": "A", "bonds": [...]}, {"atom": "B", "bonds": [...]}) where A and B are atom identifiers,
-            and bonds are lists of atom identifiers that atoms A and B are bonded to, respectively.
+            and bonds are lists of atom identifiers that atoms A and B are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
         num_bins : int, optional
-            Number of bins for histogram sampling.
+            Number of bins for the histogram. Default is 200.
         r_max : float, optional
-            Maximum distance for RDF calculation.
+            Maximum distance in Angstroms for which to compute the histogram. Default is 7.0.
+            Be aware that the maximum distance significantly affects the computation time.
         """
         dimension = "Histogram"
         inputs = {"name_out": name_out,
