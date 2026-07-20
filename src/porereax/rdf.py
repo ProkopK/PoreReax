@@ -1,10 +1,7 @@
 """
-### Module for sampling radial distribution functions (RDF).
+Module for sampling radial distribution functions (RDF).
 
-It provides:
-1. RdfSampler: A class to sample radial distribution functions between atom pairs.
-2. Functions to plot the sampled RDF data:
-    * plot_rdf: Plot RDF curves from sampled data.
+The module provides :class:`RdfSampler` for pair-distribution sampling of specified atom pairs.
 """
 
 

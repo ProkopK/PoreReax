@@ -1,3 +1,7 @@
+"""
+Module for defining regions in the simulation box.
+"""
+
 import numpy as np
 
 

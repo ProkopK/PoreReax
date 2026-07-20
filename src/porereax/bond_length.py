@@ -1,8 +1,7 @@
 """
-Module for sampling bond lengths and bond orders between bonded atom pairs.
+Module for sampling bond lengths and bond orders.
 
-Provides the BondLengthSampler class which histograms bond lengths (in Angstroms)
-or ReaxFF bond orders for specified atom-pair types.
+The module provides :class:`BondLengthSampler` to sample bond length histograms (in Angstroms) or ReaxFF bond order histograms for specified bonds.
 """
 
 import numpy as np

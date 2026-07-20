@@ -1,8 +1,7 @@
 """
-Module for sampling molecular structure (bonding environment) statistics.
+Module for sampling molecular structure statistics.
 
-Provides the MoleculeStructureSampler class which counts how many times each
-atom type appears with a given set of bonded neighbours, per frame.
+The module provides :class:`MoleculeStructureSampler` to sample bonding environments of all atomtypes and reveal the atom structures.
 """
 
 import numpy as np

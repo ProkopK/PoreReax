@@ -1,8 +1,7 @@
 """
 Module providing parent Sampler classes
 
-This module defines base Sampler classes, including BondSampler and AtomSampler,
-which can be extended for specific sampling tasks.
+The module provides :class:`Sampler`, :class:`AtomSampler`, and :class:`BondSampler` as base classes for sampling various properties of MD simulations.
 """
 
 import abc

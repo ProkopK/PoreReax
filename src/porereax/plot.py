@@ -1,3 +1,9 @@
+"""
+Module for plotting sampled data.
+
+The module provides functions to plot histograms, time series, and 2D density data from sampled data.
+"""
+
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 import numpy as np

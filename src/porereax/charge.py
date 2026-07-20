@@ -1,10 +1,7 @@
 """
-### Module for sampling atomic charges.
+Module for sampling atomic charges.
 
-It provides:
-1. ChargeSampler: A class to sample atomic charges on specified atoms and their bonded atoms.
-2. Fuctions to plot the sampled charge data:
-    * plot_hist: Plot histogram curves from sampled charge data.
+The module provides :class:`ChargeSampler` to sample charge histograms of specified atom structures.
 """
 
 

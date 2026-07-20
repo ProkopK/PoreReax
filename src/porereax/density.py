@@ -1,15 +1,13 @@
 """
-### Module for sampling atomic and bond densities.
+Module for sampling atomic and bond densities.
 
-It provides:
-1. DensitySampler: A class to sample atomic densities on specified atoms and their bonds with for multiple dimensions:
-    * Cartesian1D: Samples the density histogram along a specified Cartesian direction for the whole simulation box.
-    * Cartesian2D: Samples the density histogram in a specified plane for the whole simulation box.
-    * Time: Samples the number of atoms (with given bonds) per frame.
-2. BondDensitySampler: A class to sample bond densities on specified bonds with for multiple dimensions:
-    * Cartesian1D: Samples the density histogram along a specified Cartesian direction for the whole simulation box.
-    * Cartesian2D: Samples the density histogram in a specified plane for the whole simulation box.
-    * Time: Samples the number of bonds per frame.
+The module provides:
+1. :class:`DensitySampler`: A class to sample atomic densities of specified atom structures.
+2. :class:`BondDensitySampler`: A class to sample bond densities of specified bonds.
+Both samplers support multiple dimensions for density sampling:
+- "Cartesian1D": Samples the density histogram along a specified Cartesian direction for the whole simulation box.
+- "Cartesian2D": Samples the density histogram in a specified plane for the whole simulation box.
+- "Time": Samples the number of atoms (with given bonds) or bonds per frame
 """
 
 

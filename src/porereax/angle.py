@@ -1,8 +1,8 @@
 """
-Module for sampling bond angles between triplets of bonded atoms.
+Module for sampling bond angles between bonded atoms.
 
-Provides the AngleSampler class which histograms bond angles (in degrees) for
-specified central atoms and optional A-B-C triplet filters.
+The module provides :class:`AngleSampler` to sample bond angle histograms for specified atom structures.
+It supports filtering by specific A-B-C triplets or sampling all angles formed by the central atom B.
 """
 
 import numpy as np
