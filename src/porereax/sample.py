@@ -129,7 +129,7 @@ class Sample:
         # Check atom library
         if not isinstance(atom_lib, dict):
             raise TypeError("atom_lib must be a dictionary mapping atom names to types.")
-        if len(atom_lib) != len(set(atom_lib.values())) and len(atom_lib) != len(set(atom_lib.keys())):
+        if len(atom_lib) != len(set(atom_lib.values())) or len(atom_lib) != len(set(atom_lib.keys())):
             raise ValueError("atom_lib must have a one-to-one mapping of atom names to types.")
         self.type_to_name = {v: k for k, v in atom_lib.items()}
         self.name_to_type = atom_lib
@@ -217,7 +217,7 @@ class Sample:
         type_set = set(first_frame.particles.particle_types.array)
         atom_type_set = set(atom_lib.values())
         if type_set != atom_type_set:
-            raise ValueError("Atom types in trajectory do not match those in atom_lib.")
+            raise ValueError(f"Atom types in trajectory {type_set} do not match those in atom_lib {atom_type_set}.")
 
         num_particles = first_frame.particles.count
         num_frames = pipeline.source.num_frames
