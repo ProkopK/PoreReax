@@ -75,7 +75,8 @@ def assert_input_params(obj_1, obj_2):
             )
 
 
-def assert_sampler_data(obj_1, obj_2):
+def assert_sampler_data(obj_1, obj_2, check_for_std):
+    ignore_keys = ["hist_std", "mean_std"] if not check_for_std else []
     for identifier in obj_1.keys():
         if identifier == "input_params":
             continue
@@ -88,6 +89,8 @@ def assert_sampler_data(obj_1, obj_2):
             f"Sampler data keys for identifier '{identifier}' do not match."
         )
         for data_key in obj_1[identifier].keys():
+            if data_key in ignore_keys:
+                continue
             assert_array_almost_equal(
                 obj_1[identifier][data_key],
                 obj_2[identifier][data_key],
@@ -95,9 +98,29 @@ def assert_sampler_data(obj_1, obj_2):
             )
 
 
-def assert_sample_object_files(file_1, file_2):
+def assert_sample_object_files(file_1, file_2, check_for_std=True):
     obj_1 = load_object(file_1)
     obj_2 = load_object(file_2)
     assert obj_1.keys() == obj_2.keys(), "Keys of the two objects do not match."
     assert_input_params(obj_1, obj_2)
-    assert_sampler_data(obj_1, obj_2)
+    assert_sampler_data(obj_1, obj_2, check_for_std)
+
+
+@pytest.fixture
+def list_of_sample_object_file_names():
+    return [
+        "molecule_structures.obj",
+        "charge_sampling.obj",
+        "bond_order_sampling.obj",
+        "bond_length_sampling.obj",
+        "angle_all_sampling.obj",
+        "angle_H-O-H_sampling.obj",
+        "density_sampling_time.obj",
+        "density_sampling_1d.obj",
+        "density_sampling_1d_cond_charge.obj",
+        "density_sampling_1d_cond_angle.obj",
+        "density_sampling_2d.obj",
+        "bond_density_sampling_1d.obj",
+        "bond_density_sampling_2d.obj",
+        "rdf_sampling.obj",
+    ]

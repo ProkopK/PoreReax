@@ -2,6 +2,7 @@ import pytest
 import warnings
 
 from porereax.sample import Sample
+from conftest import assert_sample_object_files
 from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
@@ -19,6 +20,7 @@ atoms = [
     {"atom": "Si", "bonds": ["H", "H", "H", "H"]},
 ]
 bonds = [{"bond": "Si-O", "bonds_A": ["O", "O", "O"], "bonds_B": ["H"]}]
+pairs = [({"atom": "O", "bonds": ["Si", "H"]}, {"atom": "O", "bonds": ["H", "H"]})]
 
 
 def test_sample_initialization():
@@ -27,6 +29,16 @@ def test_sample_initialization():
         masses=masses,
         trajectory_file=traj_file,
         bond_file=bond_file,
+    )
+
+
+def test_sample_initialization_with_system_yaml():
+    sampler = Sample(
+        atom_lib=atom_lib,
+        masses=masses,
+        trajectory_file=traj_file,
+        bond_file=bond_file,
+        system=TEST_DATA_DIR / "test_pore.yml",
     )
 
 
@@ -68,12 +80,17 @@ def test_sample_initialization_validation(kwargs, expected_exception, expected_m
 
 
 @pytest.fixture
-def full_sampler(sampler, tmp_path):
+def full_sampler_w_path(sampler, tmp_path):
     path = tmp_path.as_posix()
     sampler.add_molecule_structure_sampling(path + "/molecule_structures")
     sampler.add_charge_sampling(
         path + "/charge_sampling",
         atoms=atoms,
+    )
+    sampler.add_bond_length_sampling(
+        path + "/bond_order_sampling",
+        bonds=bonds,
+        dimension="Bond Order",
     )
     sampler.add_bond_length_sampling(
         path + "/bond_length_sampling",
@@ -86,17 +103,77 @@ def full_sampler(sampler, tmp_path):
     sampler.add_angle_sampling(
         path + "/angle_H-O-H_sampling", atoms=atoms, num_bins=90, angle="H-O-H"
     )
-    return sampler
+    sampler.add_density_sampling(
+        path + "/density_sampling_time",
+        atoms=atoms,
+        dimension="Time",
+    )
+    sampler.add_density_sampling(
+        path + "/density_sampling_1d",
+        atoms=atoms,
+        direction="x",
+        dimension="Cartesian1D",
+    )
+    sampler.add_density_sampling(
+        path + "/density_sampling_1d_cond_charge",
+        atoms=atoms,
+        dimension="Cartesian1D",
+        direction="y",
+        conditions={"Charge": (0.0, 1.0)},
+    )
+    sampler.add_density_sampling(
+        path + "/density_sampling_1d_cond_angle",
+        atoms=atoms,
+        dimension="Cartesian1D",
+        direction="z",
+        conditions={"Angle": (75, 125)},
+    )
+    sampler.add_density_sampling(
+        path + "/density_sampling_2d",
+        atoms=atoms,
+        dimension="Cartesian2D",
+        direction="xy",
+    )
+    sampler.add_bond_density_sampling(
+        path + "/bond_density_sampling_1d",
+        bonds=bonds,
+        dimension="Cartesian1D",
+    )
+    sampler.add_bond_density_sampling(
+        path + "/bond_density_sampling_2d",
+        bonds=bonds,
+        dimension="Cartesian2D",
+        direction="yz",
+    )
+    sampler.add_rdf_sampling(
+        path + "/rdf_sampling",
+        pairs=pairs,
+        r_max=5.0,
+    )
+
+    return sampler, path
 
 
-def test_sample_sampling_parallel(full_sampler):
+def test_sample_sampling_parallel(
+    full_sampler_w_path, list_of_sample_object_file_names
+):
     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
+    full_sampler, path = full_sampler_w_path
     full_sampler.sample(is_parallel=True)
 
+    for file_name in list_of_sample_object_file_names:
+        assert_sample_object_files(path + f"/{file_name}", TEST_DATA_DIR / file_name)
 
-def test_sample_sampling_serial(full_sampler):
+
+def test_sample_sampling_serial(full_sampler_w_path, list_of_sample_object_file_names):
     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
+    full_sampler, path = full_sampler_w_path
     full_sampler.sample(is_parallel=False)
+
+    for file_name in list_of_sample_object_file_names:
+        assert_sample_object_files(
+            path + f"/{file_name}", TEST_DATA_DIR / file_name, check_for_std=False
+        )
 
 
 def test_sample_ovito_conflicts(tmp_path):
