@@ -136,7 +136,7 @@ class Simulate():
         self._sim = []
         self.image_dump = None
 
-    def set_job_file(self, file_path, submit_command, lammps_command=None):
+    def set_job_file(self, job_file, submit_command, lammps_command=None):
         """
         Specify a custom job submission template file and command.
 
@@ -146,7 +146,7 @@ class Simulate():
 
         Parameters
         ----------
-        file_path : str
+        job_file : str
             Path to the job submission template file. Must be a valid file that exists.
             The template should be compatible with the HPC scheduler (SLURM, PBS, etc.).
         submit_command : str
@@ -174,10 +174,10 @@ class Simulate():
         >>> sim.set_job_file('/path/to/custom.job', 'sbatch', 'mpirun lmp -in {input_file} -log {log_file}')
         """
         # Validate and set job file path
-        if file_path is None and self._job_file is None:
+        if job_file is None and self._job_file is None:
             f_path = os.path.abspath(files("porereax").joinpath("templates", "reax.job"))
         else:
-            f_path = os.path.abspath(file_path)
+            f_path = os.path.abspath(job_file)
 
         # Validate and set submit command
         if submit_command is None and self._submit_cmd is None:

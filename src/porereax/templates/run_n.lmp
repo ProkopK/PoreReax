@@ -17,9 +17,11 @@ timestep {{ TIMESTEP }}
 thermo {{ THERMO_FREQ }}
 thermo_style custom step temp press pe ke etotal vol density
 dump trajdump all custom {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.lammpstrj id type x y z vx vy vz
+dump_modify trajdump sort id
 fix myspec all reaxff/species 1 1 {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.species element {{ ATOMS }}
 fix bond all reaxff/bonds {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.bonds
 fix removeMom all momentum 100 linear 1 1 1 rescale
+restart {{ RESTART_FREQ }} checkpoint_a.restart checkpoint_b.restart
 {% if SIMULATIONTYPE == "nvt" %}
 fix nvt all nvt temp {{ TEMP }} {{ TEMP }} 100.0
 {% elif SIMULATIONTYPE == "npt" %}
@@ -65,4 +67,3 @@ undump imagedump_{{ image.dump_id }}
 {% endfor %}
 {% endif -%}
 write_restart run_{{ SIMNUMBER }}.data
-
