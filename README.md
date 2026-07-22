@@ -67,8 +67,9 @@ sampler.sample()
 
 Sphinx docs live under `/docs` and include:
 
-- getting started and workflow guides
-- analysis usage pages
+- getting started
+- simulation workflow guides
+- analysis workflow guides
 - API reference generated from source
 
 Build locally:
