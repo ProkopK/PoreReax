@@ -54,13 +54,18 @@ class Sample:
         start_end_nthframe : tuple, optional
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         """
-        if "ovito" in sys.modules:
-            raise RuntimeError(
-                "The 'ovito' module is already imported. Please remove it from the "
-                "loaded modules before creating a Sample instance to avoid conflicts "
-                "during parallel processing."
-            )
-        ctx = mp.get_context("spawn")
+        if "forkserver" in mp.get_all_start_methods():
+            ctx = mp.get_context("forkserver")
+        elif "spawn" in mp.get_all_start_methods():
+            ctx = mp.get_context("spawn")
+        else:
+            ctx = mp.get_context("fork")
+            if "ovito" in sys.modules:
+                raise RuntimeError(
+                    "The 'ovito' module is already imported. Please remove it from the "
+                    "loaded modules to avoid conflicts during parallel processing. "
+                    "This is necessary because the OS does not support the 'spawn' start method."
+                )
         with ctx.Pool(1) as pool:
             num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, atom_lib, )).get()
 
@@ -524,11 +529,19 @@ class Sample:
             start_end_nthframe_list = [(frames[0], frames[-1], 1) for frames in frames_per_core]
             for i, (start_frame, end_frame, _) in enumerate(start_end_nthframe_list):
                 print(f"Process {i}: frames {start_frame} to {end_frame}")
-            if "ovito" in sys.modules:
-                print("Ovito module detected. Please remove it before using parallel sampling. This exit is intentional to avoid infinite spawning of subprocesses.")
-                sys.exit(1)
             print(f"Starting parallel sampling with {num_cores} cores...")
-            ctx = mp.get_context("spawn")
+            if "forkserver" in mp.get_all_start_methods():
+                ctx = mp.get_context("forkserver")
+            elif "spawn" in mp.get_all_start_methods():
+                ctx = mp.get_context("spawn")
+            else:
+                ctx = mp.get_context("fork")
+                if "ovito" in sys.modules:
+                    raise RuntimeError(
+                        "The 'ovito' module is already imported. Please remove it from the "
+                        "loaded modules to avoid conflicts during parallel processing. "
+                        "This is necessary because the OS does not support the 'spawn' start method."
+                    )
             with ctx.Pool(num_cores) as pool:
                 results = [pool.apply_async(self.init_subprocess_sampler, (self.name_to_type,
                                                                            self.masses,
