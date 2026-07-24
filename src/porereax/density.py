@@ -116,10 +116,9 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
         Combined data structure.
     """
     combined_data = {}
+    input_params = data_list.pop("input_params", None)
+    combined_data["input_params"] = input_params
     for identifier in data_list:
-        if identifier == "input_params":
-            combined_data["input_params"] = data_list["input_params"]
-            continue
         combined_data[identifier] = {}
         num_frames = np.sum(data_list[identifier]["num_frames"])
         combined_data[identifier]["num_frames"] = num_frames

@@ -58,7 +58,7 @@ class MoleculeStructureSampler(Sampler):
             os.remove(file_path)
             for identifier, data in proc_data.items():
                 if identifier == "input_params":
-                    combined_data[identifier] = data
+                    combined_data["input_params"] = data
                 elif identifier == "num_frames":
                     if identifier not in combined_data:
                         combined_data[identifier] = 0

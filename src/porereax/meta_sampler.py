@@ -111,16 +111,15 @@ class Sampler(abc.ABC):
             file_path = self.name_out + f"_proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
             os.remove(file_path)
+            input_params = proc_data.pop("input_params", None)
+            data_list["input_params"] = input_params
             for identifier, data in proc_data.items():
-                if identifier == "input_params":
-                    data_list[identifier] = data
-                else:
-                    if identifier not in data_list:
-                        data_list[identifier] = {}
-                    for key, value in data.items():
-                        if key not in data_list[identifier]:
-                            data_list[identifier][key] = []
-                        data_list[identifier][key].append(value)
+                if identifier not in data_list:
+                    data_list[identifier] = {}
+                for key, value in data.items():
+                    if key not in data_list[identifier]:
+                        data_list[identifier][key] = []
+                    data_list[identifier][key].append(value)
         return data_list
 
     @staticmethod

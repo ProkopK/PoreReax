@@ -58,10 +58,9 @@ class BondLengthSampler(BondSampler):
     def join_samplers(self, num_cores):
         data_list = super().join_samplers(num_cores)
         combined_data = {}
+        input_params = data_list.pop("input_params", None)
+        combined_data["input_params"] = input_params
         for identifier in data_list:
-            if identifier == "input_params":
-                combined_data["input_params"] = data_list["input_params"]
-                continue
             combined_data[identifier] = {}
 
             num_frames = np.sum(data_list[identifier]["num_frames"])
