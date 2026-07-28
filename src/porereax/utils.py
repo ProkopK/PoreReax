@@ -104,7 +104,7 @@ def get_identifiers(link_data: str):
     data = load_object(link_data)
     return [identifier for identifier in data.keys() if identifier != "input_params" and identifier != "num_frames"]
 
-def get_data(link_data: str, identifier: str):
+def get_data(link_data: str, identifier: str) -> dict:
     """
     Retrieve the data for a specific identifier from a data file.
 

@@ -15,7 +15,7 @@ import os
 import sys
 import porereax.utils as utils
 
-from typing import List, Dict, Tuple, Callable
+from collections.abc import Callable
 from numpy.typing import NDArray
 from porereax.charge import ChargeSampler
 from porereax.density import DensitySampler, BondDensitySampler
@@ -23,7 +23,10 @@ from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
-from porereax.meta_sampler import Sampler, AtomSampler, BondSampler
+from porereax.meta_sampler import Sampler
+
+
+type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
 
 
 class Sample:
@@ -231,9 +234,9 @@ class Sample:
         return num_particles, num_frames, box
 
     # --------------------------- Add Sampler Methods ---------------------------
-    def add_molecule_structure_sampling(self, name_out: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box"):
+    def add_molecule_structure_sampling(self, name_out: str, region: Region = "Box"):
         """
-        Add sampling for molecule structures to analyze the bonding of atoms and identify substructures.
+        Add sampling for molecule structures to analyse the bonding of atoms and identify substructures.
 
         Parameters
         ----------
@@ -249,7 +252,7 @@ class Sample:
                   "region": region,}
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
-    def add_charge_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=800, range=(-2.0, 2.0)):
+    def add_charge_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", num_bins=800, range=(-2.0, 2.0)):
         """
         Add sampling for charge distribution of the central atom in the specified atom structures.
 
@@ -277,7 +280,7 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["charge_samplers"].append(inputs)
 
-    def add_density_sampling(self, name_out: str, atoms: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
+    def add_density_sampling(self, name_out: str, atoms: list[dict], dimension: str, region: Region = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add sampling for time or position density distribution of the specified atom structures. For positional sampling the position of the central atom is used.
 
@@ -317,7 +320,7 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["density_samplers"].append(inputs)
 
-    def add_angle_sampling(self, name_out: str, atoms: List[Dict], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=180, angle="all"):
+    def add_angle_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", num_bins=180, angle="all"):
         """
         Add sampling for angle distribution of the specified atom structures. The angle is defined by the central atom and its bonded atoms. 
 
@@ -347,7 +350,7 @@ class Sample:
                   "angle": angle,}
         self.sampler_inputs["angle_samplers"].append(inputs)
 
-    def add_bond_density_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, direction="z", conditions={}):
+    def add_bond_density_sampling(self, name_out: str, bonds: list[dict], dimension: str, region: Region = "Box", num_bins=200, direction="z", conditions={}):
         """
         Add sampling for time or position density distribution of the specified bonds. For positional sampling the position of the bond center is used.
 
@@ -386,9 +389,9 @@ class Sample:
                   "conditions": conditions,}
         self.sampler_inputs["bond_density_samplers"].append(inputs)
 
-    def add_bond_length_sampling(self, name_out: str, bonds: List[Dict], dimension: str, region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, range=(0.0, 3.0)):
+    def add_bond_length_sampling(self, name_out: str, bonds: list[dict], dimension: str, region: Region = "Box", num_bins=200, range=(0.0, 3.0)):
         """
-        Add a BondLengthSampler to the Sample instance.
+        Add sampling for bond length or bond order distribution of the specified bonds.
 
         Parameters
         ----------
@@ -417,9 +420,9 @@ class Sample:
                   "range": range,}
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_rdf_sampling(self, name_out: str, pairs: List[Tuple[Dict, Dict]], region: str | Callable[[NDArray[np.float64]], NDArray[np.bool_]] = "Box", num_bins=200, r_max=7.0):
+    def add_rdf_sampling(self, name_out: str, pairs: list[tuple[dict, dict]], region: Region = "Box", num_bins=200, r_max=7.0):
         """
-        Add a RdfSampler to the Sample instance.
+        Add sampling for radial distribution function (RDF) of the specified atom pairs.
 
         Parameters
         ----------
@@ -427,8 +430,8 @@ class Sample:
             Name of the output directory and object file of the sampler data
         pairs : list
             List of atom pairs to sample. Each pair is defined as a tuple of two dictionaries in the format:
-            ({"atom": "A", "bonds": [...]}, {"atom": "B", "bonds": [...]}) where A and B are atom identifiers,
-            and bonds are lists of atom identifiers that atoms A and B are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
+            ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
+            and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
         region : str or function, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
         num_bins : int, optional

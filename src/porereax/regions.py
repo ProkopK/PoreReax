@@ -3,9 +3,11 @@ Module for defining regions in the simulation box.
 """
 
 import numpy as np
+from numpy.typing import NDArray
+from collections.abc import Callable
 
 
-def get_region_function(region, box, system_properties):
+def get_region_function(region: str, box: NDArray[np.float64], system_properties: dict | None = None) -> Callable[[NDArray[np.float64]], NDArray[np.bool_]]:
     """
     Retrieve the region function based on the provided region identifier.
 
@@ -25,10 +27,10 @@ def get_region_function(region, box, system_properties):
     """
     if region == "Box":
         return box_region
-    else: 
+    else:
         raise ValueError(f"Unknown region identifier: {region}")
-    
-def box_region(coords):
+
+def box_region(coords: NDArray[np.float64]) -> NDArray[np.bool_]:
     """
     Region function that includes all coordinates within the simulation box.
 
