@@ -51,6 +51,7 @@ class MoleculeStructureSampler(Sampler):
         if self.process_id != -1:
             return
         combined_data = {}
+        num_frames = 0
         type_to_name = {v: k for k, v in self.atom_lib.items()}
         for process_id in range(num_cores) if num_cores > 1 else [-1]:
             file_path = self.name_out + f"_proc_{process_id}.pkl"
@@ -60,9 +61,7 @@ class MoleculeStructureSampler(Sampler):
                 if identifier == "input_params":
                     combined_data["input_params"] = data
                 elif identifier == "num_frames":
-                    if identifier not in combined_data:
-                        combined_data[identifier] = 0
-                    combined_data[identifier] += data
+                    num_frames += data
                 elif identifier == "structure_counts":
                     for key, value in data.items():
                         atom = type_to_name[key]
@@ -73,4 +72,10 @@ class MoleculeStructureSampler(Sampler):
                             if name not in combined_data[atom]:
                                 combined_data[atom][name] = 0
                             combined_data[atom][name] += count
+        for atom in combined_data:
+            if atom != "input_params":
+                combined_data[atom] = dict(sorted(combined_data[atom].items(), key=lambda item: item[1], reverse=True))
+                for structure in combined_data[atom]:
+                    combined_data[atom][structure] /= num_frames
+
         utils.save_object(combined_data, self.name_out + ".obj")
