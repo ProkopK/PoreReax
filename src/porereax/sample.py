@@ -18,7 +18,7 @@ import porereax.utils as utils
 from collections.abc import Callable
 from numpy.typing import NDArray
 from porereax.charge import ChargeSampler
-from porereax.density import DensitySampler, BondDensitySampler
+from porereax.density import DensitySampler, BondDensitySampler, ReactionSampler
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
 from porereax.molecule_structure import MoleculeStructureSampler
@@ -118,6 +118,7 @@ class Sample:
                                "bond_length_samplers": [],
                                "molecule_structure_samplers": [],
                                "rdf_samplers": [],
+                               "reaction_samplers": [],
                                }
         # Registry mapping sampler_inputs key -> (SamplerClass, kind, extra_kwarg_keys)
         self._SAMPLER_REGISTRY = {
@@ -128,6 +129,7 @@ class Sample:
             "bond_length_samplers":       (BondLengthSampler,       "bond", ["bonds", "num_bins", "range"]),
             "molecule_structure_samplers":(MoleculeStructureSampler,"atom", []),
             "rdf_samplers":               (RdfSampler,              "atom", ["pairs", "num_bins", "r_max"]),
+            "reaction_samplers":          (ReactionSampler,         "atom", ["reactions", "num_bins", "direction", "position"]),
         }
 
         self.samplers = []
@@ -448,6 +450,47 @@ class Sample:
                   "num_bins": num_bins,
                   "r_max": r_max,}
         self.sampler_inputs["rdf_samplers"].append(inputs)
+
+    def add_reaction_sampling(self, name_out: str, reactions: list[tuple], dimension: str, region: Region = "Box", num_bins=200, direction="z", position="center"):
+        """
+        Add sampling for reaction events of the specified reactions.
+
+        Parameters
+        ----------
+        name_out : str
+            Name of the output directory and object file of the sampler data
+        reactions : list
+            List of reactions to sample. Each reaction is defined as a tuple of two dictionaries in the format:
+            ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
+            and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
+        dimension : str
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+            - "Time": Samples the amount of the specified reactions over time.
+            - "Cartesian1D": Samples the amount of the specified reactions along a specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of the specified reactions in a 2D plane (xy, xz, or yz) in the simulation box.
+        region : str or function, optional
+            Region of the box to sample. Supported: "Box" or a user-defined 
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+        num_bins : int, optional
+            Number of bins for position sampling. Default is 200.
+        direction : str, optional
+            Direction along which to sample. Options depending on the dimension:
+            - For "Cartesian1D": use ("x", "y", or "z").
+            - For "Cartesian2D": use ("xy", "xz", or "yz").
+        position : str, optional
+            Position of the reaction event to sample. Supported: "center", "reactant", "product"
+            - "center": Samples the position of the reaction event at the center between the reactant and product atoms.
+            - "reactant": Samples the position of the reaction event at the position of the reactant atoms.
+            - "product": Samples the position of the reaction event at the position of the product atoms.
+        """
+        inputs = {"name_out": name_out,
+                  "reactions": reactions,
+                  "dimension": dimension,
+                  "region": region,
+                  "num_bins": num_bins,
+                  "direction": direction,
+                  "position": position,}
+        self.sampler_inputs["reaction_samplers"].append(inputs)
 
     def _add_sampler(self, sampler: Sampler):
         """

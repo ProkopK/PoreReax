@@ -29,6 +29,7 @@ dependencies = [
     "matplotlib",
     "jinja2",
     "pyyaml",
+    "scipy",
 ]
 
 [dependency-groups]

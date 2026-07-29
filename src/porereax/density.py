@@ -14,6 +14,7 @@ Both samplers support multiple dimensions for density sampling:
 import numpy as np
 from porereax.meta_sampler import BondSampler, AtomSampler, _build_mol_dictionary, _validate_double_atoms
 import porereax.utils as utils
+from scipy.sparse import coo_matrix
 
 
 def _validate_dimension(dimension: str, sampler_name: str):
@@ -351,11 +352,139 @@ class BondDensitySampler(BondSampler):
 
             # Record density
             _record_density(
-                self.data[identifier], 
-                self.dimension, 
-                bond_midpoints, 
-                frame_id, 
-                self.num_bins, 
+                self.data[identifier],
+                self.dimension,
+                bond_midpoints,
+                frame_id,
+                self.num_bins,
+                self.box
+            )
+
+    def join_samplers(self, num_cores: int) -> None:
+        """
+        Join data from multiple samplers after parallel processing.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used.
+        """
+        data_list = super().join_samplers(num_cores)
+        combined_data = _join_data(data_list, self.dimension, self.num_bins)
+        utils.save_object(combined_data, self.name_out + ".obj")
+
+class ReactionSampler(AtomSampler):
+    """
+    Sampler class for reactions.
+    """
+    def __init__(self, name_out: str, reactions: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, position: str):
+        """
+        Sampler for reaction densities.
+
+        Parameters
+        ----------
+        name_out : str
+            Output folder name.
+        dimension : str
+            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time".
+        reactions : list
+            List of reactions to sample.
+        process_id : int
+            Process ID for parallel sampling.
+        atom_lib : dict
+            Dictionary mapping atom type strings to their type IDs.
+        masses : dict
+            Dictionary mapping atom type strings to their masses.
+        num_frames : int
+            Total number of frames to sample.
+        box : np.ndarray
+            Simulation box dimensions.
+        num_bins : int
+            Number of bins for Cartesian sampling along each axis.
+        direction : str
+            Direction for Cartesian sampling. Options:
+            - ("x", "y", or "z") for "Cartesian1D".
+            - ("xy", "xz", or "yz") for "Cartesian2D".
+        position : str
+            Position for reaction sampling. Options: "center", "reactant", "product".
+        """
+        # Validate parameters
+        _validate_dimension(dimension, "ReactionSampler")
+        _validate_num_bins(num_bins, "ReactionSampler")
+        if position not in ["center", "reactant", "product"]:
+            raise ValueError(f"ReactionSampler requires 'position' parameter to be one of 'center', 'reactant', or 'product'.")
+
+        self.num_bins = num_bins
+        self.direction = direction
+        self.position = position
+
+        # Extract atoms from reactions and validate format
+        _validate_double_atoms(reactions, "ReactionSampler", "reactions", allow_none=True)
+        atoms = []
+        for reaction in reactions:
+            reactant, product = reaction
+            if reactant is not None:
+                atoms.append(reactant)
+            if product is not None:
+                atoms.append(product)
+
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, position=position)
+
+        # Build reaction identifiers and setup data structures for each reaction
+        self.reactions = {}
+        for reaction in reactions:
+            reactant, product = reaction
+            identifier_reactant = _build_mol_dictionary(reactant["atom"], reactant.get("bonds", None), atom_lib, "Reaction Sampler")[0] if reactant is not None else "X"
+            identifier_product = _build_mol_dictionary(product["atom"], product.get("bonds", None), atom_lib, "Reaction Sampler")[0] if product is not None else "X"
+            reaction_key = f"{identifier_reactant}-{identifier_product}"
+            self.reactions[reaction_key] = (identifier_reactant, identifier_product)
+            self.data[reaction_key] = _setup_data_structure(
+                            self.dimension, self.direction, num_frames-1, self.num_bins, box, "ReactionSampler"
+                        )
+        self.input["reactions"] = self.reactions
+        self.pre_positions = None
+        self.cur_positions = None
+        self.pre_mol_index = None
+        self.cur_mol_index = None
+        self.pre_bonds = None
+        self.cur_bonds = None
+
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        cur_topology = frame.particles.bonds.topology.array
+
+        self.pre_positions = self.cur_positions
+        self.pre_mol_index = self.cur_mol_index
+        self.pre_bonds = self.cur_bonds
+        self.cur_positions = frame.particles.positions.array
+        self.cur_mol_index = {key: np.copy(value) for key, value in mol_index.items()}
+        self.cur_bonds = coo_matrix((np.ones(cur_topology.shape[0]), (cur_topology[:, 0], cur_topology[:, 1])), shape=(self.cur_positions.shape[0], self.cur_positions.shape[0]), dtype=bool)
+        if self.pre_positions is None:
+            return
+
+        if self.position == "center":
+            positions = utils.min_image_midpoint(self.pre_positions, self.cur_positions, self.box)
+        elif self.position == "reactant":
+            positions = self.pre_positions
+        elif self.position == "product":
+            positions = self.cur_positions
+        position_mask = self.region(positions)
+
+        reaction_events = (self.pre_bonds - self.cur_bonds).tocoo()
+        reaction_indices = np.unique(np.concatenate((reaction_events.row, reaction_events.col)))
+
+        for reaction_key, (identifier_reactant, identifier_product) in self.reactions.items():
+            reactant_mask = self.pre_mol_index[identifier_reactant] if identifier_reactant != "X" else True
+            product_mask = self.cur_mol_index[identifier_product] if identifier_product != "X" else True
+            reaction_mask = reactant_mask & product_mask & position_mask
+            reaction_key_indices = reaction_indices[reaction_mask[reaction_indices]]
+
+            reaction_positions = positions[reaction_key_indices]
+            _record_density(
+                self.data[reaction_key],
+                self.dimension,
+                reaction_positions,
+                frame_id-1,
+                self.num_bins,
                 self.box
             )
 
