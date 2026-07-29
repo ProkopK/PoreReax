@@ -12,6 +12,116 @@ import porereax.utils as utils
 import porereax.regions as regions
 
 
+def _permutate_bonds(bonds, atom_lib, class_name):
+    """
+    Generate all permutations of bonded atom types, considering 'X' as wildcard.
+
+    Parameters
+    ----------
+    bonds : list
+        List of bonded atom type strings.
+    atom_lib : dict
+        Dictionary mapping atom type strings to their type IDs.
+    class_name : str
+        Name of the calling class for error messages.
+
+    Returns
+    -------
+    bond_permutations : list
+        List of lists containing all permutations of bonded atom type IDs.
+    """
+    bond_types = []
+    for bonded_atom in bonds:
+        if bonded_atom in atom_lib:
+            bond_types.append(atom_lib[bonded_atom])
+        # elif bonded_atom == "X":
+        #     bond_types.append("X")
+        else:
+            raise ValueError(f"Error in {class_name}: Bonded atom {bonded_atom} not found in atom library.")
+    options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
+    expanded = itertools.product(*options)
+    bond_permutations = []
+    seen_permutations = set()
+    for e in expanded:
+        for perm in set(itertools.permutations(e)):
+            if perm not in seen_permutations:
+                seen_permutations.add(perm)
+                bond_permutations.append(list(perm))
+    return bond_permutations
+
+def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
+    """
+    Build molecule dictionary for sampling.
+
+    Parameters
+    ----------
+    atom : str
+        Atom type string.
+    bonds : list or None
+        List of bonded atom type strings or None.
+    atom_lib : dict
+        Dictionary mapping atom type strings to their type IDs.
+    class_name : str
+        Name of the calling class for error messages.
+
+    Returns
+    -------
+    identifier : str
+        Unique identifier for the molecule.
+    mol : dict
+        Molecule dictionary containing atom type ID and bonded atom type ID permutations.
+    """
+    if atom in atom_lib:
+        atom_id = atom_lib[atom]
+    elif atom == "X":
+        atom_id = "X"
+    else:
+        raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
+    bonds = sorted(bonds) if bonds is not None else None
+    identifier = atom + "(" + "+".join(bonds) + ")" if bonds is not None else atom
+    if bonds is not None:
+        bond_permutations = _permutate_bonds(bonds, atom_lib, class_name)
+    else:
+        bond_permutations = None
+    mol = {"atom": atom_id, "bonds": bond_permutations}
+    return identifier, mol
+
+def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False):
+    """
+    Validate the format of double atom pairs for sampling.
+
+    Parameters
+    ----------
+    doubles : list
+        List of atom pairs to validate.
+    class_name : str
+        Name of the calling class (for error messages).
+    atribute_name : str
+        Name of the attribute being validated (for error messages).
+    allow_none : bool, optional
+        Whether to allow None values in the pairs. Default is False.
+
+    Raises
+    ------
+    ValueError
+        If the pairs are not in the expected format or contain invalid atom types.
+    """
+    if not isinstance(doubles, list) or len(doubles) == 0:
+        raise ValueError(f"{class_name} '{attribute_name}' parameter must be a non-empty list.")
+    for double in doubles:
+        if (not isinstance(double, (list, tuple)) or len(double) != 2):
+            raise ValueError(f"{class_name} '{attribute_name}' parameter must be a list of doubles (lists or tuples of length 2).")
+        atom1, atom2 = double
+        if (not isinstance(atom1, dict) or not isinstance(atom2, dict)) and not allow_none:
+            raise ValueError(f"{class_name} '{attribute_name}' parameter must contain dictionaries with 'atom' and optional 'bonds' keys.")
+        elif allow_none and (not (atom1 is None and isinstance(atom2, dict)) and
+                             not (atom2 is None and isinstance(atom1, dict)) and
+                             not (isinstance(atom1, dict) and isinstance(atom2, dict))):
+            raise ValueError(f"{class_name} '{attribute_name}' parameter must contain dictionaries with 'atom' and optional 'bonds' keys, while one of the double can be None.")
+        if (atom1 is not None and "atom" not in atom1) or (atom2 is not None and "atom" not in atom2):
+            raise ValueError(f"{class_name} '{attribute_name}' parameter dictionaries must have an 'atom' key.")
+
+
 class Sampler(abc.ABC):
     """
     Base class for samplers.
@@ -67,13 +177,7 @@ class Sampler(abc.ABC):
         self.dimension = dimension
         if isinstance(region, str):
             region_function = regions.get_region_function(region, box, system_properties)
-        test_coords = np.array([[0.0, 0.0, 0.0]])
-        try:
-            mask = region_function(test_coords)
-            if not isinstance(mask, np.ndarray) or mask.dtype != bool or mask.shape != (1,):
-                raise ValueError(f"Region function for {self.__class__.__name__} must return a boolean numpy array of shape (N,) for input coordinates of shape (N, 3).")
-        except Exception as e:
-            raise ValueError(f"Error in region function for {self.__class__.__name__}: {e}")
+        self._validate_region_function(region_function)
         self.region = region_function
         self.process_id = process_id
         self.atom_lib = atom_lib
@@ -122,82 +226,6 @@ class Sampler(abc.ABC):
                     data_list[identifier][key].append(value)
         return data_list
 
-    @staticmethod
-    def permutate_bonds(bonds, atom_lib, class_name):
-        """
-        Generate all permutations of bonded atom types, considering 'X' as wildcard.
-
-        Parameters
-        ----------
-        bonds : list
-            List of bonded atom type strings.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        class_name : str
-            Name of the calling class for error messages.
-
-        Returns
-        -------
-        bond_permutations : list
-            List of lists containing all permutations of bonded atom type IDs.
-        """
-        bond_types = []
-        for bonded_atom in bonds:
-            if bonded_atom in atom_lib:
-                bond_types.append(atom_lib[bonded_atom])
-            elif bonded_atom == "X":
-                bond_types.append("X")
-            else:
-                raise ValueError(f"Error in {class_name}: Bonded atom {bonded_atom} not found in atom library.")
-        options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
-        expanded = itertools.product(*options)
-        bond_permutations = []
-        seen_permutations = set()
-        for e in expanded:
-            for perm in set(itertools.permutations(e)):
-                if perm not in seen_permutations:
-                    seen_permutations.add(perm)
-                    bond_permutations.append(list(perm))
-        return bond_permutations
-
-    @staticmethod
-    def build_mol_dictionary(atom, bonds, atom_lib, class_name):
-        """
-        Build molecule dictionary for sampling.
-
-        Parameters
-        ----------
-        atom : str
-            Atom type string.
-        bonds : list or None
-            List of bonded atom type strings or None.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        class_name : str
-            Name of the calling class for error messages.
-
-        Returns
-        -------
-        identifier : str
-            Unique identifier for the molecule.
-        mol : dict
-            Molecule dictionary containing atom type ID and bonded atom type ID permutations.
-        """
-        if atom in atom_lib:
-            atom_id = atom_lib[atom]
-        elif atom == "X":
-            atom_id = "X"
-        else:
-            raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
-        bonds = sorted(bonds) if bonds is not None else None
-        identifier = atom + "(" + "+".join(bonds) + ")" if bonds is not None else atom
-        if bonds is not None:
-            bond_permutations = Sampler.permutate_bonds(bonds, atom_lib, class_name)
-        else:
-            bond_permutations = None
-        mol = {"atom": atom_id, "bonds": bond_permutations}
-        return identifier, mol
-
     def get_mols(self):
         """
         Retrieve the defined molecules for sampling.
@@ -208,6 +236,28 @@ class Sampler(abc.ABC):
             Dictionary of molecules defined for sampling.
         """
         return self.molecules
+
+    def _validate_region_function(self, region_function):
+        """
+        Validate the region function to ensure it returns a boolean mask for given coordinates.
+
+        Parameters
+        ----------
+        region_function : callable
+            Function that takes coordinates and returns a boolean mask.
+
+        Raises
+        ------
+        ValueError
+            If the region function does not return a valid boolean mask.
+        """
+        test_coords = np.array([[0.0, 0.0, 0.0]])
+        try:
+            mask = region_function(test_coords)
+            if not isinstance(mask, np.ndarray) or mask.dtype != bool or mask.shape != (1,):
+                raise ValueError(f"Region function for {self.__class__.__name__} must return a boolean numpy array of shape (N,) for input coordinates of shape (N, 3).")
+        except Exception as e:
+            raise ValueError(f"Error in region function for {self.__class__.__name__}: {e}")
 
 
 class AtomSampler(Sampler):
@@ -251,7 +301,7 @@ class AtomSampler(Sampler):
                 raise ValueError(f"{self.__class__.__name__} requires the 'bonds' key to be a list if provided.")
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
-            identifier, mol = self.build_mol_dictionary(atom, bonds, atom_lib, self.__class__.__name__)
+            identifier, mol = _build_mol_dictionary(atom, bonds, atom_lib, self.__class__.__name__)
             self.molecules[identifier] = mol
 
 
@@ -324,8 +374,8 @@ class BondSampler(Sampler):
                 bonds_B.append(atom_A)
                 bonds_B.sort()
 
-            mol_identifier_A, mol_A = self.build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
-            mol_identifier_B, mol_B = self.build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)
+            mol_identifier_A, mol_A = _build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
+            mol_identifier_B, mol_B = _build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)
             self.molecules[mol_identifier_A] = mol_A
             self.molecules[mol_identifier_B] = mol_B
 

@@ -12,7 +12,7 @@ Both samplers support multiple dimensions for density sampling:
 
 
 import numpy as np
-from porereax.meta_sampler import BondSampler, AtomSampler
+from porereax.meta_sampler import BondSampler, AtomSampler, _build_mol_dictionary, _validate_double_atoms
 import porereax.utils as utils
 
 
@@ -36,7 +36,7 @@ def _validate_condition_range(conditions: dict, condition_name: str, sampler_nam
     """Validate a specific condition range (Charge, Angle, Bond Length)."""
     if condition_name in conditions:
         cond = conditions[condition_name]
-        if (not isinstance(cond, (list, tuple)) or 
+        if (not isinstance(cond, (list, tuple)) or
                 len(cond) != 2 or
                 cond[0] >= cond[1]):
             raise ValueError(f"{sampler_name} 'conditions' parameter '{condition_name}' must be a list or tuple of two numbers (min, max) with min < max.")
@@ -216,10 +216,10 @@ class DensitySampler(AtomSampler):
 
             atom_positions = positions[mol_mask]
             _record_density(
-                self.data[identifier], 
-                self.dimension, atom_positions, 
-                frame_id, 
-                self.num_bins, 
+                self.data[identifier],
+                self.dimension, atom_positions,
+                frame_id,
+                self.num_bins,
                 self.box
             )
 
@@ -334,16 +334,12 @@ class BondDensitySampler(BondSampler):
 
         for identifier in self.bonds:
             bond_indices = bond_index[identifier]
-            if bond_indices.size == 0:
-                continue
 
             bonds = bond_topology[bond_indices]
             bond_positions = positions[bonds]
 
             # Calculate bond midpoints
-            bond_midpoints = (bond_positions[:, 0, :] + bond_positions[:, 1, :]) / 2.0
-            periodic_shifts = bond_periodic_images[bond_indices] * self.box
-            bond_midpoints += periodic_shifts / 2.0 # TODO: Check if this is correct
+            bond_midpoints = utils.min_image_midpoint(bond_positions[:, 0, :], bond_positions[:, 1, :], self.box)
 
             # Apply Bond Length condition if specified
             if "Bond Length" in self.conditions:

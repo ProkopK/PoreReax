@@ -8,7 +8,7 @@ The module provides :class:`RdfSampler` for pair-distribution sampling of specif
 import numpy as np
 import porereax.utils as utils
 
-from porereax.meta_sampler import AtomSampler, Sampler
+from porereax.meta_sampler import AtomSampler, _build_mol_dictionary, _validate_double_atoms
 
 
 class RdfSampler(AtomSampler):
@@ -47,22 +47,15 @@ class RdfSampler(AtomSampler):
             raise ValueError("RdfSampler requires a positive integer 'num_bins' parameter.")
         if not isinstance(r_max, (float, int)) or r_max <= 0:
             raise ValueError("RdfSampler requires a positive 'r_max' parameter.")
-        if not isinstance(pairs, list) or len(pairs) == 0:
-            raise ValueError("RdfSampler requires a non-empty list of 'pairs' parameter.")
 
         self.num_bins = num_bins
         self.r_max = r_max
 
         # Extract atoms from pairs and validate format
+        _validate_double_atoms(pairs, "RdfSampler", "pairs", allow_none=False)
         atoms = []
         for pair in pairs:
-            if (not isinstance(pair, (list, tuple)) or len(pair) != 2):
-                raise ValueError("RdfSampler 'pairs' parameter must be a list of pairs (lists or tuples of length 2).")
             atom1, atom2 = pair
-            if not isinstance(atom1, dict) or not isinstance(atom2, dict):
-                raise ValueError("RdfSampler 'pairs' parameter must contain dictionaries with 'atom' and optional 'bonds' keys.")
-            if "atom" not in atom1 or "atom" not in atom2:
-                raise ValueError("RdfSampler 'pairs' parameter dictionaries must have an 'atom' key.")
             atoms.append(atom1)
             atoms.append(atom2)
 
@@ -72,13 +65,8 @@ class RdfSampler(AtomSampler):
         self.pairs = {}
         for pair in pairs:
             pair_A, pair_B = pair
-            identifier_A = Sampler.build_mol_dictionary(pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler")[0]
-            identifier_B = Sampler.build_mol_dictionary(pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler")[0]
-            self.pairs.append((identifier_A, identifier_B))
-        self.input["pairs"] = self.pairs
-
-        # Setup data structures for each pair
-        for identifier_A, identifier_B in self.pairs:
+            identifier_A = _build_mol_dictionary(pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler")[0]
+            identifier_B = _build_mol_dictionary(pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler")[0]
             pair_key = f"{identifier_A}-{identifier_B}"
             self.pairs[pair_key] = (identifier_A, identifier_B)
 

@@ -87,7 +87,31 @@ def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
     """
     return vec - box * np.round(vec / box)
 
-def get_identifiers(link_data: str):
+def min_image_midpoint(vec1: np.ndarray, vec2: np.ndarray, box: np.ndarray) -> np.ndarray:
+    """
+    Calculate the midpoint between two vectors considering the minimal image convention.
+
+    Parameters
+    ----------
+    vec1 : np.ndarray
+        The first vector (shape: (N, 3)).
+    vec2 : np.ndarray
+        The second vector (shape: (N, 3)).
+    box : np.ndarray
+        The simulation box dimensions (shape: (3,)).
+
+    Returns
+    -------
+    np.ndarray
+        The midpoint vector adjusted by the minimal image convention (shape: (N, 3)).
+    """
+    dist = vec2 - vec1
+    dist = min_image_convention(dist, box)
+    midpoint = vec1 + 0.5 * dist
+    midpoint %= box
+    return midpoint
+
+def get_identifiers(link_data: str) -> list:
     """
     Retrieve the list of identifiers from a data file.
 
