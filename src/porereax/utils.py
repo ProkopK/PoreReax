@@ -9,7 +9,6 @@ such as the minimum-image convention.
 
 import pickle
 import yaml
-from matplotlib.axes import Axes
 import numpy as np
 import os
 

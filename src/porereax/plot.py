@@ -11,49 +11,6 @@ import numpy as np
 import porereax.utils as utils
 
 
-def _plot_setup(link_data: str, axis: Axes | bool = True, identifiers: list = None, colors: list = None):
-    """
-    Set up a matplotlib figure and axis for plotting.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file to be loaded.
-    axis : matplotlib.axes.Axes or bool, optional
-        Axis to plot on or True to create a new one. Default is True.
-    identifiers : list, optional
-        List of identifiers to plot (default is an empty list, which means all identifiers).
-    colors : list, optional
-        List of colors to use for plotting (default is an empty list, which uses default colors
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The created figure object.
-    ax : matplotlib.axes.Axes
-        The created axes object.
-    data : dict
-        The loaded data from the specified file.
-    identifiers : list
-        The list of identifiers to be plotted.
-    colors : list
-        The list of colors to be used for plotting.
-    """
-    if identifiers is None:
-        identifiers = []
-    if colors is None:
-        colors = []
-    data = utils.load_object(link_data)
-    if axis is True:
-        fig, ax = plt.subplots()
-    else:
-        fig = None
-        ax = axis
-    identifiers = data.keys() if not identifiers else identifiers
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if not colors else colors
-
-    return fig, ax, data, identifiers, colors
-
 def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, mean_std: float = None):
     """
     Plot a histogram curve on the given axis.
@@ -86,10 +43,10 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
     if std_data is not None:
         upper_bound = hist_data + std_data
         lower_bound = hist_data - std_data
-        axis.fill_between(bin_centers, 
-            lower_bound, 
-            upper_bound, 
-            color=color, 
+        axis.fill_between(bin_centers,
+            lower_bound,
+            upper_bound,
+            color=color,
             alpha=0.3)
     if mean_data is not None:
         axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
@@ -102,146 +59,73 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
             alpha=0.2
         )
 
-def plot_hist(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], std=False, mean=False, density=False, plot_kwargs = {}):
-    """
-    Plot histogram curves from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file created by a sampler instance.
-    axis : matplotlib.axes.Axes or bool, optional
-        Axis to plot on or True to create a new one. Default is True.
-    identifiers : list, optional
-        List of identifiers to plot (default is an empty list, which means all identifiers).
-    colors : list, optional
-        List of colors to use for plotting (default is an empty list, which uses default colors).
-    std : bool, optional
-        Whether to plot standard deviation shading (default is False).
-    mean : bool, optional
-        Whether to plot mean lines (default is False).
-    density : bool, optional
-        Whether to normalize histogram by number of samples (default is False).
-    plot_kwargs : dict, optional
-        Additional keyword arguments for the plot function.
-
-    Returns
-    -------
-    None
-    """
-    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
-
-    sampler_type = data["input_params"]["sampler_type"]
-    if sampler_type not in ["BondLengthSampler", "AngleSampler", "ChargeSampler", "BondDensitySampler", "DensitySampler", "RdfSampler"]:
-        print(f"Warning: plot_hist is not implemented for sampler type {sampler_type}.")
-        return
-
+def _plot_parameters(input_params: dict, mean: bool, density: bool):
+    sampler_type = input_params["sampler_type"]
+    # Set defaults
+    x_label = "X-axis"
+    y_label = "Counts"
     if sampler_type == "ChargeSampler":
-        density_normalization = "num_atoms"
         x_label = "Charge / e"
-        y_label = "Counts per Atom"
-
-    elif sampler_type == "BondLengthSampler":
-        density_normalization = "num_bonds"
-        y_label = "Counts per Bond"
-        if data["input_params"]["dimension"] == "Bond Order":
-            x_label = "Bond Order"
-        elif data["input_params"]["dimension"] == "Bond Length":
-            x_label = "Bond Length / Angstrom"
-
+        if density:
+            y_label = "Counts per Atom"
+        else:
+            y_label = "Counts"
+        density_normalization = "num_atoms"
     elif sampler_type == "AngleSampler":
-        density_normalization = "num_angles"
         x_label = "Angle / degrees"
-        y_label = "Counts per Angle"
-
-    elif sampler_type == "BondDensitySampler" or sampler_type == "DensitySampler":
-        if data["input_params"]["dimension"] != "Cartesian1D":
-            print("Warning: plot_hist is only implemented for Cartesian1D density data. If using Cartesian2D or Time, consider using plot_2d_hist or plot_time instead.")
-            return
-        density_normalization = None
-        x_label = f"{data['input_params']['direction']} Position / nm"
+        if density:
+            y_label = "Counts per Angle"
+        else:
+            y_label = "Counts"
+        density_normalization = "num_angles"
+    elif sampler_type == "BondLengthSampler":
+        if input_params["dimension"] == "Bond Order":
+            x_label = "Bond Order"
+        elif input_params["dimension"] == "Bond Length":
+            x_label = "Bond Length / Angstrom"
+        if density:
+            y_label = "Counts per Bond"
+        else:
+            y_label = "Counts"
+        density_normalization = "num_bonds"
+    elif sampler_type == "BondDensitySampler" or sampler_type == "DensitySampler" or sampler_type == "ReactionSampler":
+        x_label = f"{input_params['direction']} Position / nm"
         y_label = "Density / atoms"
         mean = False
-        density = True
-
+        density = False
     elif sampler_type == "RdfSampler":
-        density_normalization = None
         x_label = "Distance r / Å"
         y_label = "g(r)"
         mean = False
-        density = True
+        density = False
+    else:
+        print(f"Warning: plot_hist is not implemented for sampler type {sampler_type}. Trying to use default labels.")
+        density_normalization = None
+
+    return x_label, y_label, density_normalization, mean, density
+
+
+def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, colors: list, std: bool, mean: bool, density: bool, plot_kwargs: dict):
+    x_label, y_label, density_normalization, mean, density = _plot_parameters(input_params, mean, density)
 
     for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
         bin_edges = data[identifier]["bin_edges"]
         hist = data[identifier]["hist"]
-        if density and density_normalization:
+        if density:
             hist = hist / data[identifier][density_normalization]
         hist_std = data[identifier]["hist_std"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
         mean_std = data[identifier]["mean_std"] if std and mean else None
-        _plot_one_line(ax, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, hist_std, mean_value, mean_std)
-    ax.set_xlabel(x_label)
-    if not density:
-        ax.set_ylabel("Counts")
-    else:
-        ax.set_ylabel(y_label)
+        _plot_one_line(axis, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, hist_std, mean_value, mean_std)
+    axis.set_xlabel(x_label)
+    axis.set_ylabel(y_label)
 
-def plot_time(link_data: str, axis: Axes | bool=True, identifiers = [], colors = [], dt=50):
-    """
-    Plot density over time from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file created by a sampler instance.
-    axis : Axes or bool, optional
-        Axis to plot on or True to create a new one. Default is True.
-    identifiers : list, optional
-        List of identifiers to plot (default is an empty list, which means all identifiers).
-    colors : list, optional
-        List of colors to use for plotting (default is an empty list, which uses default colors).
-    dt : int, optional
-        Time interval between frames in femtoseconds (default is 50 fs).
-    """
-    fig, ax, data, identifiers, colors = _plot_setup(link_data, axis, identifiers, colors)
-    if data["input_params"]["dimension"] != "Time":
-        return
-    for i, identifier in enumerate(identifiers):
-        if identifier == "input_params":
-            continue
-        if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
-            continue
-        time_data = data[identifier]
-        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000  # Convert to ps
-        density_data = time_data["densities"]
-        color = colors[i % len(colors)] if colors else None
-        ax.plot(time_points, density_data, label=identifier, color=color)
-    ax.set_xlabel("Time / ps")
-    ax.set_ylabel("Density / atoms")
-
-def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
-    """
-    Plot 2D density histogram from sampled data.
-
-    Parameters
-    ----------
-    link_data : str
-        Path to the data file containing sampled density data.
-    identifier : str
-        Molecule identifier to plot.
-    """
-    data = utils.load_object(link_data)
-    if data["input_params"]["dimension"] != "Cartesian2D":
-        return
+def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool):
     if identifier not in data:
-        print(f"Warning: Identifier {identifier} not found in data.")
-        return
+        raise ValueError(f"Identifier {identifier} not found in data.")
     density_data = data[identifier]
     x_edges = density_data["x_edges"] / 10  # Convert to nm
     y_edges = density_data["y_edges"] / 10  # Convert to nm
@@ -250,27 +134,62 @@ def plot_2d_hist(link_data: str, identifier: str, transpose: bool=False):
     X, Y = np.meshgrid(x_edges, y_edges)
     if transpose:
         X, Y = Y, X
-    plt.figure()
-    plt.pcolormesh(X, Y, hist.T, shading='auto')
+    c = axis.pcolormesh(X, Y, hist.T, shading='auto')
+    plt.colorbar(c, ax=axis, label='Density / Counts per frame')
     if transpose:
-        plt.xlabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
-        plt.ylabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
+        axis.set_xlabel(f"{['x','y','z'][density_data['direction'][1]]} / nm")
+        axis.set_ylabel(f"{['x','y','z'][density_data['direction'][0]]} / nm")
     else:
-        plt.xlabel(f"{['x','y','z'][density_data['direction'][0]]} Position / nm")
-        plt.ylabel(f"{['x','y','z'][density_data['direction'][1]]} Position / nm")
-    plt.axis('scaled')
-    plt.colorbar(label='Density / Counts per frame')
+        axis.set_xlabel(f"{['x','y','z'][density_data['direction'][0]]} / nm")
+        axis.set_ylabel(f"{['x','y','z'][density_data['direction'][1]]} / nm")
+    axis.set_aspect('equal', adjustable='box')
 
-def plot_mol_structure(link_data: str, identifier):
-    data = utils.load_object(link_data)
-    num_frames = data["num_frames"]
+def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
+    for i, identifier in enumerate(identifiers):
+        if identifier not in data:
+            print(f"Warning: Identifier {identifier} not found in data.")
+            continue
+        time_data = data[identifier]
+        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000  # Convert to ps
+        density_data = time_data["densities"]
+        color = colors[i % len(colors)] if colors else None
+        axis.plot(time_points, density_data, label=identifier, color=color)
+    axis.set_xlabel("Time / ps")
+    axis.set_ylabel("Counts per Frame")
+
+def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     structure_counts = data[identifier]
     structures = list(structure_counts.keys())
-    counts = np.array([structure_counts[s] for s in structures]) / num_frames
-    fig, ax = plt.subplots()
-    ax.bar(structures, counts)
-    ax.set_xlabel("Molecule Structure")
-    ax.xaxis.set_tick_params(rotation=90)
-    ax.set_ylabel("Average Count per Frame")
+    counts = list(structure_counts.values())
+    axis.bar(structures, counts)
+    axis.set_xlabel("Molecule Structure")
+    axis.xaxis.set_tick_params(rotation=90)
+    axis.set_ylabel("Average Count per Frame")
+
+def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs: dict = {}):
+    data = utils.load_object(link_data)
+    input_params = data.pop("input_params", None)
+    sampler_type = input_params["sampler_type"]
+
+    if axis is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+        ax = axis
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if not colors else colors
+    identifiers = identifiers if identifiers else list(data.keys())
+
+    if sampler_type == "MoleculeStructureSampler":
+        _plot_mol_structure(ax, data, identifiers[0] if identifiers else list(data.keys())[0])
+    elif input_params["dimension"] == "Time":
+        _plot_time(ax, data, identifiers, colors, dt)
+    elif input_params["dimension"] == "Cartesian2D":
+        _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose)
+    elif input_params["dimension"] == "Cartesian1D" or input_params["dimension"] == "Histogram":
+        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs)
+    else:
+        raise ValueError(f"Plotting is not implemented for sampler type {sampler_type} with dimension {input_params['dimension']}.")
+
+    return fig, ax
