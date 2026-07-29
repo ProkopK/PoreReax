@@ -61,9 +61,6 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
 
 def _plot_parameters(input_params: dict, mean: bool, density: bool):
     sampler_type = input_params["sampler_type"]
-    # Set defaults
-    x_label = "X-axis"
-    y_label = "Counts"
     if sampler_type == "ChargeSampler":
         x_label = "Charge / e"
         if density:
@@ -91,16 +88,17 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
     elif sampler_type == "BondDensitySampler" or sampler_type == "DensitySampler" or sampler_type == "ReactionSampler":
         x_label = f"{input_params['direction']} Position / nm"
         y_label = "Density / atoms"
+        density_normalization = None
         mean = False
         density = False
     elif sampler_type == "RdfSampler":
         x_label = "Distance r / Å"
         y_label = "g(r)"
+        density_normalization = None
         mean = False
         density = False
     else:
-        print(f"Warning: plot_hist is not implemented for sampler type {sampler_type}. Trying to use default labels.")
-        density_normalization = None
+        raise ValueError(f"Plotting is not implemented for sampler type {sampler_type} with dimension {input_params['dimension']}.")
 
     return x_label, y_label, density_normalization, mean, density
 
@@ -187,9 +185,7 @@ def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], color
         _plot_time(ax, data, identifiers, colors, dt)
     elif input_params["dimension"] == "Cartesian2D":
         _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose)
-    elif input_params["dimension"] == "Cartesian1D" or input_params["dimension"] == "Histogram":
-        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs)
     else:
-        raise ValueError(f"Plotting is not implemented for sampler type {sampler_type} with dimension {input_params['dimension']}.")
+        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs)
 
     return fig, ax

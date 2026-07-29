@@ -80,7 +80,7 @@ def test_sample_initialization_validation(kwargs, expected_exception, expected_m
 
 
 @pytest.fixture
-def full_sampler_w_path(sampler, tmp_path):
+def full_sampler_with_path(sampler, tmp_path):
     path = tmp_path.as_posix()
     sampler.add_molecule_structure_sampling(path + "/molecule_structures")
     sampler.add_charge_sampling(
@@ -155,19 +155,19 @@ def full_sampler_w_path(sampler, tmp_path):
 
 
 def test_sample_sampling_parallel(
-    full_sampler_w_path, list_of_sample_object_file_names
+    full_sampler_with_path, list_of_sample_object_file_names
 ):
     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
-    full_sampler, path = full_sampler_w_path
+    full_sampler, path = full_sampler_with_path
     full_sampler.sample(is_parallel=True)
 
     for file_name in list_of_sample_object_file_names:
         assert_sample_object_files(path + f"/{file_name}", TEST_DATA_DIR / file_name)
 
 
-def test_sample_sampling_serial(full_sampler_w_path, list_of_sample_object_file_names):
+def test_sample_sampling_serial(full_sampler_with_path, list_of_sample_object_file_names):
     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
-    full_sampler, path = full_sampler_w_path
+    full_sampler, path = full_sampler_with_path
     full_sampler.sample(is_parallel=False)
 
     for file_name in list_of_sample_object_file_names:
