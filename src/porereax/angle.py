@@ -64,6 +64,16 @@ class AngleSampler(AtomSampler):
         self.range = (0, 180)
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self.num_bins, range=self.range, angle=self.angle)
 
+        # Remove atomstructures with less than 3 atoms or not matching A-B-C if specified
+        molecules_to_remove = []
+        for identifier, atoms_info in self.molecules.items():
+            if self.angle and atoms_info["atom"] != self.angle[1]:
+                molecules_to_remove.append(identifier)
+            elif atoms_info["bonds"] is None or len(atoms_info["bonds"][0]) < 2:
+                molecules_to_remove.append(identifier)
+        for identifier in molecules_to_remove:
+            del self.molecules[identifier]
+
         # Setup data
         for identifier, atoms_info in self.molecules.items():
             hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
@@ -82,18 +92,12 @@ class AngleSampler(AtomSampler):
         position_mask = self.region(positions)
         for identifier, bonds_info in self.molecules.items():
             mol_mask = position_mask & mol_index[identifier]
-            if not np.any(mol_mask):
-                continue
             atom_indices = np.where(mol_mask)[0]
             bonded_atoms = mol_bonds[identifier][atom_indices]
-            if bonded_atoms.shape[1] < 2:
-                continue
             if self.angle:
                 atom_a_type = self.angle[0]
                 atom_b_type = self.angle[1]
                 atom_c_type = self.angle[2]
-                if bonds_info["atom"] != atom_b_type:
-                    continue
                 bonded_types = atom_types[bonded_atoms]
             angles = []
             for i in range(bonded_atoms.shape[1]):
@@ -107,8 +111,6 @@ class AngleSampler(AtomSampler):
                         mask_a = bonded_types[:, i] == atom_a_type
                         mask_c = bonded_types[:, j] == atom_c_type
                         valid_mask = mask_a & mask_c
-                        if not np.any(valid_mask):
-                            continue
                         atom_a = atom_a[valid_mask]
                         atom_b = atom_b[valid_mask]
                         atom_c = atom_c[valid_mask]
