@@ -43,9 +43,6 @@ class RdfSampler(AtomSampler):
         r_max : float
             Maximum distance for RDF calculation.
         """
-        valid_dimensions = ["Histogram"]
-        if not isinstance(dimension, str) or dimension not in valid_dimensions:
-            raise ValueError(f"RdfSampler does not support dimension {dimension}")
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("RdfSampler requires a positive integer 'num_bins' parameter.")
         if not isinstance(r_max, (float, int)) or r_max <= 0:
@@ -71,8 +68,8 @@ class RdfSampler(AtomSampler):
 
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, r_max=r_max)
 
-        # Build pair identifiers
-        self.pairs = []
+        # Build pair identifiers and setup data structures for each pair
+        self.pairs = {}
         for pair in pairs:
             pair_A, pair_B = pair
             identifier_A = Sampler.build_mol_dictionary(pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler")[0]
@@ -83,6 +80,8 @@ class RdfSampler(AtomSampler):
         # Setup data structures for each pair
         for identifier_A, identifier_B in self.pairs:
             pair_key = f"{identifier_A}-{identifier_B}"
+            self.pairs[pair_key] = (identifier_A, identifier_B)
+
             hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0, self.r_max))
             self.data[pair_key] = {
                 "num_frames": 0,
@@ -91,6 +90,8 @@ class RdfSampler(AtomSampler):
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
+        self.input["pairs"] = self.pairs
+
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         """
@@ -119,17 +120,12 @@ class RdfSampler(AtomSampler):
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
 
-        for identifier_A, identifier_B in self.pairs:
-            pair_key = f"{identifier_A}-{identifier_B}"
-
+        for pair_key, (identifier_A, identifier_B) in self.pairs.items():
             # Get atom indices for both types
             atom_mask_A = mol_index[identifier_A] & position_mask
             atom_mask_B = mol_index[identifier_B] & position_mask
             atom_indices_A = np.where(atom_mask_A)[0]
             atom_indices_B = np.where(atom_mask_B)[0]
-
-            if atom_indices_A.size == 0 or atom_indices_B.size == 0:
-                continue
 
             pairs, pair_vectors = finder.find_all(atom_indices_A)
 
@@ -160,46 +156,45 @@ class RdfSampler(AtomSampler):
         for identifier in data_list:
             combined_data[identifier] = {}
 
-            if self.dimension == "Histogram":
-                num_frames = np.sum(data_list[identifier]["num_frames"])
-                num_atoms_A = np.sum(data_list[identifier]["num_atoms_A"])
-                num_atoms_B = np.sum(data_list[identifier]["num_atoms_B"])
-                combined_data[identifier]["num_frames"] = num_frames
-                combined_data[identifier]["num_atoms_A"] = num_atoms_A
-                combined_data[identifier]["num_atoms_B"] = num_atoms_B
+            num_frames = np.sum(data_list[identifier]["num_frames"])
+            num_atoms_A = np.sum(data_list[identifier]["num_atoms_A"])
+            num_atoms_B = np.sum(data_list[identifier]["num_atoms_B"])
+            combined_data[identifier]["num_frames"] = num_frames
+            combined_data[identifier]["num_atoms_A"] = num_atoms_A
+            combined_data[identifier]["num_atoms_B"] = num_atoms_B
 
-                # Sum histograms and normalize
-                hist_sum = np.sum(data_list[identifier]["hist"], axis=0)
+            # Sum histograms and normalize
+            hist_sum = np.sum(data_list[identifier]["hist"], axis=0)
 
-                bin_edges = data_list[identifier]["bin_edges"][0]
+            bin_edges = data_list[identifier]["bin_edges"][0]
 
-                # Calculate average number of atoms per frame
-                avg_atoms_A = num_atoms_A / num_frames if num_frames > 0 else 0
-                avg_atoms_B = num_atoms_B / num_frames if num_frames > 0 else 0
+            # Calculate average number of atoms per frame
+            avg_atoms_A = num_atoms_A / num_frames if num_frames > 0 else 0
+            avg_atoms_B = num_atoms_B / num_frames if num_frames > 0 else 0
 
-                # Calculate box volume
-                box_volume = np.prod(self.box)
+            # Calculate box volume
+            box_volume = np.prod(self.box)
 
-                # Calculate number density of B atoms
-                rho_B = avg_atoms_B / box_volume if box_volume > 0 else 0
+            # Calculate number density of B atoms
+            rho_B = avg_atoms_B / box_volume if box_volume > 0 else 0
 
-                # Calculate shell volumes: V = 4/3 * pi * (r_outer^3 - r_inner^3)
-                r_inner = bin_edges[:-1]
-                r_outer = bin_edges[1:]
-                shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
+            # Calculate shell volumes: V = 4/3 * pi * (r_outer^3 - r_inner^3)
+            r_inner = bin_edges[:-1]
+            r_outer = bin_edges[1:]
+            shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
 
-                # Avoid division by zero
-                shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1e-10)
+            # Avoid division by zero
+            shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1e-10)
 
-                # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
-                # This gives g(r) -> 1 for large r in a homogeneous system
-                if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
-                    combined_data[identifier]["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
-                else:
-                    combined_data[identifier]["hist"] = np.zeros(self.num_bins)
-                
-                combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self.num_bins)
-                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-                combined_data[identifier]["bin_edges"] = bin_edges
+            # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
+            # This gives g(r) -> 1 for large r in a homogeneous system
+            if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
+                combined_data[identifier]["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
+            else:
+                combined_data[identifier]["hist"] = np.zeros(self.num_bins)
+
+            combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self.num_bins)
+            combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
+            combined_data[identifier]["bin_edges"] = bin_edges
 
         utils.save_object(combined_data, self.name_out + ".obj")
