@@ -17,17 +17,17 @@ def test_simulate_pore_native(simulate_pore, tmp_path):
 def test_simulate_pore_with_setup(simulate_pore, tmp_path):
     with pytest.raises(FileNotFoundError):
         simulate_pore.set_job_file(
-            file_path="non_existent_file.txt", submit_command="s", lammps_command="s"
+            job_file="non_existent_file.txt", submit_command="s", lammps_command="s"
         )
     with pytest.raises(ValueError):
         simulate_pore.set_job_file(
-            file_path=TEST_DATA_DIR / "test_job.job",
+            job_file=TEST_DATA_DIR / "test_job.job",
             submit_command="",
             lammps_command="s",
         )
     with pytest.raises(ValueError):
         simulate_pore.set_job_file(
-            file_path=TEST_DATA_DIR / "test_job.job",
+            job_file=TEST_DATA_DIR / "test_job.job",
             submit_command="s",
             lammps_command="",
         )
@@ -38,7 +38,7 @@ def test_simulate_pore_with_setup(simulate_pore, tmp_path):
     submit_command = "sbatch"
     lammps_command = "mpirun --bind-to none --map-by node lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
     simulate_pore.set_job_file(
-        file_path=job_file_path,
+        job_file=job_file_path,
         submit_command=submit_command,
         lammps_command=lammps_command,
     )
