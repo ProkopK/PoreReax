@@ -175,15 +175,15 @@ def test_sample_sampling_serial(full_sampler_w_path, list_of_sample_object_file_
             path + f"/{file_name}", TEST_DATA_DIR / file_name, check_for_std=False
         )
 
+# System dependent tests
+# def test_sample_ovito_conflicts(tmp_path):
+#     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
+#     import ovito
 
-def test_sample_ovito_conflicts(tmp_path):
-    warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
-    import ovito
-
-    with pytest.raises(RuntimeError):
-        sampler = Sample(
-            atom_lib=atom_lib,
-            masses=masses,
-            trajectory_file=traj_file,
-            bond_file=bond_file,
-        )
+#     with pytest.raises(RuntimeError):
+#         sampler = Sample(
+#             atom_lib=atom_lib,
+#             masses=masses,
+#             trajectory_file=traj_file,
+#             bond_file=bond_file,
+#         )
