@@ -9,11 +9,17 @@ dynamics workflows based on ReaxFF and LAMMPS.
   structures (`.gro`)
 - Configure multi-stage ReaxFF workflows (for example NPT/NVT/NVE)
 - Sample and post-process trajectories with reusable analysis samplers
-- Plot sampled results with built-in plotting helpers
+    * Angle distributions
+    * Charge distributions
+    * Molecule structures
+    * Time evolution and density of atoms, molecules, bonds, and reactions
+    * Bond length distributions
+    * Radial distribution functions (RDFs)
+- Plot sampled results with built-in plotting functions
 
 ## Installation
 
-PoreReax currently targets Python 3.10+.
+PoreReax currently targets Python 3.12+.
 
 Direct installation from github:
 
@@ -65,19 +71,12 @@ sampler.sample()
 
 ## Documentation
 
-Sphinx docs live under `/docs` and include:
+Documentation is available at [https://prokopk.github.io/PoreReax/](https://prokopk.github.io/PoreReax/) and includes:
 
 - getting started
 - simulation workflow guides
 - analysis workflow guides
 - API reference generated from source
-
-Build locally:
-
-```bash
-cd docs
-make html
-```
 
 ## License
 
