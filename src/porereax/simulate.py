@@ -127,14 +127,14 @@ class Simulate():
             raise ValueError("All values in atom_masses must be positive numbers representing masses.")
         if not all(atom_masses.get(v) is not None for v in self._type_to_name.values()):
             raise ValueError("All atoms in gro_lib must have corresponding masses in atom_masses.")
-        self.atom_masses = atom_masses
+        self._atom_masses = atom_masses
 
         self._job_file = None
         self._submit_cmd = None
         self._lammps_command = None
         self._force_field = None
         self._sim = []
-        self.image_dump = None
+        self._image_dump = None
 
     def set_job_file(self, job_file, submit_command, lammps_command=None):
         """
@@ -303,9 +303,9 @@ class Simulate():
         if kwargs is not None and not isinstance(kwargs, str):
             raise ValueError("kwargs must be a string or None.")
 
-        if self.image_dump is None:
-            self.image_dump = []
-        self.image_dump.append({
+        if self._image_dump is None:
+            self._image_dump = []
+        self._image_dump.append({
             "plane": plane,
             "dump_freq": dump_freq,
             "zoom": zoom,
@@ -331,7 +331,7 @@ class Simulate():
         dict
             Dictionary containing image dump settings for use in Jinja2 templates.
         """
-        if self.image_dump is None:
+        if self._image_dump is None:
             return {
                 "IMAGE_DUMP_ENABLED": False,
                 "IMAGE_DUMPS": [],
@@ -352,7 +352,7 @@ class Simulate():
             },
         }
         image_dumps = []
-        for dump_id, dump in enumerate(self.image_dump):
+        for dump_id, dump in enumerate(self._image_dump):
             plane = dump["plane"]
             view = plane_settings[plane]
             if dump["map_by_charge"]:
@@ -502,7 +502,7 @@ class Simulate():
             self.set_job_file(None, None, None)
 
         # Setup figure folder
-        if self.image_dump is not None:
+        if self._image_dump is not None:
             os.makedirs(os.path.join(self._path, "figures"), exist_ok=True)
 
         with open(self._job_file, 'r') as f:
@@ -516,7 +516,7 @@ class Simulate():
         for step_idx, step in enumerate(self._sim):
             file_name = f"run_{step_idx}"
             lmp_file = os.path.join(self._path, f"{file_name}.lmp")
-            lammps_command = "mkdir -p figures \n" if self.image_dump is not None else ""
+            lammps_command = "mkdir -p figures \n" if self._image_dump is not None else ""
             lammps_command += self._lammps_command.format(
                 input_file=f"{file_name}.lmp",
                 log_file=f"{file_name}.log"
@@ -556,7 +556,7 @@ class Simulate():
             file_content = ana_template.render(
                 NUMSIMS=len(self._sim),
                 NAME_TO_TYPE=self._name_to_type,
-                ATOM_MASSES=self.atom_masses,
+                ATOM_MASSES=self._atom_masses,
             )
             f.write(file_content)
 
@@ -680,7 +680,7 @@ class Simulate():
         file.write(f"{0.0:8.3f} {box_dims[1]:8.3f} ylo yhi\n")
         file.write(f"{0.0:8.3f} {box_dims[2]:8.3f} zlo zhi\n\n")
         file.write("Masses\n\n")
-        for atom_name, mass in self.atom_masses.items():
+        for atom_name, mass in self._atom_masses.items():
             file.write(f"{self._name_to_type[atom_name]} {mass:8.3f}\n")
 
     def _write_lammps_data(self, file, gro_data):
@@ -714,7 +714,7 @@ class Simulate():
         charge_count = 0.0
         atom_count = {atom_type: 0 for atom_type in range(1, self._num_atom_types + 1)}
         file.write("\nAtoms\n\n")
-        for i, data in enumerate(gro_data):
+        for i, data in enumerate(gro_data, start=1):
             res_id, _, atom_name, x, y, z, _, _, _ = data
             atom_type = self._name_to_type.get(self._gro_lib.get(atom_name))
             charge = self._gro_charges.get(atom_name)
@@ -724,11 +724,11 @@ class Simulate():
                 raise ValueError(f"Charge for atom name '{atom_name}' not found in gro_charges.")
             charge_count += charge
             atom_count[atom_type] += 1
-            file.write(f"{i+1:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} {y:8.3f} {z:8.3f}\n")
+            file.write(f"{i:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} {y:8.3f} {z:8.3f}\n")
         file.write("\nVelocities\n\n")
-        for i, data in enumerate(gro_data):
+        for i, data in enumerate(gro_data, start=1):
             _, _, _, _, _, _, vx, vy, vz = data
-            file.write(f"{i+1:5d} {vx: 2.6f} {vy: 2.6f} {vz: 2.6f}\n")
+            file.write(f"{i:5d} {vx: 2.6f} {vy: 2.6f} {vz: 2.6f}\n")
 
         print(f"Total charge in system: {charge_count:.4f}e")
         print("Atom counts by type:")
