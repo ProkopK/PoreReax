@@ -22,14 +22,32 @@ fix myspec all reaxff/species 1 1 {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.species el
 fix bond all reaxff/bonds {{ DUMP_FREQ }} run_{{ SIMNUMBER }}.bonds
 fix removeMom all momentum 100 linear 1 1 1 rescale
 restart 10000 checkpoint_a.restart checkpoint_b.restart
+
+{% if FROZEN_ATOMS -%}
+{%- for name, type_id in FROZEN_ATOMS.items() -%}
+group {{ name }} type {{ type_id }}
+{% endfor %}
+group frozen union{% for name in FROZEN_ATOMS.keys() %} {{ name }}{% endfor %}
+fix freeze frozen setforce 0.0 0.0 0.0
+velocity frozen set 0.0 0.0 0.0
+
+group mobile subtract all frozen
+compute mobileTemp mobile temp
+compute_modify mobileTemp extra/dof 0
+thermo_modify temp mobileTemp
+{% endif -%}
 {% if SIMULATIONTYPE == "nvt" %}
-fix nvt all nvt temp {{ TEMP }} {{ TEMP }} 100.0
+fix integrate {% if FROZEN_ATOMS -%}mobile{% else %}all{% endif %} nvt temp {{ TEMP }} {{ TEMP }} 100.0
 {% elif SIMULATIONTYPE == "npt" %}
-fix npt all npt temp {{ TEMP }} {{ TEMP }} 100.0 iso {{ PRESS }} {{ PRESS }} 1000.0
+fix integrate {% if FROZEN_ATOMS -%}mobile{% else %}all{% endif %} npt temp {{ TEMP }} {{ TEMP }} 100.0 iso {{ PRESS }} {{ PRESS }} 1000.0
 {% elif SIMULATIONTYPE == "nve" %}
-fix nve all nve
+fix integrate {% if FROZEN_ATOMS -%}mobile{% else %}all{% endif %} nve
+{% endif %}
+{%- if FROZEN_ATOMS -%}
+fix_modify integrate temp mobileTemp
 {% endif %}
 {% if IMAGE_DUMP_ENABLED -%}
+# Image dump regions and dumps
 variable img_xmid equal 0.5*(xlo+xhi)
 variable img_ymid equal 0.5*(ylo+yhi)
 variable img_zmid equal 0.5*(zlo+zhi)
@@ -50,17 +68,12 @@ dump_modify imagedump_{{ image.dump_id }} region {{ image.region_id }}
 
 run {{ NSTEPS }}
 
+# Cleanup
 undump trajdump
 unfix myspec
 unfix bond
 unfix removeMom
-{% if SIMULATIONTYPE == "npt" %}
-unfix npt
-{% elif SIMULATIONTYPE == "nve" %}
-unfix nve
-{% elif SIMULATIONTYPE == "nvt" %}
-unfix nvt
-{% endif %}
+unfix integrate
 {% if IMAGE_DUMP_ENABLED -%}
 {% for image in IMAGE_DUMPS -%}
 undump imagedump_{{ image.dump_id }}

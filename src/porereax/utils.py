@@ -147,3 +147,30 @@ def get_data(link_data: str, identifier: str) -> dict:
     if identifier not in data:
         raise ValueError(f"Identifier '{identifier}' not found in the data file.")
     return data[identifier]
+
+def read_pore_yml(file_path: str):
+    properties = {}
+    system_data = load_yaml(file_path)
+    if len(system_data) > 2:
+        raise NotImplementedError("Only systems with one pore are supported.")
+    reservoir = system_data["system"]["reservoir"]
+    properties["reservoir"] = reservoir * 10
+    if system_data["shape_00"]["shape"] == "CYLINDER":
+        if system_data["shape_00"]["parameter"]["central"] != [0, 0, 1]:
+            raise NotImplementedError("Only CYLINDER pores with central axis along z (0,0,1) are supported.")
+        pore_length = 2 * system_data["system"]["centroid"][2] * 10
+        box_length = system_data["system"]["dimensions"][2] * 10
+        center = np.array(system_data["shape_00"]["parameter"]["centroid"]) * 10
+        center[2] = box_length / 2
+        gap = (box_length - pore_length - 2 * reservoir) / 2
+        pore_range = np.array([reservoir + gap, box_length - reservoir - gap])
+        
+        properties["type"] = "cylinder"
+        properties["radius"] = system_data["shape_00"]["diameter"] / 2 * 10
+        properties["length"] = pore_length
+        properties["center"] = center
+        properties["range"] = pore_range
+    else:
+        raise NotImplementedError("Currently, only CYLINDER pores are supported.")
+
+    return properties

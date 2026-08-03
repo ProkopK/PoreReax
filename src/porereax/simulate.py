@@ -26,9 +26,12 @@ Example
 
 import os
 import shutil
+import numpy as np
 
 from jinja2 import Template
 from importlib.resources import files
+from porereax.utils import read_pore_yml
+from collections.abc import Callable
 
 
 class Simulate():
@@ -88,9 +91,13 @@ class Simulate():
         if structure_file is None:
             self._name = os.path.basename(os.path.split(self._path)[0])
             self._structure_file = os.path.join(os.path.split(self._path)[0], "nvt", "nvt.gro")
+            self._system_file = os.path.join(os.path.split(self._path)[0], "_gro", "pore.yml")
+            if not os.path.isfile(self._system_file):
+                raise FileNotFoundError(f"System file {self._system_file} not found.")
         else:
             self._name = os.path.basename(self._path)
             self._structure_file = os.path.abspath(structure_file)
+            self._system_file = None
         if not os.path.isfile(self._structure_file):
             raise FileNotFoundError(f"Structure file {self._structure_file} not found.")
 
@@ -135,6 +142,8 @@ class Simulate():
         self._force_field = None
         self._sim = []
         self._image_dump = None
+        self._frozen_atoms = None
+        self._frozen_region = lambda x, y, z: False
 
     def set_job_file(self, job_file, submit_command, lammps_command=None):
         """
@@ -445,6 +454,65 @@ class Simulate():
             "wall_time": wall_time,
         })
 
+    def freeze_region(self, region: Callable[[float, float, float], bool]):
+        """
+        Freeze atoms in a specified region of the simulation box.
+
+        Parameters
+        ----------
+        region : callable
+            A function that takes three arguments (x, y, z) representing the coordinates
+            of an atom in Angstroms and returns True if the atom should be frozen, or False otherwise.
+
+        Raises
+        ------
+        ValueError
+            If the provided region is not callable.
+
+        Notes
+        -----
+        This method modifies the atom types to create frozen versions of the specified
+        atom types. Frozen atoms will not move during the simulation, allowing for
+        the study of surface interactions or confinement effects.
+        """
+        if not callable(region):
+            raise ValueError("region must be a callable function that takes (x, y, z) and returns a boolean.")
+        if not self._frozen_atoms:
+            self._frozen_atoms = {}
+            for a_name, a_type in self._name_to_type.items():
+                self._frozen_atoms[a_name+"_f"] = a_type + self._num_atom_types
+            self._num_atom_types *= 2
+            self._type_to_name.update({v: k for k, v in self._frozen_atoms.items()})
+            self._name_to_type.update({k: v for k, v in self._frozen_atoms.items()})
+            self._atom_masses.update({a_name: 1.0 for a_name in self._frozen_atoms.keys()})
+            self._frozen_region = region
+
+    def auto_freeze(self, reactive_radius=10.0):
+        """
+        Automatically freeze some atoms of the pore structure and leave a reactive layer between frozen and solvent.
+
+        Parameters
+        ----------
+        reactive_radius : float, optional
+            The thickness of the reactive layer in Angstroms. Atoms within this distance from the pore wall will remain unfrozen. Default is 10.0 Angstroms.
+
+        Raises
+        ------
+        NotImplementedError
+            If the pore type specified in the system YAML file is not "cylinder". Currently, only cylindrical pores are supported for automatic freezing.
+        """
+        pore_properties = read_pore_yml(self._system_file)
+        if pore_properties["type"] == "cylinder":
+            pore_radius = pore_properties["radius"]
+            pore_center = pore_properties["center"]
+            pore_range = pore_properties["range"]
+            def region(x, y, z):
+                d = np.linalg.norm(np.array([x, y]) - np.array(pore_center[:2]))
+                return d > (pore_radius + reactive_radius) and pore_range[0] + reactive_radius + 1 < z < pore_range[1] - reactive_radius - 1
+            self.freeze_region(region)
+        else:
+            raise NotImplementedError("Only cylindrical pores are supported for auto_freeze.")
+
     def generate(self):
         """
         Generate all simulation files and scripts.
@@ -511,7 +579,10 @@ class Simulate():
         with open(run_template_path, 'r') as f:
             lmp_step_template = Template(f.read())
 
-        atoms = ' '.join(self._type_to_name[k] for k in range(1, self._num_atom_types + 1))
+        if self._frozen_atoms:
+            atoms = ' '.join(self._type_to_name[1 + (k%(self._num_atom_types//2))] for k in range(self._num_atom_types))
+        else:
+            atoms = ' '.join(self._type_to_name[k] for k in range(1, self._num_atom_types + 1))
 
         for step_idx, step in enumerate(self._sim):
             file_name = f"run_{step_idx}"
@@ -532,6 +603,7 @@ class Simulate():
                     TEMP=step["temp"],
                     PRESS=step["pressure"],
                     NSTEPS=step["nsteps"],
+                    FROZEN_ATOMS=self._frozen_atoms,
                     **self._image_dump_template_data(step),
                 )
                 f.write(file_content)
@@ -717,6 +789,9 @@ class Simulate():
         for i, data in enumerate(gro_data, start=1):
             res_id, _, atom_name, x, y, z, _, _, _ = data
             atom_type = self._name_to_type.get(self._gro_lib.get(atom_name))
+            if self._frozen_atoms:
+                if self._frozen_region(x, y, z):
+                    atom_type += self._num_atom_types // 2
             charge = self._gro_charges.get(atom_name)
             if atom_type is None:
                 raise ValueError(f"Atom name '{atom_name}' not found in gro_lib.")
