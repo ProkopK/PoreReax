@@ -148,7 +148,20 @@ def get_data(link_data: str, identifier: str) -> dict:
         raise ValueError(f"Identifier '{identifier}' not found in the data file.")
     return data[identifier]
 
-def read_pore_yml(file_path: str):
+def read_pore_yml(file_path: str) -> dict:
+    """
+    Read a YAML file containing pore system properties and extract relevant depending on the pore shape.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the YAML file containing pore system properties.
+    
+    Returns
+    -------
+    dict
+        A dictionary containing the extracted pore properties.
+    """
     properties = {}
     system_data = load_yaml(file_path)
     if len(system_data) > 2:

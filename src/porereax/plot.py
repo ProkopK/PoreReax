@@ -4,7 +4,7 @@ Module for plotting sampled data.
 The module provides functions to plot histograms, time series, and 2D density data from sampled data.
 """
 
-from matplotlib.axes import Axes
+from matplotlib.axes import Axes, Figure
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -60,6 +60,23 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
         )
 
 def _plot_parameters(input_params: dict, mean: bool, density: bool):
+    """
+    Determine the appropriate x and y labels, density normalization, and flags for mean and density based on the sampler type and dimension.
+
+    Parameters
+    ----------
+    input_params : dict
+        Input parameters from the data file.
+    mean : bool
+        Whether to plot mean values as vertical lines.
+    density : bool
+        Whether to normalize histograms to density.
+
+    Returns
+    -------
+    tuple
+        A tuple containing x_label, y_label, density_normalization, mean, and density.
+    """
     sampler_type = input_params["sampler_type"]
     if sampler_type == "ChargeSampler":
         x_label = "Charge / e"
@@ -104,6 +121,30 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
 
 
 def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, colors: list, std: bool, mean: bool, density: bool, plot_kwargs: dict):
+    """
+    Plot histograms for the given identifiers on the provided axis.
+
+    Parameters
+    ----------
+    axis : matplotlib.axes.Axes
+        Axis to plot on.
+    data : dict
+        Data dictionary containing histogram data for each identifier.
+    input_params : dict
+        Input parameters from the data file.
+    identifiers : list
+        List of identifiers to plot.
+    colors : list
+        List of colors to use for plotting.
+    std : bool
+        Whether to plot standard deviation shading.
+    mean : bool
+        Whether to plot mean values as vertical lines.
+    density : bool
+        Whether to normalize histograms to density.
+    plot_kwargs : dict
+        Additional keyword arguments for the plot function.
+    """
     x_label, y_label, density_normalization, mean, density = _plot_parameters(input_params, mean, density)
 
     for i, identifier in enumerate(identifiers):
@@ -122,6 +163,22 @@ def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, co
     axis.set_ylabel(y_label)
 
 def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwargs: dict):
+    """
+    Plot 2D density data for the given identifier on the provided axis.
+
+    Parameters
+    ----------
+    axis : matplotlib.axes.Axes
+        Axis to plot on.
+    data : dict
+        Data dictionary containing 2D density data for each identifier.
+    identifier : str
+        Identifier for the data to plot.
+    transpose : bool
+        Whether to transpose the axes for the 2D density plot.
+    plot_kwargs : dict
+        Additional keyword arguments for the pcolormesh function.
+    """
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     density_data = data[identifier]
@@ -145,6 +202,22 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwar
     axis.set_aspect('equal', adjustable='box')
 
 def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
+    """
+    Plot time series data for the given identifiers on the provided axis.
+
+    Parameters
+    ----------
+    axis : matplotlib.axes.Axes
+        Axis to plot on.
+    data : dict
+        Data dictionary containing time series data for each identifier.
+    identifiers : list
+        List of identifiers to plot.
+    colors : list
+        List of colors to use for plotting.
+    dt : int
+        Time step in femtoseconds for time series plots.
+    """
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
@@ -158,6 +231,18 @@ def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int)
     axis.set_ylabel("Counts per Frame")
 
 def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
+    """
+    Plot molecule structure counts for the given identifier on the provided axis.
+
+    Parameters
+    ----------
+    axis : matplotlib.axes.Axes
+        Axis to plot on.
+    data : dict
+        Data dictionary containing molecule structure counts for each identifier.
+    identifier : str
+        Identifier for the data to plot.
+    """
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     structure_counts = data[identifier]
@@ -168,7 +253,41 @@ def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     axis.xaxis.set_tick_params(rotation=90)
     axis.set_ylabel("Average Count per Frame")
 
-def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}):
+def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}) -> tuple[Figure | None, Axes]:
+    """
+    Plot sampled data from a data file.
+    All types of samplers are supported. Depending on the sampler type and dimension, different types of plots will be generated.
+
+    Parameters
+    ----------
+    link_data : str
+        Path to the data file created by a sampler instance.
+    axis : matplotlib.axes.Axes, optional
+        Axis to plot on. If None, a new figure and axis will be created (default is None).
+    identifiers : list, optional
+        List of identifiers to plot. If empty, all identifiers will be plotted (default is []).
+    colors : list, optional
+        List of colors to use for plotting. If empty, default colors will be used (default is []).
+    std : bool, optional
+        Whether to plot standard deviation shading (default is False).
+    mean : bool, optional
+        Whether to plot mean values as vertical lines (default is False).
+    density : bool, optional
+        Whether to normalize histograms to density (default is False).
+    dt : int, optional
+        Time step in femtoseconds for time series plots (default is 50).
+    transpose : bool, optional
+        Whether to transpose the axes for 2D density plots (default is False).
+    plot_kwargs_1d : dict, optional
+        Additional keyword arguments for 1D plots (default is {}).
+    plot_kwargs_2d : dict, optional
+        Additional keyword arguments for 2D plots (default is {}).
+
+    Returns
+    -------
+    tuple
+        A tuple containing the figure and axis objects. If an axis was provided, the figure will be None.
+    """
     data = utils.load_object(link_data)
     input_params = data.pop("input_params", None)
     sampler_type = input_params["sampler_type"]

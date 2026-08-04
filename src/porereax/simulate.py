@@ -32,6 +32,7 @@ from jinja2 import Template
 from importlib.resources import files
 from porereax.utils import read_pore_yml
 from collections.abc import Callable
+from io import TextIOWrapper
 
 
 class Simulate():
@@ -50,7 +51,7 @@ class Simulate():
     >>> sim = Simulate(gro_lib, gro_charges, atom_masses, 'system.gro')
     """
 
-    def __init__(self, gro_lib, gro_charges, atom_masses, structure_file=None):
+    def __init__(self, gro_lib: dict, gro_charges: dict, atom_masses: dict, structure_file: str = None):
         """
         Initialize the Simulate object with atom mappings and structure file.
 
@@ -145,7 +146,7 @@ class Simulate():
         self._frozen_atoms = None
         self._frozen_region = lambda x, y, z: False
 
-    def set_job_file(self, job_file, submit_command, lammps_command=None):
+    def set_job_file(self, job_file: str = None, submit_command: str = None, lammps_command: str = None):
         """
         Specify a custom job submission template file and command.
 
@@ -210,7 +211,7 @@ class Simulate():
         self._submit_cmd = s_command
         self._lammps_command = l_command
 
-    def set_force_field(self, force_field):
+    def set_force_field(self, force_field: str = None):
         """
         Specify a custom ReaxFF force field parameter file.
 
@@ -326,7 +327,7 @@ class Simulate():
             "kwargs": kwargs,
         })
 
-    def _image_dump_template_data(self, step):
+    def _image_dump_template_data(self, step: dict) -> dict:
         """
         Generate template data for image dump settings in LAMMPS input scripts.
 
@@ -395,7 +396,7 @@ class Simulate():
 
         return {"IMAGE_DUMP_ENABLED": True, "IMAGE_DUMPS": image_dumps}
 
-    def add_sim(self, type, nsteps, temp, pressure=1.0, dt=0.5, nodes=1, tasks_per_node=64, wall_time="20:00:00", dump_freq=100, thermo_freq=100):
+    def add_sim(self, type: str, nsteps: int, temp: float, pressure: float = 1.0, dt: float = 0.5, nodes: int = 1, tasks_per_node: int = 64, wall_time: str = "20:00:00", dump_freq: int = 100, thermo_freq: int = 100) -> None:
         """
         Add a simulation step to the workflow.
 
@@ -487,7 +488,7 @@ class Simulate():
             self._atom_masses.update({a_name: 1.0 for a_name in self._frozen_atoms.keys()})
             self._frozen_region = region
 
-    def auto_freeze(self, reactive_radius=10.0):
+    def auto_freeze(self, reactive_radius: float = 10.0):
         """
         Automatically freeze some atoms of the pore structure and leave a reactive layer between frozen and solvent.
 
@@ -632,7 +633,7 @@ class Simulate():
             )
             f.write(file_content)
 
-    def _line_mapper(self, line):
+    def _line_mapper(self, line: str) -> tuple:
         """
         Parse a line from a GROMACS structure file and extract atom information.
 
@@ -686,7 +687,7 @@ class Simulate():
         vz = float(line[60:68].strip()) / 100
         return res_id, res_name, atom_name, x, y, z, vx, vy, vz
 
-    def _read_gro_file(self):
+    def _read_gro_file(self) -> tuple:
         """
         Read and parse a GROMACS structure file.
 
@@ -719,7 +720,7 @@ class Simulate():
 
         return box_dims, gro_data
 
-    def _write_lammps_header(self, file, num_atoms, box_dims):
+    def _write_lammps_header(self, file: TextIOWrapper, num_atoms: int, box_dims: list):
         """
         Write the header section of a LAMMPS data file.
 
@@ -755,7 +756,7 @@ class Simulate():
         for atom_name, mass in self._atom_masses.items():
             file.write(f"{self._name_to_type[atom_name]} {mass:8.3f}\n")
 
-    def _write_lammps_data(self, file, gro_data):
+    def _write_lammps_data(self, file: TextIOWrapper, gro_data: list):
         """
         Write the Atoms and Velocities sections of a LAMMPS data file.
 
@@ -810,7 +811,7 @@ class Simulate():
         for atom_type, count in atom_count.items():
             print(f"  Type {self._type_to_name[atom_type]}: {count} atoms")
 
-    def _create_input_file(self, out_path):
+    def _create_input_file(self, out_path: str):
         """
         Create a complete LAMMPS data file from GROMACS structure file.
 
