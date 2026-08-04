@@ -121,7 +121,7 @@ def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, co
     axis.set_xlabel(x_label)
     axis.set_ylabel(y_label)
 
-def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool):
+def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwargs: dict):
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     density_data = data[identifier]
@@ -129,10 +129,12 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool):
     y_edges = density_data["y_edges"] / 10  # Convert to nm
     hist = density_data["hist"]
 
+    shading = plot_kwargs.pop("shading", "auto")
+
     X, Y = np.meshgrid(x_edges, y_edges)
     if transpose:
         X, Y = Y, X
-    c = axis.pcolormesh(X, Y, hist.T, shading='auto')
+    c = axis.pcolormesh(X, Y, hist.T, shading=shading, **plot_kwargs)
     plt.colorbar(c, ax=axis, label='Density / Counts per frame')
     if transpose:
         axis.set_xlabel(f"{['x','y','z'][density_data['direction'][1]]} / nm")
@@ -166,7 +168,7 @@ def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     axis.xaxis.set_tick_params(rotation=90)
     axis.set_ylabel("Average Count per Frame")
 
-def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs: dict = {}):
+def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}):
     data = utils.load_object(link_data)
     input_params = data.pop("input_params", None)
     sampler_type = input_params["sampler_type"]
@@ -184,8 +186,8 @@ def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], color
     elif input_params["dimension"] == "Time":
         _plot_time(ax, data, identifiers, colors, dt)
     elif input_params["dimension"] == "Cartesian2D":
-        _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose)
+        _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose, plot_kwargs_2d)
     else:
-        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs)
+        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs_1d)
 
     return fig, ax
