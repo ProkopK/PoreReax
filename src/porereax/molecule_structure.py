@@ -24,16 +24,17 @@ class MoleculeStructureSampler(Sampler):
         super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
 
         # Setup data
-        self.data = {"num_frames": 0, "structure_counts": {}}
+        self._data["num_frames"] = 0
+        self._data["structure_counts"] = {}
         for atom_type in atom_lib.values():
-            self.data["structure_counts"][atom_type] = {}
+            self._data["structure_counts"][atom_type] = {}
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
-        for atom_type in self.data["structure_counts"]:
+        position_mask = self._region(positions)
+        for atom_type in self._data["structure_counts"]:
             atoms = np.where(atom_types == atom_type)[0]
             for atom in atoms:
                 bonds = list(bond_enum.bonds_of_particle(atom))
@@ -42,19 +43,19 @@ class MoleculeStructureSampler(Sampler):
                 other_types = np.sort(atom_types[other_particles])
                 key = tuple(other_types)
                 if position_mask[atom]:
-                    if key not in self.data["structure_counts"][atom_type]:
-                        self.data["structure_counts"][atom_type][key] = 0
-                    self.data["structure_counts"][atom_type][key] += 1
-        self.data["num_frames"] += 1
+                    if key not in self._data["structure_counts"][atom_type]:
+                        self._data["structure_counts"][atom_type][key] = 0
+                    self._data["structure_counts"][atom_type][key] += 1
+        self._data["num_frames"] += 1
 
     def join_samplers(self, num_cores):
-        if self.process_id != -1:
+        if self._process_id != -1:
             return
         combined_data = {}
         num_frames = 0
-        type_to_name = {v: k for k, v in self.atom_lib.items()}
+        type_to_name = {v: k for k, v in self._atom_lib.items()}
         for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self.name_out + f"_proc_{process_id}.pkl"
+            file_path = self._name_out + f"_proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
             os.remove(file_path)
             for identifier, data in proc_data.items():
@@ -78,4 +79,4 @@ class MoleculeStructureSampler(Sampler):
                 for structure in combined_data[atom]:
                     combined_data[atom][structure] /= num_frames
 
-        utils.save_object(combined_data, self.name_out + ".obj")
+        utils.save_object(combined_data, self._name_out + ".obj")

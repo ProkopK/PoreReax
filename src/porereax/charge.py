@@ -51,27 +51,27 @@ class ChargeSampler(AtomSampler):
                 len(range) != 2 or
                 range[0] >= range[1]):
             raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
-        self.num_bins = num_bins
-        self.range = range
+        self._num_bins = num_bins
+        self._range = range
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
 
         # Setup data
-        for identifier, bonds_info in self.molecules.items():
-            hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
-            self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
+        for identifier, bonds_info in self._molecules.items():
+            hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
+            self._data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
-        for identifier in self.molecules:
+        position_mask = self._region(positions)
+        for identifier in self._molecules:
             mol_mask = mol_index[identifier] & position_mask
             atom_charges = charges[mol_mask]
-            hist, _ = np.histogram(atom_charges, bins=self.num_bins, range=self.range)
-            self.data[identifier]["hist"] += hist
-            self.data[identifier]["num_frames"] += 1
-            self.data[identifier]["num_atoms"] += atom_charges.shape[0]
-            self.data[identifier]["mean_charge"] += np.sum(atom_charges)
+            hist, _ = np.histogram(atom_charges, bins=self._num_bins, range=self._range)
+            self._data[identifier]["hist"] += hist
+            self._data[identifier]["num_frames"] += 1
+            self._data[identifier]["num_atoms"] += atom_charges.shape[0]
+            self._data[identifier]["mean_charge"] += np.sum(atom_charges)
 
     def join_samplers(self, num_cores):
         """
@@ -88,14 +88,14 @@ class ChargeSampler(AtomSampler):
         combined_data["input_params"] = input_params
         for identifier in data_list:
             combined_data[identifier] = {}
-            if self.dimension == "Histogram":
+            if self._dimension == "Histogram":
                 num_frames = np.sum(data_list[identifier]["num_frames"])
                 num_atoms = np.sum(data_list[identifier]["num_atoms"])
                 combined_data[identifier]["num_frames"] = num_frames
                 combined_data[identifier]["num_atoms"] = num_atoms
                 combined_data[identifier]["mean"] = np.sum(data_list[identifier]["mean_charge"]) / num_atoms if num_atoms > 0 else np.nan
-                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins) # TODO check normalization
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins) # TODO check normalization
                 combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-        utils.save_object(combined_data, self.name_out + ".obj")
+        utils.save_object(combined_data, self._name_out + ".obj")

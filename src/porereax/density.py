@@ -184,44 +184,44 @@ class DensitySampler(AtomSampler):
         _validate_condition_range(conditions, "Charge", "DensitySampler")
         _validate_condition_range(conditions, "Angle", "DensitySampler")
 
-        self.num_bins = num_bins
-        self.direction = direction
-        self.conditions = conditions
+        self._num_bins = num_bins
+        self._direction = direction
+        self._conditions = conditions
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
-        for identifier in self.molecules:
-            self.data[identifier] = _setup_data_structure(
-                self.dimension, self.direction, num_frames, self.num_bins, box, "DensitySampler"
+        for identifier in self._molecules:
+            self._data[identifier] = _setup_data_structure(
+                self._dimension, self._direction, num_frames, self._num_bins, box, "DensitySampler"
             )
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
-        for identifier in self.molecules:
+        position_mask = self._region(positions)
+        for identifier in self._molecules:
             mol_mask = mol_index[identifier] & position_mask
             # Apply conditions
-            if "Charge" in self.conditions:
+            if "Charge" in self._conditions:
                 charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
-                min_charge, max_charge = self.conditions["Charge"]
+                min_charge, max_charge = self._conditions["Charge"]
                 charge_mask = (charges >= min_charge) & (charges <= max_charge)
                 mol_mask = mol_mask & charge_mask
-            if "Angle" in self.conditions:
+            if "Angle" in self._conditions:
                 # atom_indices = np.where(mol_mask)[0]
                 atom_indices = np.arange(positions.shape[0])
                 angles = self._get_atom_angles(atom_indices, positions, mol_bonds[identifier])
-                min_angle, max_angle = self.conditions["Angle"]
+                min_angle, max_angle = self._conditions["Angle"]
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
                 angle_mask = np.any(angle_mask, axis=1)
                 mol_mask = mol_mask & angle_mask
 
             atom_positions = positions[mol_mask]
             _record_density(
-                self.data[identifier],
-                self.dimension, atom_positions,
+                self._data[identifier],
+                self._dimension, atom_positions,
                 frame_id,
-                self.num_bins,
-                self.box
+                self._num_bins,
+                self._box
             )
 
     def _get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
@@ -250,8 +250,8 @@ class DensitySampler(AtomSampler):
                 atom_a = bonded_atoms[:, i]
                 atom_b = atom_indices
                 atom_c = bonded_atoms[:, j]
-                vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self.box)
-                vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self.box)
+                vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self._box)
+                vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self._box)
                 cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
                 cos_angle = np.clip(cos_angle, -1.0, 1.0)
                 angle_deg = np.degrees(np.arccos(cos_angle))
@@ -268,8 +268,8 @@ class DensitySampler(AtomSampler):
             Number of parallel processes used.
         """
         data_list = super().join_samplers(num_cores)
-        combined_data = _join_data(data_list, self.dimension, self.num_bins)
-        utils.save_object(combined_data, self.name_out + ".obj")
+        combined_data = _join_data(data_list, self._dimension, self._num_bins)
+        utils.save_object(combined_data, self._name_out + ".obj")
 
 
 class BondDensitySampler(BondSampler):
@@ -317,15 +317,15 @@ class BondDensitySampler(BondSampler):
         _validate_conditions(conditions, "BondDensitySampler")
         _validate_condition_range(conditions, "Bond Length", "BondDensitySampler")
 
-        self.num_bins = num_bins
-        self.direction = direction
-        self.conditions = conditions
+        self._num_bins = num_bins
+        self._direction = direction
+        self._conditions = conditions
         super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
 
         # Setup data
-        for identifier in self.bonds:
-            self.data[identifier] = _setup_data_structure(
-                self.dimension, self.direction, num_frames, self.num_bins, box, "BondDensitySampler"
+        for identifier in self._bonds:
+            self._data[identifier] = _setup_data_structure(
+                self._dimension, self._direction, num_frames, self._num_bins, box, "BondDensitySampler"
             )
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
@@ -333,31 +333,31 @@ class BondDensitySampler(BondSampler):
         bond_periodic_images = frame.particles.bonds.pbc_vectors.array
         positions = frame.particles.positions.array
 
-        for identifier in self.bonds:
+        for identifier in self._bonds:
             bond_indices = bond_index[identifier]
 
             bonds = bond_topology[bond_indices]
             bond_positions = positions[bonds]
 
             # Calculate bond midpoints
-            bond_midpoints = utils.min_image_midpoint(bond_positions[:, 0, :], bond_positions[:, 1, :], self.box)
+            bond_midpoints = utils.min_image_midpoint(bond_positions[:, 0, :], bond_positions[:, 1, :], self._box)
 
             # Apply Bond Length condition if specified
-            if "Bond Length" in self.conditions:
-                min_length, max_length = self.conditions["Bond Length"]
-                bond_vectors = utils.min_image_convention(bond_positions[:, 0, :] - bond_positions[:, 1, :], self.box)
+            if "Bond Length" in self._conditions:
+                min_length, max_length = self._conditions["Bond Length"]
+                bond_vectors = utils.min_image_convention(bond_positions[:, 0, :] - bond_positions[:, 1, :], self._box)
                 bond_lengths = np.linalg.norm(bond_vectors, axis=1)
                 length_mask = (bond_lengths >= min_length) & (bond_lengths <= max_length)
                 bond_midpoints = bond_midpoints[length_mask]
 
             # Record density
             _record_density(
-                self.data[identifier],
-                self.dimension,
+                self._data[identifier],
+                self._dimension,
                 bond_midpoints,
                 frame_id,
-                self.num_bins,
-                self.box
+                self._num_bins,
+                self._box
             )
 
     def join_samplers(self, num_cores: int) -> None:
@@ -370,8 +370,8 @@ class BondDensitySampler(BondSampler):
             Number of parallel processes used.
         """
         data_list = super().join_samplers(num_cores)
-        combined_data = _join_data(data_list, self.dimension, self.num_bins)
-        utils.save_object(combined_data, self.name_out + ".obj")
+        combined_data = _join_data(data_list, self._dimension, self._num_bins)
+        utils.save_object(combined_data, self._name_out + ".obj")
 
 class ReactionSampler(AtomSampler):
     """
@@ -414,9 +414,9 @@ class ReactionSampler(AtomSampler):
         if position not in ["center", "reactant", "product"]:
             raise ValueError(f"ReactionSampler requires 'position' parameter to be one of 'center', 'reactant', or 'product'.")
 
-        self.num_bins = num_bins
-        self.direction = direction
-        self.position = position
+        self._num_bins = num_bins
+        self._direction = direction
+        self._position = position
 
         # Extract atoms from reactions and validate format
         _validate_double_atoms(reactions, "ReactionSampler", "reactions", allow_none=True)
@@ -431,61 +431,61 @@ class ReactionSampler(AtomSampler):
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, position=position)
 
         # Build reaction identifiers and setup data structures for each reaction
-        self.reactions = {}
+        self._reactions = {}
         for reaction in reactions:
             reactant, product = reaction
             identifier_reactant = _build_mol_dictionary(reactant["atom"], reactant.get("bonds", None), atom_lib, "Reaction Sampler")[0] if reactant is not None else "X"
             identifier_product = _build_mol_dictionary(product["atom"], product.get("bonds", None), atom_lib, "Reaction Sampler")[0] if product is not None else "X"
             reaction_key = f"{identifier_reactant}-{identifier_product}"
-            self.reactions[reaction_key] = (identifier_reactant, identifier_product)
-            self.data[reaction_key] = _setup_data_structure(
-                            self.dimension, self.direction, num_frames-1, self.num_bins, box, "ReactionSampler"
+            self._reactions[reaction_key] = (identifier_reactant, identifier_product)
+            self._data[reaction_key] = _setup_data_structure(
+                            self._dimension, self._direction, num_frames-1, self._num_bins, box, "ReactionSampler"
                         )
-        self.input["reactions"] = self.reactions
-        self.pre_positions = None
-        self.cur_positions = None
-        self.pre_mol_index = None
-        self.cur_mol_index = None
-        self.pre_bonds = None
-        self.cur_bonds = None
+        self._input["reactions"] = self._reactions
+        self._pre_positions = None
+        self._cur_positions = None
+        self._pre_mol_index = None
+        self._cur_mol_index = None
+        self._pre_bonds = None
+        self._cur_bonds = None
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         cur_topology = frame.particles.bonds.topology.array
 
-        self.pre_positions = self.cur_positions
-        self.pre_mol_index = self.cur_mol_index
-        self.pre_bonds = self.cur_bonds
-        self.cur_positions = frame.particles.positions.array
-        self.cur_mol_index = {key: np.copy(value) for key, value in mol_index.items()}
-        self.cur_bonds = coo_matrix((np.ones(cur_topology.shape[0]), (cur_topology[:, 0], cur_topology[:, 1])), shape=(self.cur_positions.shape[0], self.cur_positions.shape[0]), dtype=bool)
-        if self.pre_positions is None:
+        self._pre_positions = self._cur_positions
+        self._pre_mol_index = self._cur_mol_index
+        self._pre_bonds = self._cur_bonds
+        self._cur_positions = frame.particles.positions.array
+        self._cur_mol_index = {key: np.copy(value) for key, value in mol_index.items()}
+        self._cur_bonds = coo_matrix((np.ones(cur_topology.shape[0]), (cur_topology[:, 0], cur_topology[:, 1])), shape=(self._cur_positions.shape[0], self._cur_positions.shape[0]), dtype=bool)
+        if self._pre_positions is None:
             return
 
-        if self.position == "center":
-            positions = utils.min_image_midpoint(self.pre_positions, self.cur_positions, self.box)
-        elif self.position == "reactant":
-            positions = self.pre_positions
-        elif self.position == "product":
-            positions = self.cur_positions
-        position_mask = self.region(positions)
+        if self._position == "center":
+            positions = utils.min_image_midpoint(self._pre_positions, self._cur_positions, self._box)
+        elif self._position == "reactant":
+            positions = self._pre_positions
+        elif self._position == "product":
+            positions = self._cur_positions
+        position_mask = self._region(positions)
 
-        reaction_events = (self.pre_bonds - self.cur_bonds).tocoo()
+        reaction_events = (self._pre_bonds - self._cur_bonds).tocoo()
         reaction_indices = np.unique(np.concatenate((reaction_events.row, reaction_events.col)))
 
-        for reaction_key, (identifier_reactant, identifier_product) in self.reactions.items():
-            reactant_mask = self.pre_mol_index[identifier_reactant] if identifier_reactant != "X" else True
-            product_mask = self.cur_mol_index[identifier_product] if identifier_product != "X" else True
+        for reaction_key, (identifier_reactant, identifier_product) in self._reactions.items():
+            reactant_mask = self._pre_mol_index[identifier_reactant] if identifier_reactant != "X" else True
+            product_mask = self._cur_mol_index[identifier_product] if identifier_product != "X" else True
             reaction_mask = reactant_mask & product_mask & position_mask
             reaction_key_indices = reaction_indices[reaction_mask[reaction_indices]]
 
             reaction_positions = positions[reaction_key_indices]
             _record_density(
-                self.data[reaction_key],
-                self.dimension,
+                self._data[reaction_key],
+                self._dimension,
                 reaction_positions,
                 frame_id-1,
-                self.num_bins,
-                self.box
+                self._num_bins,
+                self._box
             )
 
     def join_samplers(self, num_cores: int) -> None:
@@ -498,5 +498,5 @@ class ReactionSampler(AtomSampler):
             Number of parallel processes used.
         """
         data_list = super().join_samplers(num_cores)
-        combined_data = _join_data(data_list, self.dimension, self.num_bins)
-        utils.save_object(combined_data, self.name_out + ".obj")
+        combined_data = _join_data(data_list, self._dimension, self._num_bins)
+        utils.save_object(combined_data, self._name_out + ".obj")

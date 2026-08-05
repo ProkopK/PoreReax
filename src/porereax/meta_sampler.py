@@ -172,28 +172,28 @@ class Sampler(abc.ABC):
         if system_properties is not None and not isinstance(system_properties, dict):
             raise ValueError(f"{self.__class__.__name__} requires a dictionary 'system_properties' parameter or None.")
 
-        self.name_out = name_out
-        self.file_out = name_out + f"_proc_{process_id}.pkl"
-        self.dimension = dimension
+        self._name_out = name_out
+        self._file_out = name_out + f"_proc_{process_id}.pkl"
+        self._dimension = dimension
         if isinstance(region, str):
             region_function = regions.get_region_function(region, box, system_properties)
         self._validate_region_function(region_function)
-        self.region = region_function
-        self.process_id = process_id
-        self.atom_lib = atom_lib
-        self.masses = masses
-        self.num_frames = num_frames
-        self.box = box
-        self.system_properties = system_properties
-        self.molecules = {}
-        self.data = {}
-        self.input = {}
-        self.input.update({"name_out": name_out, "dimension": dimension, "region": region_function, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
-        self.input.update(parameters)
+        self._region = region_function
+        self._process_id = process_id
+        self._atom_lib = atom_lib
+        self._masses = masses
+        self._num_frames = num_frames
+        self._box = box
+        self._system_properties = system_properties
+        self._molecules = {}
+        self._data = {}
+        self._input = {}
+        self._input.update({"name_out": name_out, "dimension": dimension, "region": region_function, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
+        self._input.update(parameters)
 
     def save_object(self):
-        self.data.update({"input_params": self.input})
-        utils.save_object(self.data, self.file_out)
+        self._data.update({"input_params": self._input})
+        utils.save_object(self._data, self._file_out)
 
     @abc.abstractmethod
     def sample(self, frame_id, mol_index, mol_bonds, bond_index, frame, bond_enum):
@@ -208,11 +208,11 @@ class Sampler(abc.ABC):
         num_cores : int
             Number of parallel processes used for sampling.
         """
-        if self.process_id != -1:
+        if self._process_id != -1:
             return
         data_list = {}
         for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self.name_out + f"_proc_{process_id}.pkl"
+            file_path = self._name_out + f"_proc_{process_id}.pkl"
             proc_data = utils.load_object(file_path)
             os.remove(file_path)
             input_params = proc_data.pop("input_params", None)
@@ -235,7 +235,7 @@ class Sampler(abc.ABC):
         molecules : dict
             Dictionary of molecules defined for sampling.
         """
-        return self.molecules
+        return self._molecules
 
     def _validate_region_function(self, region_function):
         """
@@ -302,7 +302,7 @@ class AtomSampler(Sampler):
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
             identifier, mol = _build_mol_dictionary(atom, bonds, atom_lib, self.__class__.__name__)
-            self.molecules[identifier] = mol
+            self._molecules[identifier] = mol
 
 
 class BondSampler(Sampler):
@@ -342,7 +342,7 @@ class BondSampler(Sampler):
         super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, **parameters)
         if not isinstance(bonds, list) or len(bonds) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
-        self.bonds = {}
+        self._bonds = {}
         for bond_info in bonds:
             if "bond" not in bond_info or not isinstance(bond_info["bond"], str):
                 raise ValueError(f"{self.__class__.__name__} requires each bond entry to have a 'bond' key with a string value.")
@@ -376,10 +376,10 @@ class BondSampler(Sampler):
 
             mol_identifier_A, mol_A = _build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
             mol_identifier_B, mol_B = _build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)
-            self.molecules[mol_identifier_A] = mol_A
-            self.molecules[mol_identifier_B] = mol_B
+            self._molecules[mol_identifier_A] = mol_A
+            self._molecules[mol_identifier_B] = mol_B
 
-            self.bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
+            self._bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
 
     def get_bonds(self):
         """
@@ -390,4 +390,4 @@ class BondSampler(Sampler):
         bonds : dict
             Dictionary of bonds defined for sampling.
         """
-        return self.bonds
+        return self._bonds

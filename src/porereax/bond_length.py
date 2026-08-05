@@ -23,37 +23,37 @@ class BondLengthSampler(BondSampler):
                 len(range) != 2 or
                 range[0] >= range[1]):
             raise ValueError("BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
-        self.num_bins = num_bins
-        self.range = range
+        self._num_bins = num_bins
+        self._range = range
         super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
 
         # Setup data
-        for identifier in self.bonds:
-            hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
-            self.data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
+        for identifier in self._bonds:
+            hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
+            self._data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
-        for identifier in self.bonds:
+        position_mask = self._region(positions)
+        for identifier in self._bonds:
             bond_mask = np.zeros(bond_topology.shape[0], dtype=bool)
             bond_mask[bond_index[identifier]] = True
             bond_mask &= position_mask[bond_topology[:, 0]] & position_mask[bond_topology[:, 1]]
             bonds = bond_topology[bond_mask]
             position = positions[bonds]
-            if self.dimension == "Bond Length":
-                bond_lengths = np.linalg.norm(utils.min_image_convention(position[:, 0, :] - position[:, 1, :], self.box), axis=1)
-                hist, _ = np.histogram(bond_lengths, bins=self.num_bins, range=self.range)
-                self.data[identifier]["mean"] += np.sum(bond_lengths)
-            elif self.dimension == "Bond Order":
+            if self._dimension == "Bond Length":
+                bond_lengths = np.linalg.norm(utils.min_image_convention(position[:, 0, :] - position[:, 1, :], self._box), axis=1)
+                hist, _ = np.histogram(bond_lengths, bins=self._num_bins, range=self._range)
+                self._data[identifier]["mean"] += np.sum(bond_lengths)
+            elif self._dimension == "Bond Order":
                 bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(frame.particles.bonds.count)
                 bond_order = bond_orders[bond_mask]
-                hist, _ = np.histogram(bond_order, bins=self.num_bins, range=self.range)
-                self.data[identifier]["mean"] += np.sum(bond_order)
-            self.data[identifier]["hist"] += hist
-            self.data[identifier]["num_frames"] += 1
-            self.data[identifier]["num_bonds"] += bonds.shape[0]
+                hist, _ = np.histogram(bond_order, bins=self._num_bins, range=self._range)
+                self._data[identifier]["mean"] += np.sum(bond_order)
+            self._data[identifier]["hist"] += hist
+            self._data[identifier]["num_frames"] += 1
+            self._data[identifier]["num_bonds"] += bonds.shape[0]
 
     def join_samplers(self, num_cores):
         data_list = super().join_samplers(num_cores)
@@ -65,7 +65,7 @@ class BondLengthSampler(BondSampler):
 
             num_frames = np.sum(data_list[identifier]["num_frames"])
             num_bonds = np.sum(data_list[identifier]["num_bonds"])
-            hist = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins)
+            hist = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins)
             mean = np.sum(data_list[identifier]["mean"]) / num_bonds if num_bonds > 0 else 0.0
             hist_std = np.std(data_list[identifier]["hist"], axis=0)
             combined_data[identifier]["num_frames"] = num_frames
@@ -75,4 +75,4 @@ class BondLengthSampler(BondSampler):
             combined_data[identifier]["hist_std"] = hist_std
             combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
             combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-        utils.save_object(combined_data, self.name_out + ".obj")
+        utils.save_object(combined_data, self._name_out + ".obj")

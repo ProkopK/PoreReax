@@ -229,7 +229,7 @@ class Sample:
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         """
@@ -250,7 +250,7 @@ class Sample:
         atoms : list
             List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
             {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
@@ -283,7 +283,7 @@ class Sample:
             - "Time": Samples the amount of atom structures over time.
             - "Cartesian1D": Samples the amount of atom structures along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of atom structures in a 2D plane (xy, xz, or yz) in the simulation box.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
@@ -318,7 +318,7 @@ class Sample:
         atoms : list
             List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
             {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
@@ -353,7 +353,7 @@ class Sample:
             - "Time": Samples the amount of the specified bonds over time.
             - "Cartesian1D": Samples the amount of the specified bonds along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified bonds in a 2D plane (xy, xz, or yz) in the simulation box.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
@@ -389,7 +389,7 @@ class Sample:
             {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d, ...]}, where a and b are the bonded atoms, and c, d, ... are the atoms bonded to A and B, respectively. With a, b, c, d being atom identifiers. Atom b/a does not need to be added to the "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and "bonds_B" lists does not matter. The "bonds_A" and "bonds_B" lists can be empty to indicate that the atoms a and b are not bonded to any other atoms. If the dictionary does not contain the "bonds_A" or "bonds_B" keys, every bond of type a-b will be sampled regardless of its bonding environment.
         dimension : str
             Sampling dimension. Supported: "Bond Length" and "Bond Order"
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
@@ -419,7 +419,7 @@ class Sample:
             List of atom pairs to sample. Each pair is defined as a tuple of two dictionaries in the format:
             ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
             and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
         num_bins : int, optional
             Number of bins for the histogram. Default is 200.
@@ -453,7 +453,7 @@ class Sample:
             - "Time": Samples the amount of the specified reactions over time.
             - "Cartesian1D": Samples the amount of the specified reactions along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified reactions in a 2D plane (xy, xz, or yz) in the simulation box.
-        region : str or function, optional
+        region : Region, optional
             Region of the box to sample. Supported: "Box" or a user-defined 
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional

@@ -48,8 +48,8 @@ class RdfSampler(AtomSampler):
         if not isinstance(r_max, (float, int)) or r_max <= 0:
             raise ValueError("RdfSampler requires a positive 'r_max' parameter.")
 
-        self.num_bins = num_bins
-        self.r_max = r_max
+        self._num_bins = num_bins
+        self._r_max = r_max
 
         # Extract atoms from pairs and validate format
         _validate_double_atoms(pairs, "RdfSampler", "pairs", allow_none=False)
@@ -62,23 +62,23 @@ class RdfSampler(AtomSampler):
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, r_max=r_max)
 
         # Build pair identifiers and setup data structures for each pair
-        self.pairs = {}
+        self._pairs = {}
         for pair in pairs:
             pair_A, pair_B = pair
             identifier_A = _build_mol_dictionary(pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler")[0]
             identifier_B = _build_mol_dictionary(pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler")[0]
             pair_key = f"{identifier_A}-{identifier_B}"
-            self.pairs[pair_key] = (identifier_A, identifier_B)
+            self._pairs[pair_key] = (identifier_A, identifier_B)
 
-            hist, bin_edges = np.histogram([], bins=self.num_bins, range=(0, self.r_max))
-            self.data[pair_key] = {
+            hist, bin_edges = np.histogram([], bins=self._num_bins, range=(0, self._r_max))
+            self._data[pair_key] = {
                 "num_frames": 0,
                 "num_atoms_A": 0, # needed for normalization
                 "num_atoms_B": 0, # needed for normalization
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
-        self.input["pairs"] = self.pairs
+        self._input["pairs"] = self._pairs
 
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
@@ -103,12 +103,12 @@ class RdfSampler(AtomSampler):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search
-        finder = CutoffNeighborFinder(self.r_max, frame)
+        finder = CutoffNeighborFinder(self._r_max, frame)
 
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
+        position_mask = self._region(positions)
 
-        for pair_key, (identifier_A, identifier_B) in self.pairs.items():
+        for pair_key, (identifier_A, identifier_B) in self._pairs.items():
             # Get atom indices for both types
             atom_mask_A = mol_index[identifier_A] & position_mask
             atom_mask_B = mol_index[identifier_B] & position_mask
@@ -121,11 +121,11 @@ class RdfSampler(AtomSampler):
             filtered_vectors = pair_vectors[mask]
             distances = np.linalg.norm(filtered_vectors, axis=1)
 
-            hist, _ = np.histogram(distances, bins=self.num_bins, range=(0, self.r_max))
-            self.data[pair_key]["hist"] += hist
-            self.data[pair_key]["num_frames"] += 1
-            self.data[pair_key]["num_atoms_A"] += atom_indices_A.size
-            self.data[pair_key]["num_atoms_B"] += atom_indices_B.size
+            hist, _ = np.histogram(distances, bins=self._num_bins, range=(0, self._r_max))
+            self._data[pair_key]["hist"] += hist
+            self._data[pair_key]["num_frames"] += 1
+            self._data[pair_key]["num_atoms_A"] += atom_indices_A.size
+            self._data[pair_key]["num_atoms_B"] += atom_indices_B.size
 
     def join_samplers(self, num_cores):
         """
@@ -161,7 +161,7 @@ class RdfSampler(AtomSampler):
             avg_atoms_B = num_atoms_B / num_frames if num_frames > 0 else 0
 
             # Calculate box volume
-            box_volume = np.prod(self.box)
+            box_volume = np.prod(self._box)
 
             # Calculate number density of B atoms
             rho_B = avg_atoms_B / box_volume if box_volume > 0 else 0
@@ -179,10 +179,10 @@ class RdfSampler(AtomSampler):
             if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
                 combined_data[identifier]["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
             else:
-                combined_data[identifier]["hist"] = np.zeros(self.num_bins)
+                combined_data[identifier]["hist"] = np.zeros(self._num_bins)
 
-            combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self.num_bins)
+            combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
             combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
             combined_data[identifier]["bin_edges"] = bin_edges
 
-        utils.save_object(combined_data, self.name_out + ".obj")
+        utils.save_object(combined_data, self._name_out + ".obj")

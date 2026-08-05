@@ -59,25 +59,25 @@ class AngleSampler(AtomSampler):
             angle = [atom_lib[atom] for atom in angle_atoms]
         else:
             angle = []
-        self.angle = angle
-        self.num_bins = num_bins
-        self.range = (0, 180)
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self.num_bins, range=self.range, angle=self.angle)
+        self._angle = angle
+        self._num_bins = num_bins
+        self._range = (0, 180)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self._num_bins, range=self._range, angle=self._angle)
 
         # Remove atomstructures with less than 3 atoms or not matching A-B-C if specified
         molecules_to_remove = []
-        for identifier, atoms_info in self.molecules.items():
-            if self.angle and atoms_info["atom"] != self.angle[1]:
+        for identifier, atoms_info in self._molecules.items():
+            if self._angle and atoms_info["atom"] != self._angle[1]:
                 molecules_to_remove.append(identifier)
             elif atoms_info["bonds"] is None or len(atoms_info["bonds"][0]) < 2:
                 molecules_to_remove.append(identifier)
         for identifier in molecules_to_remove:
-            del self.molecules[identifier]
+            del self._molecules[identifier]
 
         # Setup data
-        for identifier, atoms_info in self.molecules.items():
-            hist, bin_edges = np.histogram([], bins=self.num_bins, range=self.range)
-            self.data[identifier] = {
+        for identifier, atoms_info in self._molecules.items():
+            hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
+            self._data[identifier] = {
                 "num_frames": 0, 
                 "num_angles": 0, 
                 "mean_angle": 0.0, 
@@ -89,15 +89,15 @@ class AngleSampler(AtomSampler):
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
-        position_mask = self.region(positions)
-        for identifier, bonds_info in self.molecules.items():
+        position_mask = self._region(positions)
+        for identifier, bonds_info in self._molecules.items():
             mol_mask = position_mask & mol_index[identifier]
             atom_indices = np.where(mol_mask)[0]
             bonded_atoms = mol_bonds[identifier][atom_indices]
-            if self.angle:
-                atom_a_type = self.angle[0]
-                atom_b_type = self.angle[1]
-                atom_c_type = self.angle[2]
+            if self._angle:
+                atom_a_type = self._angle[0]
+                atom_b_type = self._angle[1]
+                atom_c_type = self._angle[2]
                 bonded_types = atom_types[bonded_atoms]
             angles = []
             for i in range(bonded_atoms.shape[1]):
@@ -107,26 +107,26 @@ class AngleSampler(AtomSampler):
                     atom_a = bonded_atoms[:, i]
                     atom_b = atom_indices
                     atom_c = bonded_atoms[:, j]
-                    if self.angle:
+                    if self._angle:
                         mask_a = bonded_types[:, i] == atom_a_type
                         mask_c = bonded_types[:, j] == atom_c_type
                         valid_mask = mask_a & mask_c
                         atom_a = atom_a[valid_mask]
                         atom_b = atom_b[valid_mask]
                         atom_c = atom_c[valid_mask]
-                    vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self.box)
-                    vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self.box)
+                    vec_ab = utils.min_image_convention(positions[atom_a] - positions[atom_b], self._box)
+                    vec_cb = utils.min_image_convention(positions[atom_c] - positions[atom_b], self._box)
                     cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1))
                     cos_angle = np.clip(cos_angle, -1.0, 1.0)
                     angle_deg = np.degrees(np.arccos(cos_angle))
                     angles.extend(angle_deg.tolist())
             if angles:
-                self.data[identifier]["num_frames"] += 1
-                self.data[identifier]["num_angles"] += len(angles)
-                self.data[identifier]["mean_angle"] += np.sum(angles)
-                if self.dimension == "Histogram":
-                    hist, _ = np.histogram(angles, bins=self.num_bins, range=self.range)
-                    self.data[identifier]["hist"] += hist
+                self._data[identifier]["num_frames"] += 1
+                self._data[identifier]["num_angles"] += len(angles)
+                self._data[identifier]["mean_angle"] += np.sum(angles)
+                if self._dimension == "Histogram":
+                    hist, _ = np.histogram(angles, bins=self._num_bins, range=self._range)
+                    self._data[identifier]["hist"] += hist
 
     def join_samplers(self, num_cores):
         """
@@ -143,14 +143,14 @@ class AngleSampler(AtomSampler):
         combined_data["input_params"] = input_params
         for identifier in data_list:
             combined_data[identifier] = {}
-            if self.dimension == "Histogram":
+            if self._dimension == "Histogram":
                 num_frames = np.sum(data_list[identifier]["num_frames"])
                 num_angles = np.sum(data_list[identifier]["num_angles"])
                 combined_data[identifier]["num_frames"] = num_frames
                 combined_data[identifier]["num_angles"] = num_angles
                 combined_data[identifier]["mean"] = np.sum(data_list[identifier]["mean_angle"]) / num_angles if num_angles > 0 else np.nan
-                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self.num_bins) # TODO check normalization
+                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins) # TODO check normalization
                 combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
                 combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-        utils.save_object(combined_data, self.name_out + ".obj")
+        utils.save_object(combined_data, self._name_out + ".obj")
