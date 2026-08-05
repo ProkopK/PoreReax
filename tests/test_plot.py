@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 TEST_DATA_DIR = Path(__file__).parent / "data"
 
 
-def test_not_implemented():
+def test_plot_not_implemented():
     with pytest.raises(ValueError):
         plot(TEST_DATA_DIR / "molecule_structures.obj", identifiers=["not_implemented"])
     with pytest.raises(ValueError):
@@ -36,13 +36,13 @@ def test_plot_kwargs():
     identifiers = get_identifiers(file)
     plot(
         file,
-        plot_kwargs={"linestyle": "--", "linewidth": 2},
+        plot_kwargs_1d={"linestyle": "--", "linewidth": 2},
     )
     plot(
         file,
         colors=["blue", "orange"],
         identifiers=identifiers,
-        plot_kwargs={"color": "green", "label": "test"},
+        plot_kwargs_1d={"color": "green", "label": "test"},
     )
 
     plot(
