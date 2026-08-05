@@ -109,7 +109,7 @@ class Sample:
         """
         self.trajectory_file = os.path.abspath(trajectory_file)
         self.bond_file = os.path.abspath(bond_file) if bond_file else None
-        self.system = system # is only used to pass to the subprocesses but not used there
+        self.system = system # is only used to pass to the subprocesses
 
         self.sampler_inputs = {"charge_samplers": [],
                                "density_samplers": [],
@@ -163,22 +163,7 @@ class Sample:
         self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
         self.num_frames = len(self.frames)
 
-        pore_properties = {}
-        resv_properties = {}
-        if system is not None:
-            system_data = utils.load_yaml(system)
-            for pore_name in system_data:
-                if pore_name[:5] == "shape":
-                    pore_id = int(pore_name.split("_")[1])
-                    if system_data[pore_name]["shape"] == "CYLINDER":
-                        if system_data[pore_name]["parameter"]["central"] != [0, 0, 1]:
-                            raise NotImplementedError("Only CYLINDER pores with central axis along z (0,0,1) are supported.")
-                        pore_properties[pore_id] = {"type": "CYLINDER",}
-                        pore_properties[pore_id]["center"] = np.array(system_data[pore_name]["parameter"]["centroid"])
-                        pore_properties[pore_id]["radius"] = system_data[pore_name]["parameter"]["diameter"]
-                        pore_properties[pore_id]["length"] = system_data[pore_name]["parameter"]["length"]
-            resv_properties = system_data["system"]["reservoir"]
-        self.system_properties = {"pores": pore_properties, "reservoir": resv_properties} if system is not None else None
+        self.system_properties = utils.read_pore_yml(system) if system else None
 
     @staticmethod
     def get_trajectory_data(trajectory_file, bond_file, atom_lib):
