@@ -230,7 +230,7 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         """
         dimension = "MoleculeStructure"
@@ -251,7 +251,7 @@ class Sample:
             List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
             {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 800.
@@ -284,7 +284,7 @@ class Sample:
             - "Cartesian1D": Samples the amount of atom structures along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of atom structures in a 2D plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Not used for time sampling.
@@ -319,7 +319,7 @@ class Sample:
             List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
             {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 180.
@@ -354,7 +354,7 @@ class Sample:
             - "Cartesian1D": Samples the amount of the specified bonds along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified bonds in a 2D plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Not used for time sampling.
@@ -390,7 +390,7 @@ class Sample:
         dimension : str
             Sampling dimension. Supported: "Bond Length" and "Bond Order"
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 200.
@@ -420,7 +420,8 @@ class Sample:
             ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
             and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
+            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 200.
         r_max : float, optional
@@ -454,7 +455,7 @@ class Sample:
             - "Cartesian1D": Samples the amount of the specified reactions along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified reactions in a 2D plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box" or a user-defined 
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Default is 200.

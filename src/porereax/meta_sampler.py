@@ -157,8 +157,6 @@ class Sampler(abc.ABC):
         """
         if not isinstance(name_out, str) or name_out == "":
             raise ValueError(f"{self.__class__.__name__} requires a valid 'name_out' string parameter.")
-        if not isinstance(region, str) and not callable(region):
-            raise ValueError(f"{self.__class__.__name__} requires a valid 'region' parameter as a string or callable function.")
         if not isinstance(process_id, int):
             raise ValueError(f"{self.__class__.__name__} requires an integer 'process_id' parameter.")
         if not isinstance(atom_lib, dict):
@@ -171,14 +169,20 @@ class Sampler(abc.ABC):
             raise ValueError(f"{self.__class__.__name__} requires a numpy array 'box' parameter with shape (3,).")
         if system_properties is not None and not isinstance(system_properties, dict):
             raise ValueError(f"{self.__class__.__name__} requires a dictionary 'system_properties' parameter or None.")
+        if isinstance(region, str):
+            region_function = regions.get_region_function(region, box, system_properties)
+            region_name = region
+        elif callable(region):
+            region_function = region
+            region_name = "Custom Function"
+        else:
+            raise ValueError(f"{self.__class__.__name__} requires a valid 'region' parameter as a string or callable function.")
 
+        self._validate_region_function(region_function)
+        self._region = region_function
         self._name_out = name_out
         self._file_out = name_out + f"_proc_{process_id}.pkl"
         self._dimension = dimension
-        if isinstance(region, str):
-            region_function = regions.get_region_function(region, box, system_properties)
-        self._validate_region_function(region_function)
-        self._region = region_function
         self._process_id = process_id
         self._atom_lib = atom_lib
         self._masses = masses
@@ -188,7 +192,7 @@ class Sampler(abc.ABC):
         self._molecules = {}
         self._data = {}
         self._input = {}
-        self._input.update({"name_out": name_out, "dimension": dimension, "region": region_function, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
+        self._input.update({"name_out": name_out, "dimension": dimension, "region": region_name, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
         self._input.update(parameters)
 
     def save_object(self):
