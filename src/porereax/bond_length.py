@@ -32,23 +32,22 @@ class BondLengthSampler(BondSampler):
             hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
             self._data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier in self._bonds:
-            bond_mask = np.zeros(bond_topology.shape[0], dtype=bool)
-            bond_mask[bond_index[identifier]] = True
-            bond_mask &= position_mask[bond_topology[:, 0]] & position_mask[bond_topology[:, 1]]
-            bonds = bond_topology[bond_mask]
+            b_mask = bond_mask[identifier] & position_mask[bond_topology[:, 0]] & position_mask[bond_topology[:, 1]]
+            bonds = bond_topology[b_mask]
             position = positions[bonds]
+
             if self._dimension == "Bond Length":
                 bond_lengths = np.linalg.norm(utils.min_image_convention(position[:, 0, :] - position[:, 1, :], self._box), axis=1)
                 hist, _ = np.histogram(bond_lengths, bins=self._num_bins, range=self._range)
                 self._data[identifier]["mean"] += np.sum(bond_lengths)
             elif self._dimension == "Bond Order":
                 bond_orders = frame.particles.bonds.get("Bond Order").array if "Bond Order" in frame.particles.bonds else np.zeros(frame.particles.bonds.count)
-                bond_order = bond_orders[bond_mask]
+                bond_order = bond_orders[b_mask]
                 hist, _ = np.histogram(bond_order, bins=self._num_bins, range=self._range)
                 self._data[identifier]["mean"] += np.sum(bond_order)
             self._data[identifier]["hist"] += hist

@@ -29,7 +29,7 @@ class MoleculeStructureSampler(Sampler):
         for atom_type in atom_lib.values():
             self._data["structure_counts"][atom_type] = {}
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array

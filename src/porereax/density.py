@@ -195,7 +195,7 @@ class DensitySampler(AtomSampler):
                 self._dimension, self._direction, num_frames, self._num_bins, box, "DensitySampler"
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier in self._molecules:
@@ -218,7 +218,8 @@ class DensitySampler(AtomSampler):
             atom_positions = positions[mol_mask]
             _record_density(
                 self._data[identifier],
-                self._dimension, atom_positions,
+                self._dimension,
+                atom_positions,
                 frame_id,
                 self._num_bins,
                 self._box
@@ -328,13 +329,12 @@ class BondDensitySampler(BondSampler):
                 self._dimension, self._direction, num_frames, self._num_bins, box, "BondDensitySampler"
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         bond_topology = frame.particles.bonds.topology.array
-        bond_periodic_images = frame.particles.bonds.pbc_vectors.array
         positions = frame.particles.positions.array
 
         for identifier in self._bonds:
-            bond_indices = bond_index[identifier]
+            bond_indices = bond_mask[identifier]
 
             bonds = bond_topology[bond_indices]
             bond_positions = positions[bonds]
@@ -449,7 +449,7 @@ class ReactionSampler(AtomSampler):
         self._pre_bonds = None
         self._cur_bonds = None
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         cur_topology = frame.particles.bonds.topology.array
 
         self._pre_positions = self._cur_positions

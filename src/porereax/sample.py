@@ -740,15 +740,13 @@ class Sample:
                     elif ((type_a == bond_def[1] and type_b == bond_def[0])):
                         if molecule_idx[mol_A][atom_b] and molecule_idx[mol_B][atom_a]:
                             bond_idx[identifier][bond_id] = 1
-            for identifier in bond_idx:
-                bond_idx[identifier] = np.where(bond_idx[identifier])[0]
 
             # Sampling
             for sampler in self.samplers:
                 sampler.sample(frame_id=frame_idx-self.start_frame,
                                mol_index=molecule_idx,
                                mol_bonds=molecule_bonds,
-                               bond_index=bond_idx,
+                               bond_mask=bond_idx,
                                frame=frame,
                                bond_enum=bond_enum,
                 )

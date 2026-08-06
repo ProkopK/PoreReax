@@ -81,25 +81,7 @@ class RdfSampler(AtomSampler):
         self._input["pairs"] = self._pairs
 
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
-        """
-        Sample RDF for the current frame.
-
-        Parameters
-        ----------
-        frame_id : int
-            Frame number.
-        mol_index : dict
-            Dictionary mapping identifiers boolean masks for atoms.
-        mol_bonds : dict
-            Dictionary mapping identifiers to bonded atom arrays.
-        bond_index : dict
-            Dictionary mapping bond identifiers to bond indices.
-        frame : object
-            OVITO data collection frame.
-        bond_enum : object
-            Bond enumeration object.
-        """
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search
