@@ -48,6 +48,14 @@ class MoleculeStructureSampler(Sampler):
         self.data["num_frames"] += 1
 
     def join_samplers(self, num_cores):
+        """
+        Join sampler data from multiple processes.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used.
+        """
         if self.process_id != -1:
             return
         combined_data = {}

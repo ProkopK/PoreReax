@@ -42,6 +42,7 @@ class AngleSampler(AtomSampler):
         angle : str
             Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
         """
+        
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"AngleSampler does not support dimension {dimension}")
@@ -82,11 +83,12 @@ class AngleSampler(AtomSampler):
                 "num_angles": 0, 
                 "mean_angle": 0.0, 
                 "hist": hist, 
-                "bin_edges": 
-                bin_edges, 
+                "bin_edges": bin_edges, 
             }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        # TODO : Kommentate einfügen & es werden oben Variablen definiert die nicht benutzt werden (bond_index?)
+        # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
@@ -96,7 +98,7 @@ class AngleSampler(AtomSampler):
             bonded_atoms = mol_bonds[identifier][atom_indices]
             if self.angle:
                 atom_a_type = self.angle[0]
-                atom_b_type = self.angle[1]
+                atom_b_type = self.angle[1]  # TODO wird nicht benzutzt?
                 atom_c_type = self.angle[2]
                 bonded_types = atom_types[bonded_atoms]
             angles = []

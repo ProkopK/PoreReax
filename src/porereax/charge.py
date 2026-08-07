@@ -42,6 +42,7 @@ class ChargeSampler(AtomSampler):
         range : tuple
             Range (min, max) for histogram sampling.
         """
+
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"ChargeSampler does not support dimension {dimension}")
@@ -61,6 +62,7 @@ class ChargeSampler(AtomSampler):
             self.data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
         positions = frame.particles.positions.array
         position_mask = self.region(positions)

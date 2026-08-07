@@ -145,6 +145,7 @@ class DensitySampler(AtomSampler):
     Sampler class for atomic densities.
     """
     def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
+        # TODO : Check noch mal die Dokus. Reihenfolge passt nicht und teilweise fehlen Variable (Region?)
         """
         Sampler for atomic densities.
 
@@ -196,6 +197,7 @@ class DensitySampler(AtomSampler):
             )
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
         for identifier in self.molecules:
@@ -329,6 +331,7 @@ class BondDensitySampler(BondSampler):
             )
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
         bond_topology = frame.particles.bonds.topology.array
         bond_periodic_images = frame.particles.bonds.pbc_vectors.array
         positions = frame.particles.positions.array

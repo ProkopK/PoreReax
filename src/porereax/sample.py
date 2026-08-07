@@ -120,6 +120,7 @@ class Sample:
                                "rdf_samplers": [],
                                "reaction_samplers": [],
                                }
+                               
         # Registry mapping sampler_inputs key -> (SamplerClass, kind, extra_kwarg_keys)
         self._SAMPLER_REGISTRY = {
             "charge_samplers":            (ChargeSampler,           "atom", ["atoms", "num_bins", "range"]),

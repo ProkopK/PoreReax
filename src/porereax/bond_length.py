@@ -33,6 +33,7 @@ class BondLengthSampler(BondSampler):
             self.data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_index: dict, frame: object, bond_enum: object):
+        # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
         position_mask = self.region(positions)
@@ -56,6 +57,15 @@ class BondLengthSampler(BondSampler):
             self.data[identifier]["num_bonds"] += bonds.shape[0]
 
     def join_samplers(self, num_cores):
+        """
+        Join sampler data from multiple processes.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used.
+        """
+        
         data_list = super().join_samplers(num_cores)
         combined_data = {}
         input_params = data_list.pop("input_params", None)

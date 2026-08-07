@@ -20,9 +20,12 @@ Available sampler APIs
 Example setup
 -------------
 
+## TO DO : Du könntest kurz erklären, was das beispiel tut, bzw für was für ein System was wäre etc. 
+
 .. code-block:: python
 
    from porereax import Sample
+
    atom_lib = {'H': 1, 'O': 2, 'Si': 3}
    masses = {'Si': 28.086, 'O': 15.9994, 'H': 2.016}
    sampler = Sample(
@@ -31,17 +34,21 @@ Example setup
        trajectory_file="run_0.lammpstrj",
        bond_file="run_0.bonds",
    )
+
    sampler.add_molecule_structure_sampling(
        name_out="molecule_structure"
    )
+
    sampler.add_charge_sampling(
        name_out="charge",
        atoms=[{"atom": "O", "bonds": ["H", "H"]}]
    )
+
    sampler.add_rdf_sampling(
        name_out="rdf",
        pairs=[({"atom": "O", "bonds": ["Si", "H"]}, {"atom": "O", "bonds": ["H", "H"]})],
    )
+
    sampler.sample(is_parallel=True)
 
 This generates the following output files:
@@ -83,6 +90,7 @@ All results are stored in ``.obj`` files. To get the raw data, you can load the 
 .. code-block:: python
 
    from porereax import load_object
+
    charge_data = load_object("charge.obj")
 
 The sampled atoms and bonds are maped to unique identifiers as keys in the dictionary. All identifiers can be retrieved as a list with the ``get_identifiers`` function. To get only the data for a specific atom or bond, you can use the ``get_data`` function. For example, to get the charge data for oxygen atoms bonded to two hydrogen atoms:
@@ -90,6 +98,7 @@ The sampled atoms and bonds are maped to unique identifiers as keys in the dicti
 .. code-block:: python
 
    from porereax import get_data
+
    charge_O_H2 = get_data("charge.obj", "O(H+H)")
 
 The easiest way to visualize the results, stored in ``.obj`` files, is to use the ``plot(...)`` function. It takes the path of the output file and returns a matplotlib figure and axes object. The figure can be displayed or saved to a file.
@@ -98,6 +107,7 @@ The easiest way to visualize the results, stored in ``.obj`` files, is to use th
 
    from porereax import plot
    import matplotlib.pyplot as plt
+
    fig, ax = plot("charge.obj")
    plt.show()
    

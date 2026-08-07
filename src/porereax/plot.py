@@ -1,3 +1,5 @@
+# TODO Allgemein etwas wenig kommentiert. 
+
 """
 Module for plotting sampled data.
 
@@ -60,6 +62,7 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
         )
 
 def _plot_parameters(input_params: dict, mean: bool, density: bool):
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben) 
     sampler_type = input_params["sampler_type"]
     if sampler_type == "ChargeSampler":
         x_label = "Charge / e"
@@ -105,7 +108,7 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
 
 def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, colors: list, std: bool, mean: bool, density: bool, plot_kwargs: dict):
     x_label, y_label, density_normalization, mean, density = _plot_parameters(input_params, mean, density)
-
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
@@ -122,6 +125,7 @@ def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, co
     axis.set_ylabel(y_label)
 
 def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool):
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     density_data = data[identifier]
@@ -143,6 +147,7 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool):
     axis.set_aspect('equal', adjustable='box')
 
 def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
@@ -156,6 +161,7 @@ def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int)
     axis.set_ylabel("Counts per Frame")
 
 def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
     if identifier not in data:
         raise ValueError(f"Identifier {identifier} not found in data.")
     structure_counts = data[identifier]
@@ -167,6 +173,7 @@ def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     axis.set_ylabel("Average Count per Frame")
 
 def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs: dict = {}):
+    # TODO : Dokumentation (ich würde für jede Funktion ein """...""" schreiben)
     data = utils.load_object(link_data)
     input_params = data.pop("input_params", None)
     sampler_type = input_params["sampler_type"]
