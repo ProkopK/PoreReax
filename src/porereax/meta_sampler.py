@@ -200,7 +200,7 @@ class Sampler(abc.ABC):
         utils.save_object(self._data, self._file_out)
 
     @abc.abstractmethod
-    def sample(self, frame_id, mol_index, mol_bonds, bond_mask, frame, bond_enum):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         """Sample data for the current frame. Must be implemented by subclasses."""
 
     def join_samplers(self, num_cores):

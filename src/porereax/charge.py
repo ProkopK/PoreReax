@@ -60,7 +60,7 @@ class ChargeSampler(AtomSampler):
             hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
             self._data[identifier] = {"num_frames": 0, "num_atoms": 0, "mean_charge": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
         positions = frame.particles.positions.array
         position_mask = self._region(positions)

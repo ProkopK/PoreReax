@@ -194,12 +194,16 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwar
         X, Y = Y, X
     c = axis.pcolormesh(X, Y, hist.T, shading=shading, **plot_kwargs)
     plt.colorbar(c, ax=axis, label='Density / Counts per frame')
+    unit_x = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][0]]
+    unit_y = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][1]]
+    x_label = fr"{['x','y','z','r','$\phi$','z','d'][density_data['direction'][0]]} / {unit_x}"
+    y_label = fr"{['x','y','z','r','$\phi$','z','d'][density_data['direction'][1]]} / {unit_y}"
     if transpose:
-        axis.set_xlabel(f"{['x','y','z'][density_data['direction'][1]]} / nm")
-        axis.set_ylabel(f"{['x','y','z'][density_data['direction'][0]]} / nm")
+        axis.set_xlabel(y_label)
+        axis.set_ylabel(x_label)
     else:
-        axis.set_xlabel(f"{['x','y','z'][density_data['direction'][0]]} / nm")
-        axis.set_ylabel(f"{['x','y','z'][density_data['direction'][1]]} / nm")
+        axis.set_xlabel(x_label)
+        axis.set_ylabel(y_label)
     axis.set_aspect('equal', adjustable='box')
 
 def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
@@ -305,7 +309,7 @@ def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], color
         _plot_mol_structure(ax, data, identifiers[0] if identifiers else list(data.keys())[0])
     elif input_params["dimension"] == "Time":
         _plot_time(ax, data, identifiers, colors, dt)
-    elif input_params["dimension"] == "Cartesian2D":
+    elif input_params["dimension"] == "Cartesian2D" or input_params["dimension"] == "Pore2D":
         _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose, plot_kwargs_2d)
     else:
         _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs_1d)

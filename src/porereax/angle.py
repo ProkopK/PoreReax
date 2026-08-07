@@ -86,7 +86,7 @@ class AngleSampler(AtomSampler):
                 bin_edges, 
             }
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
         position_mask = self._region(positions)

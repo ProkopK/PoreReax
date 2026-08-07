@@ -81,7 +81,7 @@ class RdfSampler(AtomSampler):
         self._input["pairs"] = self._pairs
 
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search

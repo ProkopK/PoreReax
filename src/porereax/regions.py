@@ -112,13 +112,10 @@ def pore_region(coords: NDArray[np.float64], system_properties: dict) -> NDArray
         Boolean mask indicating which coordinates are within the pore region.
     """
     pore_range = system_properties["range"]
-    pore_center = system_properties["center"]
-    pore_radius = system_properties["radius"]
     lower_bound = pore_range[0] + entry
     upper_bound = pore_range[1] - entry
-    distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
 
-    return (coords[:, 2] > lower_bound) & (coords[:, 2] < upper_bound) & (distance_from_center < pore_radius + entry)
+    return (coords[:, 2] > lower_bound) & (coords[:, 2] < upper_bound)
 
 def wall_region(coords: NDArray[np.float64], system_properties: dict, layer_thickness: float) -> NDArray[np.bool_]:
     """

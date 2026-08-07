@@ -19,7 +19,7 @@ from scipy.sparse import coo_matrix
 
 def _validate_dimension(dimension: str, sampler_name: str):
     """Validate the dimension parameter."""
-    valid_dimensions = ["Cartesian1D", "Cartesian2D", "Time"]
+    valid_dimensions = {"Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"}
     if not isinstance(dimension, str) or dimension not in valid_dimensions:
         raise ValueError(f"{sampler_name} does not support dimension {dimension}")
 
@@ -42,7 +42,7 @@ def _validate_condition_range(conditions: dict, condition_name: str, sampler_nam
                 cond[0] >= cond[1]):
             raise ValueError(f"{sampler_name} 'conditions' parameter '{condition_name}' must be a list or tuple of two numbers (min, max) with min < max.")
 
-def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_bins: int, box: np.ndarray, sampler_name: str):
+def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_bins: int, box: np.ndarray, sampler_name: str, system_properties: dict | None):
     """
     Setup the data structure for a given dimension.
 
@@ -65,6 +65,41 @@ def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_b
         dir_indices = {"xy": (0, 1), "xz": (0, 2), "yz": (1, 2)}[direction]
         hist, x_edges, y_edges = np.histogram2d([], [], bins=num_bins, range=[[0.0, box[dir_indices[0]]], [0.0, box[dir_indices[1]]]])
         return {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
+    elif dimension.startswith("Pore"):
+        if system_properties is None:
+            raise ValueError(f"{sampler_name} with 'Pore' dimension requires a given system")
+        elif system_properties["type"] == "cylinder":
+            center = system_properties["center"]
+            max_r = np.min([center[0], center[1], box[0] - center[0], box[1] - center[1]])
+            r2_edges = np.linspace(0.0, max_r**2, num_bins + 1)
+            r_edges = np.sqrt(r2_edges)
+            p_edges = np.linspace(-np.pi, np.pi, num_bins + 1)
+            d_edges = np.linspace(-center[2]/2, center[2]/2, num_bins + 1)
+            z_edges = np.linspace(0.0, box[2], num_bins + 1)
+            if direction in ["r", "p", "d"] and dimension == "Pore1D":
+                dir_index = {"r": 3, "p": 4, "d": 6}[direction]
+                if direction == "r":
+                    bin_edges = r_edges
+                elif direction == "p":
+                    bin_edges = p_edges
+                else:  # direction == "d"
+                    bin_edges = d_edges
+                hist, _ = np.histogram([], bins=num_bins)
+                return {"hist": hist, "bin_edges": bin_edges, "direction": dir_index, "num_frames": 0}
+            elif direction in ["rp", "rz", "pz"] and dimension == "Pore2D":
+                dir_indices = {"rp": (3, 4), "rz": (3, 5), "pz": (4, 5)}[direction]
+                if direction == "rp":
+                    x_edges = r_edges
+                    y_edges = p_edges
+                elif direction == "rz":
+                    x_edges = r_edges
+                    y_edges = z_edges
+                else:  # direction == "pz"
+                    x_edges = p_edges
+                    y_edges = z_edges
+                hist, _, _ = np.histogram2d([], [], bins=num_bins)
+                return {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
+
 
 def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: int, num_bins: int, box: np.ndarray):
     """
@@ -77,7 +112,7 @@ def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: in
     dimension : str
         Sampling dimension.
     positions : np.ndarray
-        Positions to record (Nx3 array).
+        Positions to record (Nx3 array) or (Nx4 array) for Pore dimensions.
     frame : int
         Current frame number.
     num_bins : int
@@ -91,11 +126,19 @@ def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: in
         data["densities"][frame] = positions.shape[0]
     elif dimension == "Cartesian1D":
         direction = data["direction"]
-        hist, _ = np.histogram(positions[:, direction], bins=num_bins, range=(0.0, box[direction]))
+        hist, _ = np.histogram(positions[:, direction], bins=data["bin_edges"])
         data["hist"] += hist
     elif dimension == "Cartesian2D":
         dir_x, dir_y = data["direction"]
-        hist, _, _ = np.histogram2d(positions[:, dir_x], positions[:, dir_y], bins=num_bins, range=[[0.0, box[dir_x]], [0.0, box[dir_y]]])
+        hist, _, _ = np.histogram2d(positions[:, dir_x], positions[:, dir_y], bins=[data["x_edges"], data["y_edges"]])
+        data["hist"] += hist
+    elif dimension == "Pore1D":
+        direction = data["direction"] - 3
+        hist, _ = np.histogram(positions[:, direction], bins=data["bin_edges"])
+        data["hist"] += hist
+    elif dimension == "Pore2D":
+        dir_x, dir_y = (data["direction"][0] - 3, data["direction"][1] - 3)
+        hist, _, _ = np.histogram2d(positions[:, dir_x], positions[:, dir_y], bins=[data["x_edges"], data["y_edges"]])
         data["hist"] += hist
 
 def _join_data(data_list: dict, dimension: str, num_bins: int):
@@ -126,12 +169,12 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
 
         if dimension == "Time":
             combined_data[identifier]["densities"] = np.concatenate(data_list[identifier]["densities"])
-        elif dimension == "Cartesian1D":
+        elif dimension == "Cartesian1D" or dimension == "Pore1D":
             combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(num_bins)
             combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
             combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
             combined_data[identifier]["direction"] = data_list[identifier]["direction"][0]
-        elif dimension == "Cartesian2D":
+        elif dimension == "Cartesian2D" or dimension == "Pore2D":
             combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros((num_bins, num_bins))
             combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
             combined_data[identifier]["x_edges"] = data_list[identifier]["x_edges"][0]
@@ -192,10 +235,10 @@ class DensitySampler(AtomSampler):
         # Setup data
         for identifier in self._molecules:
             self._data[identifier] = _setup_data_structure(
-                self._dimension, self._direction, num_frames, self._num_bins, box, "DensitySampler"
+                self._dimension, self._direction, num_frames, self._num_bins, box, "DensitySampler", self._system_properties
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier in self._molecules:
@@ -215,7 +258,10 @@ class DensitySampler(AtomSampler):
                 angle_mask = np.any(angle_mask, axis=1)
                 mol_mask = mol_mask & angle_mask
 
-            atom_positions = positions[mol_mask]
+            if self._dimension in ("Pore1D", "Pore2D"):
+                atom_positions = positions_transformed[mol_mask]
+            else:
+                atom_positions = positions[mol_mask]
             _record_density(
                 self._data[identifier],
                 self._dimension,
@@ -326,10 +372,10 @@ class BondDensitySampler(BondSampler):
         # Setup data
         for identifier in self._bonds:
             self._data[identifier] = _setup_data_structure(
-                self._dimension, self._direction, num_frames, self._num_bins, box, "BondDensitySampler"
+                self._dimension, self._direction, num_frames, self._num_bins, box, "BondDensitySampler", self._system_properties
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
 
@@ -439,7 +485,7 @@ class ReactionSampler(AtomSampler):
             reaction_key = f"{identifier_reactant}-{identifier_product}"
             self._reactions[reaction_key] = (identifier_reactant, identifier_product)
             self._data[reaction_key] = _setup_data_structure(
-                            self._dimension, self._direction, num_frames-1, self._num_bins, box, "ReactionSampler"
+                            self._dimension, self._direction, num_frames-1, self._num_bins, box, "ReactionSampler", self._system_properties
                         )
         self._input["reactions"] = self._reactions
         self._pre_positions = None
@@ -449,7 +495,7 @@ class ReactionSampler(AtomSampler):
         self._pre_bonds = None
         self._cur_bonds = None
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object):
+    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         cur_topology = frame.particles.bonds.topology.array
 
         self._pre_positions = self._cur_positions
@@ -478,7 +524,10 @@ class ReactionSampler(AtomSampler):
             reaction_mask = reactant_mask & product_mask & position_mask
             reaction_key_indices = reaction_indices[reaction_mask[reaction_indices]]
 
-            reaction_positions = positions[reaction_key_indices]
+            if self._dimension in ("Pore1D", "Pore2D"):
+                reaction_positions = positions_transformed[reaction_key_indices]
+            else:
+                reaction_positions = positions[reaction_key_indices]
             _record_density(
                 self._data[reaction_key],
                 self._dimension,

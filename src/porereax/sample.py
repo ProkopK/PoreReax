@@ -132,7 +132,7 @@ class Sample:
             "reaction_samplers":          (ReactionSampler,         "atom", ["reactions", "num_bins", "direction", "position"]),
         }
 
-        self.samplers = []
+        self.samplers: list[Sampler] = []
         self.molecules = {}
         self.bonds = {}
 
@@ -491,6 +491,23 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
+    def _transform_positions(self, positions: NDArray[np.float64]) -> NDArray[np.float64]:
+        if self.system_properties and self.system_properties["type"] == "cylinder":
+            # Coordinate transformation to cylindrical coordinates (r, phi, z)
+            center = self.system_properties["center"]
+            shifted_positions = positions[:, :2] - center[:2]
+            r = np.linalg.norm(shifted_positions, axis=1)
+            phi = np.arctan2(shifted_positions[:, 1], shifted_positions[:, 0])
+            z = positions[:, 2]
+            # For reservoir region calculate the distance from the wall
+            pore_range = self.system_properties["range"]
+            left_wall = pore_range[0]
+            right_wall = pore_range[1]
+            d = np.minimum(np.abs(z - left_wall), np.abs(z - right_wall)) * np.sign(z - left_wall) * np.sign(z - right_wall)
+            return np.column_stack((r, phi, z, d))
+        else:
+            return positions
+
     def init_samplers(self, sampler_inputs, process_id):
         """
         Initialize samplers based on provided configurations.
@@ -741,6 +758,10 @@ class Sample:
                         if molecule_idx[mol_A][atom_b] and molecule_idx[mol_B][atom_a]:
                             bond_idx[identifier][bond_id] = 1
 
+            # Calculate positions in transformed coordinates
+            positions = frame.particles.positions.array
+            positions_transformed = self._transform_positions(positions)
+
             # Sampling
             for sampler in self.samplers:
                 sampler.sample(frame_id=frame_idx-self.start_frame,
@@ -749,6 +770,7 @@ class Sample:
                                bond_mask=bond_idx,
                                frame=frame,
                                bond_enum=bond_enum,
+                               positions_transformed=positions_transformed
                 )
 
         for sampler in self.samplers:
