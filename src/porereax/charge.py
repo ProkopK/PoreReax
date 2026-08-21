@@ -15,7 +15,7 @@ class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
     """
-    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, range: tuple):
+    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, range: tuple):
         """
         Sampler for atomic charges.
 
@@ -37,23 +37,22 @@ class ChargeSampler(AtomSampler):
             Total number of frames to sample.
         box : np.ndarray
             Simulation box dimensions.
-        num_bins : int
-            Number of bins for histogram sampling.
         range : tuple
             Range (min, max) for histogram sampling.
         """
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"ChargeSampler does not support dimension {dimension}")
-        if not isinstance(num_bins, (int)) or num_bins <= 0:
-            raise ValueError("ChargeSampler requires a positive integer 'num_bins' parameter.")
         if (not isinstance(range, (list, tuple)) or 
                 len(range) != 2 or
                 range[0] >= range[1]):
             raise ValueError("ChargeSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
-        self._num_bins = num_bins
-        self._range = range
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
+        self._min_range, self._max_range = range
+        self._min_range = np.round(self._min_range * 1000)
+        self._max_range = np.round(self._max_range * 1000)
+        self._range = (self._min_range, self._max_range)
+        self._num_bins = int(self._max_range - self._min_range)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self._num_bins, range=range)
 
         # Setup data
         for identifier, bonds_info in self._molecules.items():
@@ -62,6 +61,7 @@ class ChargeSampler(AtomSampler):
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
+        charges = np.round(charges * 1000)
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier in self._molecules:
@@ -97,5 +97,5 @@ class ChargeSampler(AtomSampler):
                 combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins) # TODO check normalization
                 combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
                 combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
-                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
+                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0] / 1000.0
         utils.save_object(combined_data, self._name_out + ".obj")
