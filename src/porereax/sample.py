@@ -122,7 +122,7 @@ class Sample:
                                }
         # Registry mapping sampler_inputs key -> (SamplerClass, kind, extra_kwarg_keys)
         self._SAMPLER_REGISTRY = {
-            "charge_samplers":            (ChargeSampler,           "atom", ["atoms", "num_bins", "range"]),
+            "charge_samplers":            (ChargeSampler,           "atom", ["atoms", "range"]),
             "density_samplers":           (DensitySampler,          "atom", ["atoms", "num_bins", "direction", "conditions"]),
             "bond_density_samplers":      (BondDensitySampler,      "bond", ["bonds", "num_bins", "direction", "conditions"]),
             "angle_samplers":             (AngleSampler,            "atom", ["atoms", "num_bins", "angle"]),
@@ -239,7 +239,7 @@ class Sample:
                   "region": region,}
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
-    def add_charge_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", num_bins=800, range=(-2.0, 2.0)):
+    def add_charge_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", range=(-2.0, 2.0)):
         """
         Add sampling for charge distribution of the central atom in the specified atom structures.
 
@@ -253,8 +253,6 @@ class Sample:
         region : Region, optional
             Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
             function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
-        num_bins : int, optional
-            Number of bins for the histogram. Default is 800.
         range : tuple, optional
             Range (min, max) in e for which to compute the histogram. Default is (-2.0, 2.0).
         """
@@ -263,7 +261,6 @@ class Sample:
                   "atoms": atoms,
                   "dimension": dimension,
                   "region": region,
-                  "num_bins": num_bins,
                   "range": range,}
         self.sampler_inputs["charge_samplers"].append(inputs)
 
