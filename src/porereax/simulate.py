@@ -481,11 +481,13 @@ class Simulate():
         if not self._frozen_atoms:
             self._frozen_atoms = {}
             for a_name, a_type in self._name_to_type.items():
-                self._frozen_atoms[a_name+"_f"] = a_type + self._num_atom_types
+                frozen_name = a_name + "_f"
+                frozen_type = a_type + self._num_atom_types
+                self._frozen_atoms[frozen_name] = frozen_type
+                self._type_to_name[frozen_type] = frozen_name
+                self._atom_masses[frozen_name] = self._atom_masses[a_name]
             self._num_atom_types *= 2
-            self._type_to_name.update({v: k for k, v in self._frozen_atoms.items()})
             self._name_to_type.update({k: v for k, v in self._frozen_atoms.items()})
-            self._atom_masses.update({a_name: 1.0 for a_name in self._frozen_atoms.keys()})
             self._frozen_region = region
 
     def auto_freeze(self, reactive_radius: float = 10.0):
@@ -790,15 +792,14 @@ class Simulate():
         for i, data in enumerate(gro_data, start=1):
             res_id, _, atom_name, x, y, z, _, _, _ = data
             atom_type = self._name_to_type.get(self._gro_lib.get(atom_name))
-            if self._frozen_atoms:
-                if self._frozen_region(x, y, z):
-                    atom_type += self._num_atom_types // 2
             charge = self._gro_charges.get(atom_name)
             if atom_type is None:
                 raise ValueError(f"Atom name '{atom_name}' not found in gro_lib.")
             if charge is None:
                 raise ValueError(f"Charge for atom name '{atom_name}' not found in gro_charges.")
-            charge_count += charge
+            if self._frozen_atoms and self._frozen_region(x, y, z):
+                atom_type += self._num_atom_types // 2
+            charge_count += float(f"{charge:.4f}")
             atom_count[atom_type] += 1
             file.write(f"{i:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} {y:8.3f} {z:8.3f}\n")
         file.write("\nVelocities\n\n")
