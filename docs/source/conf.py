@@ -11,25 +11,28 @@ release = __version__
 version = __version__
 
 extensions = [
-    "autoapi.extension",
+    "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
+    "sphinx.ext.autosummary",
+    "myst_parser",
 ]
 
-autoapi_type = "python"
-autoapi_dirs = ["../../src/porereax"]
-autoapi_ignore = ["*/templates/*"]
-autoapi_output_dir = "api"
-autoapi_add_toctree_entry = True
-autoapi_options = [
-    "members",
-    "undoc-members",
-    "show-inheritance",
-    "show-module-summary",
-    "special-members",
-]
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
+
+autosummary_generate = True
+
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "show-inheritance": True,
+}
+autodoc_member_order = "bysource"
 
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
@@ -44,3 +47,5 @@ exclude_patterns = []
 
 html_theme = "furo"
 html_static_path = ['_static']
+html_logo = "_static/logo_text.svg"
+html_favicon = "_static/logo.svg"

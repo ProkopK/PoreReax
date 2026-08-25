@@ -1,21 +1,24 @@
-# PoreReax
+![PoreReax](docs/source/_static/logo_text_sub.svg)
 
-PoreReax is a Python package for setting up and analysing reactive molecular
-dynamics workflows based on ReaxFF and LAMMPS.
+---
 
-## What it does
+<!-- start elevator-pitch -->
 
-- Build simulation-ready LAMMPS input files from equilibrated GROMACS
-  structures (`.gro`)
+PoreReax is a Python package for analysing and setting up reactive molecular dynamics workflows based on ReaxFF and LAMMPS. It enables you to:
+
+- Build simulation-ready LAMMPS input files from equilibrated GROMACS structures (`.gro`)
 - Configure multi-stage ReaxFF workflows (for example NPT/NVT/NVE)
-- Sample and post-process trajectories with reusable analysis samplers
+- Sample and post-process trajectories with different analysis samplers
     * Angle distributions
     * Charge distributions
-    * Molecule structures
-    * Time evolution and density of atoms, molecules, bonds, and reactions
     * Bond length distributions
+    * Existing molecular structures
+    * Density of atoms, molecules, bonds, and reactions
+    * Time evolution of structures, bonds and reactions
     * Radial distribution functions (RDFs)
 - Plot sampled results with built-in plotting functions
+
+<!-- end elevator-pitch -->
 
 ## Installation
 
