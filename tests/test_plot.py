@@ -1,5 +1,5 @@
 import pytest
-from porereax.plot import plot
+from porereax.plot import plot_data
 from porereax.utils import get_identifiers
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -9,17 +9,17 @@ TEST_DATA_DIR = Path(__file__).parent / "data"
 
 def test_plot_not_implemented():
     with pytest.raises(ValueError):
-        plot(TEST_DATA_DIR / "molecule_structures.obj", identifiers=["not_implemented"])
+        plot_data(TEST_DATA_DIR / "molecule_structures.obj", identifiers=["not_implemented"])
     with pytest.raises(ValueError):
-        plot(TEST_DATA_DIR / "density_sampling_2d.obj", identifiers=["not_implemented"])
+        plot_data(TEST_DATA_DIR / "density_sampling_2d.obj", identifiers=["not_implemented"])
     
 
 
 def test_plot(list_of_sample_object_file_names):
     for file_name in list_of_sample_object_file_names:
-        plot(TEST_DATA_DIR / file_name)
+        plot_data(TEST_DATA_DIR / file_name)
         fig, ax = plt.subplots()
-        plot(
+        plot_data(
             TEST_DATA_DIR / file_name,
             axis=ax,
             identifiers=get_identifiers(TEST_DATA_DIR / file_name)[1:3],
@@ -34,18 +34,18 @@ def test_plot(list_of_sample_object_file_names):
 def test_plot_kwargs():
     file = TEST_DATA_DIR / "angle_all_sampling.obj"
     identifiers = get_identifiers(file)
-    plot(
+    plot_data(
         file,
         plot_kwargs_1d={"linestyle": "--", "linewidth": 2},
     )
-    plot(
+    plot_data(
         file,
         colors=["blue", "orange"],
         identifiers=identifiers,
         plot_kwargs_1d={"color": "green", "label": "test"},
     )
 
-    plot(
+    plot_data(
         file,
         identifiers=None,
         colors=None,

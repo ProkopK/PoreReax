@@ -12,7 +12,7 @@ import numpy as np
 import porereax.utils as utils
 
 
-def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray = None, mean_data: float = None, mean_std: float = None):
+def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray | None = None, mean_data: float | None = None, mean_std: float | None = None):
     """
     Plot a histogram curve on the given axis.
 
@@ -51,7 +51,7 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
             alpha=0.3)
     if mean_data is not None:
         axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
-    if mean_std is not None:
+    if mean_std is not None and mean_data is not None:
         axis.fill_betweenx(
             axis.get_ylim(),
             mean_data - mean_std,
@@ -196,8 +196,8 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwar
     plt.colorbar(c, ax=axis, label='Density / Counts per frame')
     unit_x = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][0]]
     unit_y = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][1]]
-    x_label = fr"{['x','y','z','r','$\phi$','z','d'][density_data['direction'][0]]} / {unit_x}"
-    y_label = fr"{['x','y','z','r','$\phi$','z','d'][density_data['direction'][1]]} / {unit_y}"
+    x_label = ['x','y','z','r',r'$\phi$','z','d'][density_data['direction'][0]] + f" / {unit_x}"
+    y_label = ['x','y','z','r',r'$\phi$','z','d'][density_data['direction'][1]] + f" / {unit_y}"
     if transpose:
         axis.set_xlabel(y_label)
         axis.set_ylabel(x_label)
@@ -258,7 +258,7 @@ def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     axis.xaxis.set_tick_params(rotation=90)
     axis.set_ylabel("Average Count per Frame")
 
-def plot(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}) -> tuple[Figure | None, Axes]:
+def plot_data(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}) -> tuple[Figure | None, Axes]:
     """
     Plot sampled data from a data file.
     All types of samplers are supported. Depending on the sampler type and dimension, different types of plots will be generated.
