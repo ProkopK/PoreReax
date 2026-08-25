@@ -215,6 +215,8 @@ class Sample:
             raise ValueError(f"Atom types in trajectory {type_set} do not match those in atom_lib {atom_type_set}.")
 
         num_particles = first_frame.particles.count
+        if pipeline.source is None:
+            raise ValueError("Pipeline source is None. Make sure the trajectory file is valid and contains frames.")
         num_frames = pipeline.source.num_frames
         box = np.diagonal(first_frame.cell.matrix)
 
