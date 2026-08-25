@@ -8,12 +8,20 @@ The module provides :class:`ChargeSampler` to sample charge histograms of specif
 import numpy as np
 import porereax.utils as utils
 
-from porereax.meta_sampler import AtomSampler
+from porereax.meta_sampler import AtomSampler, _ATOM_SAMPLER_INIT_PARAMS
+from porereax.utils import Substitution, Appender
 
 
+@Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)
 class ChargeSampler(AtomSampler):
     """
     Sampler class for atomic charges.
+
+    Parameters
+    ----------
+    %(params)s
+    range : tuple
+        Range (min, max) for histogram sampling.
     """
     def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, range: tuple):
         """
@@ -77,16 +85,8 @@ class ChargeSampler(AtomSampler):
             self._data[identifier]["num_atoms"] += atom_charges.shape[0]
             self._data[identifier]["mean_charge"] += np.sum(atom_charges)
 
-    def join_samplers(self, num_cores):
-        """
-        Join sampler data from multiple processes.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+    def join_samplers(self, num_cores: int) -> None:
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = {}
         input_params = data_list.pop("input_params", None)
         combined_data["input_params"] = input_params

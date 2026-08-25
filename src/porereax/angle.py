@@ -8,40 +8,24 @@ It supports filtering by specific A-B-C triplets or sampling all angles formed b
 import numpy as np
 import porereax.utils as utils
 
-from porereax.meta_sampler import AtomSampler
+from porereax.meta_sampler import AtomSampler, _ATOM_SAMPLER_INIT_PARAMS
+from porereax.utils import Substitution, Appender
 
 
+@Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)
 class AngleSampler(AtomSampler):
     """
     Sampler class for angles formed by three atoms.
+
+    Parameters
+    ----------
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    angle : str
+        Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
     """
     def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, angle: str):
-        """
-        Sampler for angles formed by three atoms.
-
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Currently only "Histogram" is supported.
-        atoms : dict
-            Dictionary defining atoms to sample.
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimension
-        num_bins : int
-            Number of bins for histogram sampling.
-        angle : str
-            Angle of interested atoms. Supported: "all", "A-B-C" where A, B, C are atom identifiers.
-        """
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"AngleSampler does not support dimension {dimension}")
@@ -127,16 +111,8 @@ class AngleSampler(AtomSampler):
                     hist, _ = np.histogram(angles, bins=self._num_bins, range=self._range)
                     self._data[identifier]["hist"] += hist
 
-    def join_samplers(self, num_cores):
-        """
-        Join sampler data from multiple processes.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+    def join_samplers(self, num_cores: int) -> None:
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = {}
         input_params = data_list.pop("input_params", None)
         combined_data["input_params"] = input_params

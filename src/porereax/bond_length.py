@@ -5,13 +5,23 @@ The module provides :class:`BondLengthSampler` to sample bond length histograms 
 """
 
 import numpy as np
-from porereax.meta_sampler import BondSampler
+from porereax.meta_sampler import BondSampler, _BOND_SAMPLER_INIT_PARAMS
+from porereax.utils import Substitution, Appender
 import porereax.utils as utils
 
 
+@Substitution(params=_BOND_SAMPLER_INIT_PARAMS)
 class BondLengthSampler(BondSampler):
     """
-    Sampler class for bond lengths and bond orders between bonded atom pairs.
+    Sampler class for bond lengths and bond orders.
+
+    Parameters
+    ----------
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    range : tuple
+        Range (min, max) for histogram sampling.
     """
     def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, range: tuple):
         valid_dimensions = ["Bond Length", "Bond Order"]
@@ -58,8 +68,8 @@ class BondLengthSampler(BondSampler):
             self._data[identifier]["num_frames"] += 1
             self._data[identifier]["num_bonds"] += bonds.shape[0]
 
-    def join_samplers(self, num_cores):
-        data_list = super().join_samplers(num_cores)
+    def join_samplers(self, num_cores: int) -> None:
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = {}
         input_params = data_list.pop("input_params", None)
         combined_data["input_params"] = input_params

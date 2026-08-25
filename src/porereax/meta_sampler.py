@@ -10,6 +10,50 @@ import os
 import itertools
 import porereax.utils as utils
 import porereax.regions as regions
+from porereax.utils import Substitution, Appender
+
+
+_SAMPLER_INIT_PARAMS = """
+dimension : str
+    Dimension along which to sample.
+region : str or Callable
+    Region specification for sampling.
+    Can be a string defining a geometric region or a function that takes coordinates and returns a boolean mask.
+process_id : int
+    Process ID for parallel processing.
+atom_lib : dict
+    Dictionary mapping atom type strings to their type IDs.
+masses : dict
+    Dictionary mapping atom type strings to their masses.
+num_frames : int
+    Total number of frames to sample.
+box : np.ndarray
+    Simulation box dimensions.
+system_properties : dict or None
+    System properties for sampling, if applicable.
+"""
+
+_NAME_OUT_PARAM = """
+name_out : str
+    Name of the output file of the sampler data
+"""
+
+_ATOM_SAMPLER_INIT_PARAMS = _NAME_OUT_PARAM + """
+atoms : list
+    List of atoms to sample, each specified as a dictionary with keys:
+
+    - "atom": str, the atom type
+    - "bonds": list, optional, list of bonded atom types
+""" + _SAMPLER_INIT_PARAMS
+
+_BOND_SAMPLER_INIT_PARAMS = _NAME_OUT_PARAM + """
+bonds : list
+    List of bonds to sample, each specified as a dictionary with keys:
+
+    - "bond": str, the bond in format "A-B"
+    - "bonds_A": list, optional, list of bonded atom types for atom A
+    - "bonds_B": list, optional, list of bonded atom types for atom B
+""" + _SAMPLER_INIT_PARAMS
 
 
 def _permutate_bonds(bonds, atom_lib, class_name):
@@ -96,7 +140,7 @@ def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False
         List of atom pairs to validate.
     class_name : str
         Name of the calling class (for error messages).
-    atribute_name : str
+    attribute_name : str
         Name of the attribute being validated (for error messages).
     allow_none : bool, optional
         Whether to allow None values in the pairs. Default is False.
@@ -122,17 +166,15 @@ def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False
             raise ValueError(f"{class_name} '{attribute_name}' parameter dictionaries must have an 'atom' key.")
 
 
+@Substitution(params=_SAMPLER_INIT_PARAMS)
 class Sampler(abc.ABC):
     """
-    Base class for samplers.
-    """
-
-    def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, **parameters):
-        """
-        Base sampler class.
+    Base sampler class.
 
     Parameters
     ----------
+    name_out : str
+        Name of the output file of the sampler data
     %(params)s
     """
     def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
@@ -174,24 +216,61 @@ class Sampler(abc.ABC):
         self._data = {}
         self._input = {}
         self._input.update({"name_out": name_out, "dimension": dimension, "region": region_name, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
-        self._input.update(parameters)
 
     def save_object(self):
+        """
+        Save the sampler data to a file.
+        """
         self._data.update({"input_params": self._input})
         utils.save_object(self._data, self._file_out)
 
     @abc.abstractmethod
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
-        """Sample data for the current frame. Must be implemented by subclasses."""
-
-    def join_samplers(self, num_cores):
         """
-        Join sampler data from multiple processes.
+        Sample data for the current frame.
+
+        Parameters
+        ----------
+        frame_id : int
+            Frame index in perspective of the subprocess (starts from 0 for each subprocess).
+        mol_index : dict
+            Dictionary mapping molecule identifiers to boolean masks indicating which atoms belong to that molecule in the frame.
+        mol_bonds : dict
+            Dictionary mapping molecule identifiers to their bonded atom indices in the frame.
+        bond_mask : dict
+            Dictionary mapping bond identifiers to boolean masks indicating which bonds belong to that identifier in the frame.
+        frame : OVITO frame object
+            Current frame object from OVITO containing atomic data.
+        bond_enum : OVITO BondsEnumerator
+            OVITO BondsEnumerator object for enumerating bonds in the frame.
+        positions_transformed : np.ndarray
+            Transformed positions of atoms in the current frame.
+        """
+
+    @abc.abstractmethod
+    def join_samplers(self, num_cores: int) -> None:
+        """
+        Collect and combine sampler data from multiple processes. This saves the combined data to a single '.obj' file and removes the individual process files. This process is only executed by the main process (process_id == -1).
 
         Parameters
         ----------
         num_cores : int
             Number of parallel processes used for sampling.
+        """
+
+    def _collect_sampler_data(self, num_cores: int) -> dict:
+        """
+        Collect sampler data from multiple processes.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used for sampling.
+
+        Returns
+        -------
+        data_list : dict
+            Dictionary containing collected data from all processes.
         """
         if self._process_id != -1:
             return {}
@@ -245,7 +324,15 @@ class Sampler(abc.ABC):
             raise ValueError(f"Error in region function for {self.__class__.__name__}: {e}")
 
 
+@Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)
 class AtomSampler(Sampler):
+    """
+    Sampler class for atom-based properties.
+
+    Parameters
+    ----------
+    %(params)s
+    """
     def __init__(self, name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
         super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
         if not isinstance(atoms, list) or len(atoms) == 0:
@@ -261,38 +348,16 @@ class AtomSampler(Sampler):
             self._molecules[identifier] = mol
 
 
+@Substitution(params=_BOND_SAMPLER_INIT_PARAMS)
 class BondSampler(Sampler):
     """
-    Sampler class for bonds.
+    Sampler class for bond-based properties.
+
+    Parameters
+    ----------
+    %(params)s
     """
     def __init__(self, name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
-        """
-        Sampler for bonds.
-
-        Parameters
-        ----------
-        name_out : str
-            Name of the output directory of the sampler data
-        bonds : list
-            List of bonds to sample, each specified as a dictionary with keys:
-            - "bond": str, the bond in format "A-B"
-            - "bonds_A": list, optional, list of bonded atom types for atom A
-            - "bonds_B": list, optional, list of bonded atom types for atom B
-        dimension : str
-            Dimension along which to sample.
-        region : str or function
-            Region specification for sampling.
-        process_id : int
-            Process ID for parallel processing.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        """
         super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
         if not isinstance(bonds, list) or len(bonds) == 0:
             raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
@@ -335,7 +400,7 @@ class BondSampler(Sampler):
 
             self._bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
 
-    def get_bonds(self):
+    def get_bonds(self) -> dict:
         """
         Retrieve the defined bonds for sampling.
 

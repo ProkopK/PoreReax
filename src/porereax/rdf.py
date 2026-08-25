@@ -8,41 +8,28 @@ The module provides :class:`RdfSampler` for pair-distribution sampling of specif
 import numpy as np
 import porereax.utils as utils
 
-from porereax.meta_sampler import AtomSampler, _build_mol_dictionary, _validate_double_atoms
+from porereax.meta_sampler import AtomSampler, _build_mol_dictionary, _validate_double_atoms, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
+from porereax.utils import Substitution, Appender
 
 
+@Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)
 class RdfSampler(AtomSampler):
     """
     Sampler class for radial distribution functions (RDF).
+
+    Parameters
+    ----------
+    %(name_out)s
+    pairs : list
+        List of atom pairs to sample, each specified as a list or tuple of two dictionaries:
+        - Each dictionary should have keys: "atom" (str), "bonds" (list, optional)
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    r_max : float
+        Maximum distance for RDF calculation.
     """
     def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float, system_properties: dict):
-        """
-        Sampler for radial distribution functions.
-
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Currently only "Histogram" is supported.
-        pairs : list
-            List of atom pairs to sample, each specified as a list or tuple of two dictionaries:
-            - Each dictionary should have keys: "atom" (str), "bonds" (list, optional)
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        num_bins : int
-            Number of bins for histogram sampling.
-        r_max : float
-            Maximum distance for RDF calculation.
-        """
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("RdfSampler requires a positive integer 'num_bins' parameter.")
         if not isinstance(r_max, (float, int)) or r_max <= 0:
@@ -113,16 +100,8 @@ class RdfSampler(AtomSampler):
             self._data[pair_key]["num_atoms_A"] += atom_indices_A.size
             self._data[pair_key]["num_atoms_B"] += atom_indices_B.size
 
-    def join_samplers(self, num_cores):
-        """
-        Join sampler data from multiple processes and normalize RDF.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+    def join_samplers(self, num_cores: int) -> None:
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = {}
 
         input_params = data_list.pop("input_params", None)

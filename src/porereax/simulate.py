@@ -51,7 +51,7 @@ class Simulate():
     >>> sim = Simulate(gro_lib, gro_charges, atom_masses, 'system.gro')
     """
 
-    def __init__(self, gro_lib: dict, gro_charges: dict, atom_masses: dict, structure_file: str = None):
+    def __init__(self, gro_lib: dict, gro_charges: dict, atom_masses: dict, structure_file: str | None = None):
         """
         Initialize the Simulate object with atom mappings and structure file.
 
@@ -146,7 +146,7 @@ class Simulate():
         self._frozen_atoms = None
         self._frozen_region = lambda x, y, z: False
 
-    def set_job_file(self, job_file: str = None, submit_command: str = None, lammps_command: str = None):
+    def set_job_file(self, job_file: str | None = None, submit_command: str | None = None, lammps_command: str | None = None):
         """
         Specify a custom job submission template file and command.
 
@@ -211,7 +211,7 @@ class Simulate():
         self._submit_cmd = s_command
         self._lammps_command = l_command
 
-    def set_force_field(self, force_field: str = None):
+    def set_force_field(self, force_field: str | None = None):
         """
         Specify a custom ReaxFF force field parameter file.
 
@@ -504,6 +504,8 @@ class Simulate():
         NotImplementedError
             If the pore type specified in the system YAML file is not "cylinder". Currently, only cylindrical pores are supported for automatic freezing.
         """
+        if self._system_file is None:
+            raise ValueError("System file is not specified. Cannot perform auto_freeze without a system YAML file.")
         pore_properties = read_pore_yml(self._system_file)
         if pore_properties["type"] == "cylinder":
             pore_radius = pore_properties["radius"]

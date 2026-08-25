@@ -18,13 +18,27 @@ All samplers support multiple dimensions for density sampling:
 
 
 import numpy as np
-from porereax.meta_sampler import BondSampler, AtomSampler, Sampler, _build_mol_dictionary, _validate_double_atoms
+from porereax.meta_sampler import BondSampler, AtomSampler, Sampler, _build_mol_dictionary, _validate_double_atoms, _ATOM_SAMPLER_INIT_PARAMS, _BOND_SAMPLER_INIT_PARAMS, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
 import porereax.utils as utils
 from scipy.sparse import coo_matrix
 from typing import Literal
+from porereax.utils import Substitution, Appender
 
 
-def _validate_dimension(dimension: Literal["Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"], sampler_name: str):
+_DIRECTION_PARAM = """
+direction : str
+    Direction options, depending on the dimension:
+
+    - ("x", "y", or "z") for "Cartesian1D".
+    - ("xy", "xz", or "yz") for "Cartesian2D".
+    - ("r", "p", or "d") for "Pore1D".
+    - ("rp", "rz", or "pz") for "Pore2D".
+"""
+
+type Dimension = Literal["Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"]
+
+
+def _validate_dimension(dimension: Dimension, sampler_name: str):
     """Validate the dimension parameter."""
     valid_dimensions = {"Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"}
     if not isinstance(dimension, str) or dimension not in valid_dimensions:
@@ -49,7 +63,7 @@ def _validate_condition_range(conditions: dict, condition_name: str, sampler_nam
                 cond[0] >= cond[1]):
             raise ValueError(f"{sampler_name} 'conditions' parameter '{condition_name}' must be a list or tuple of two numbers (min, max) with min < max.")
 
-def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_bins: int, box: np.ndarray, sampler_name: str, system_properties: dict | None):
+def _setup_data_structure(dimension: Dimension, direction: str, num_frames: int, num_bins: int, box: np.ndarray, sampler_name: str, system_properties: dict | None):
     """
     Setup the data structure for a given dimension.
 
@@ -107,8 +121,7 @@ def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_b
                 hist, _, _ = np.histogram2d([], [], bins=num_bins)
                 return {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
 
-
-def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: int):
+def _record_density(data: dict, dimension: Dimension, positions: np.ndarray, frame: int):
     """
     Record density data for the current frame.
 
@@ -148,7 +161,7 @@ def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: in
         hist, _, _ = np.histogram2d(positions[:, dir_x], positions[:, dir_y], bins=[data["x_edges"], data["y_edges"]])
         data["hist"] += hist
 
-def _join_data(data_list: dict, dimension: str, num_bins: int):
+def _join_data(data_list: dict, dimension: Dimension, num_bins: int):
     """
     Join data from multiple samplers after parallel processing.
 
@@ -190,42 +203,23 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
     return combined_data
 
 
+@Substitution(params=_ATOM_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM)
 class DensitySampler(AtomSampler):
-    def __init__(self, name_out: str, atoms: list, dimension: Literal["Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"], region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
-        """
-        Sampler for atomic densities.
+    """
+    Sampler class for atomic densities.
 
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time".
-        atoms : dict
-            Dictionary defining atoms to sample.
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        num_bins : int
-            Number of bins for Cartesian sampling along each axis.
-        direction : str
-            Direction for Cartesian sampling. Options:
-            - ("x", "y", or "z") for "Cartesian1D".
-            - ("xy", "xz", or "yz") for "Cartesian2D".
-            - ("r", "p", or "d") for "Pore1D".
-            - ("rp", "rz", or "pz") for "Pore2D".
-        conditions : dict, optional
-            Additional conditions for sampling.
-            - "Charge": tuple (min_charge, max_charge)
-            - "Angle": tuple (min_angle, max_angle) using angle type all
-        """
+    Parameters
+    ----------
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    %(direction)s
+    conditions : dict, optional
+        Additional conditions for sampling.
+        - "Charge": tuple (min_charge, max_charge)
+        - "Angle": tuple (min_angle, max_angle) using angle type all
+    """
+    def __init__(self, name_out: str, atoms: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
         # Validate parameters
         _validate_dimension(dimension, "DensitySampler")
         _validate_num_bins(num_bins, "DensitySampler")
@@ -314,27 +308,43 @@ class DensitySampler(AtomSampler):
                 angles[:, i * (bonded_atoms.shape[1] - 1) + j - (1 if j > i else 0)] = angle_deg
         return np.array(angles)
 
-    def join_samplers(self, num_cores):
-        """
-        Join data from multiple samplers after parallel processing.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+    def join_samplers(self, num_cores: int) -> None:
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = _join_data(data_list, self._dimension, self._num_bins)
         utils.save_object(combined_data, self._name_out + ".obj")
 
 
+@Substitution(params=_BOND_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM)
 class BondDensitySampler(BondSampler):
     """
     Sampler class for bond densities.
+
+    Parameters
+    ----------
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    %(direction)s
+    conditions : dict, optional
+        Additional conditions for sampling.
+        - "Bond Length": tuple (min_length, max_length)
     """
-    def __init__(self, name_out: str, bonds: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, bonds: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for bond densities.
+
+        Parameters
+        ----------
+        name_out : str
+            Output folder name.
+        bonds : list
+            List of bonds to sample, each specified as a dictionary with keys:
+            - "bond": str, the bond in format "A-B"
+            - "bonds_A": list, optional, list of bonded atom types for atom A
+            - "bonds_B": list, optional, list of bonded atom types for atom B
+        dimension : str
+            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D".
+        region : callable
 
         Parameters
         ----------
@@ -419,53 +429,37 @@ class BondDensitySampler(BondSampler):
             )
 
     def join_samplers(self, num_cores: int) -> None:
-        """
-        Join data from multiple samplers after parallel processing.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = _join_data(data_list, self._dimension, self._num_bins)
         utils.save_object(combined_data, self._name_out + ".obj")
 
+
+@Substitution(params=_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM, name_out=_NAME_OUT_PARAM)
 class ReactionSampler(AtomSampler):
     """
-    Sampler class for reactions.
-    """
-    def __init__(self, name_out: str, reactions: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, position: str):
-        """
-        Sampler for reaction densities.
+    Sampler class for reaction events based on bond formation and breaking.
 
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time".
-        reactions : list
-            List of reactions to sample.
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        num_bins : int
-            Number of bins for Cartesian sampling along each axis.
-        direction : str
-            Direction for Cartesian sampling. Options:
-            - ("x", "y", or "z") for "Cartesian1D".
-            - ("xy", "xz", or "yz") for "Cartesian2D".
-        position : str
-            Position for reaction sampling. Options: "center", "reactant", "product".
-        """
+    Parameters
+    ----------
+    %(name_out)s
+    reactions : list
+        List of reactions to sample, each specified as a tuple of two dictionaries (reactant_dict, product_dict):
+        Each dictionary should have keys:
+
+        - "atom": str, the atom type string.
+        - "bonds": list, optional, list of bonded atom types.
+    %(params)s
+    num_bins : int
+        Number of bins for histogram sampling.
+    %(direction)s
+    position : str
+        Position to sample for reaction events. Options:
+
+        - "center": Sample at the midpoint of the reactant and product positions.
+        - "reactant": Sample at the position of the reactant.
+        - "product": Sample at the position of the product.
+    """
+    def __init__(self, name_out: str, reactions: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, position: Literal["center", "reactant", "product"]):
         # Validate parameters
         _validate_dimension(dimension, "ReactionSampler")
         _validate_num_bins(num_bins, "ReactionSampler")
@@ -553,14 +547,6 @@ class ReactionSampler(AtomSampler):
             )
 
     def join_samplers(self, num_cores: int) -> None:
-        """
-        Join data from multiple samplers after parallel processing.
-
-        Parameters
-        ----------
-        num_cores : int
-            Number of parallel processes used.
-        """
-        data_list = super().join_samplers(num_cores)
+        data_list = super()._collect_sampler_data(num_cores)
         combined_data = _join_data(data_list, self._dimension, self._num_bins)
         utils.save_object(combined_data, self._name_out + ".obj")

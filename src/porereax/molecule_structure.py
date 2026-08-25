@@ -9,14 +9,20 @@ import porereax.utils as utils
 import matplotlib.pyplot as plt
 import os
 
-from porereax.meta_sampler import Sampler
+from porereax.meta_sampler import Sampler, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
+from porereax.utils import Substitution, Appender
 
 
+@Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)
 class MoleculeStructureSampler(Sampler):
     """
-    Sampler class for molecule structure analysis.
-    """
+    Sampler class for molecular structure statistics.
 
+    Parameters
+    ----------
+    %(name_out)s
+    %(params)s
+    """
     def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict):
         valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
@@ -48,7 +54,7 @@ class MoleculeStructureSampler(Sampler):
                     self._data["structure_counts"][atom_type][key] += 1
         self._data["num_frames"] += 1
 
-    def join_samplers(self, num_cores):
+    def join_samplers(self, num_cores: int) -> None:
         if self._process_id != -1:
             return
         combined_data = {}

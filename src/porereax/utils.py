@@ -187,3 +187,33 @@ def read_pore_yml(file_path: str) -> dict:
         raise NotImplementedError("Currently, only CYLINDER pores are supported.")
 
     return properties
+
+class Substitution:
+    """Decorator that fills %(name)s placeholders in a docstring.
+
+    Use this to inject a shared block (e.g. a common Parameters section)
+    into multiple docstrings without retyping it.
+    """
+
+    def __init__(self, **kwargs):
+        self.params = kwargs
+
+    def __call__(self, func):
+        if func.__doc__:
+            func.__doc__ = func.__doc__ % self.params
+        return func
+
+
+class Appender:
+    """Decorator that appends a fixed block of text to a docstring.
+
+    Useful for tacking on a shared 'Notes' or 'See Also' section.
+    """
+
+    def __init__(self, addendum, join="\n"):
+        self.addendum = addendum
+        self.join = join
+
+    def __call__(self, func):
+        func.__doc__ = self.join.join([func.__doc__ or "", self.addendum])
+        return func
