@@ -2,22 +2,29 @@
 Module for sampling atomic and bond densities.
 
 The module provides:
+
 1. :class:`DensitySampler`: A class to sample atomic densities of specified atom structures.
 2. :class:`BondDensitySampler`: A class to sample bond densities of specified bonds.
-Both samplers support multiple dimensions for density sampling:
+3. :class:`ReactionSampler`: A class to sample reaction events based on bond formation and breaking.
+
+All samplers support multiple dimensions for density sampling:
+
 - "Cartesian1D": Samples the density histogram along a specified Cartesian direction for the whole simulation box.
 - "Cartesian2D": Samples the density histogram in a specified plane for the whole simulation box.
 - "Time": Samples the number of atoms (with given bonds) or bonds per frame
+- "Pore1D": Samples the density histogram along a specified direction in a cylindrical pore.
+- "Pore2D": Samples the density histogram in a specified plane in a cylindrical pore.
 """
 
 
 import numpy as np
-from porereax.meta_sampler import BondSampler, AtomSampler, _build_mol_dictionary, _validate_double_atoms
+from porereax.meta_sampler import BondSampler, AtomSampler, Sampler, _build_mol_dictionary, _validate_double_atoms
 import porereax.utils as utils
 from scipy.sparse import coo_matrix
+from typing import Literal
 
 
-def _validate_dimension(dimension: str, sampler_name: str):
+def _validate_dimension(dimension: Literal["Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"], sampler_name: str):
     """Validate the dimension parameter."""
     valid_dimensions = {"Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"}
     if not isinstance(dimension, str) or dimension not in valid_dimensions:
@@ -101,7 +108,7 @@ def _setup_data_structure(dimension: str, direction: str, num_frames: int, num_b
                 return {"hist": hist, "x_edges": x_edges, "y_edges": y_edges, "direction": dir_indices, "num_frames": 0}
 
 
-def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: int, num_bins: int, box: np.ndarray):
+def _record_density(data: dict, dimension: str, positions: np.ndarray, frame: int):
     """
     Record density data for the current frame.
 
@@ -184,10 +191,7 @@ def _join_data(data_list: dict, dimension: str, num_bins: int):
 
 
 class DensitySampler(AtomSampler):
-    """
-    Sampler class for atomic densities.
-    """
-    def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, atoms: list, dimension: Literal["Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D"], region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
         """
         Sampler for atomic densities.
 
@@ -215,6 +219,8 @@ class DensitySampler(AtomSampler):
             Direction for Cartesian sampling. Options:
             - ("x", "y", or "z") for "Cartesian1D".
             - ("xy", "xz", or "yz") for "Cartesian2D".
+            - ("r", "p", or "d") for "Pore1D".
+            - ("rp", "rz", or "pz") for "Pore2D".
         conditions : dict, optional
             Additional conditions for sampling.
             - "Charge": tuple (min_charge, max_charge)
@@ -267,8 +273,6 @@ class DensitySampler(AtomSampler):
                 self._dimension,
                 atom_positions,
                 frame_id,
-                self._num_bins,
-                self._box
             )
 
     def _get_atom_angles(self, atom_indices: np.ndarray, positions: np.ndarray, bonded_atoms: np.ndarray):
@@ -402,8 +406,6 @@ class BondDensitySampler(BondSampler):
                 self._dimension,
                 bond_midpoints,
                 frame_id,
-                self._num_bins,
-                self._box
             )
 
     def join_samplers(self, num_cores: int) -> None:
@@ -532,9 +534,7 @@ class ReactionSampler(AtomSampler):
                 self._data[reaction_key],
                 self._dimension,
                 reaction_positions,
-                frame_id-1,
-                self._num_bins,
-                self._box
+                frame_id - 1,
             )
 
     def join_samplers(self, num_cores: int) -> None:
