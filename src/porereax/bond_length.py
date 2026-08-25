@@ -25,7 +25,11 @@ class BondLengthSampler(BondSampler):
             raise ValueError("BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers (min, max) with min < max.")
         self._num_bins = num_bins
         self._range = range
-        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, range=range)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": num_bins,
+            "range": range,
+        })
 
         # Setup data
         for identifier in self._bonds:

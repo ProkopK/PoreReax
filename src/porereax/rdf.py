@@ -59,7 +59,11 @@ class RdfSampler(AtomSampler):
             atoms.append(atom1)
             atoms.append(atom2)
 
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, r_max=r_max)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": num_bins,
+            "r_max": r_max,
+        })
 
         # Build pair identifiers and setup data structures for each pair
         self._pairs = {}

@@ -56,13 +56,14 @@ class AngleSampler(AtomSampler):
             for atom in angle_atoms:
                 if atom not in atom_lib:
                     raise ValueError(f"AngleSampler 'angle' parameter contains unknown atom identifier '{atom}'.")
-            angle = [atom_lib[atom] for atom in angle_atoms]
+            angle_list = [atom_lib[atom] for atom in angle_atoms]
         else:
-            angle = []
-        self._angle = angle
+            angle_list = []
+        self._angle = angle_list
         self._num_bins = num_bins
         self._range = (0, 180)
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self._num_bins, range=self._range, angle=self._angle)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({"num_bins": num_bins, "range": self._range, "angle": angle})
 
         # Remove atomstructures with less than 3 atoms or not matching A-B-C if specified
         molecules_to_remove = []
@@ -82,8 +83,7 @@ class AngleSampler(AtomSampler):
                 "num_angles": 0, 
                 "mean_angle": 0.0, 
                 "hist": hist, 
-                "bin_edges": 
-                bin_edges, 
+                "bin_edges": bin_edges, 
             }
 
     def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
@@ -96,7 +96,6 @@ class AngleSampler(AtomSampler):
             bonded_atoms = mol_bonds[identifier][atom_indices]
             if self._angle:
                 atom_a_type = self._angle[0]
-                atom_b_type = self._angle[1]
                 atom_c_type = self._angle[2]
                 bonded_types = atom_types[bonded_atoms]
             angles = []

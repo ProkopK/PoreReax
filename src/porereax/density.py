@@ -236,7 +236,12 @@ class DensitySampler(AtomSampler):
         self._num_bins = num_bins
         self._direction = direction
         self._conditions = conditions
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": num_bins,
+            "direction": direction,
+            "conditions": conditions,
+        })
 
         # Setup data
         for identifier in self._molecules:
@@ -371,7 +376,12 @@ class BondDensitySampler(BondSampler):
         self._num_bins = num_bins
         self._direction = direction
         self._conditions = conditions
-        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, conditions=conditions)
+        super().__init__(name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": num_bins,
+            "direction": direction,
+            "conditions": conditions,
+        })
 
         # Setup data
         for identifier in self._bonds:
@@ -476,7 +486,12 @@ class ReactionSampler(AtomSampler):
             if product is not None:
                 atoms.append(product)
 
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=num_bins, direction=direction, position=position)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": num_bins,
+            "direction": direction,
+            "position": position,
+        })
 
         # Build reaction identifiers and setup data structures for each reaction
         self._reactions = {}

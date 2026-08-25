@@ -52,7 +52,11 @@ class ChargeSampler(AtomSampler):
         self._max_range = np.round(self._max_range * 1000)
         self._range = (self._min_range, self._max_range)
         self._num_bins = int(self._max_range - self._min_range)
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties, num_bins=self._num_bins, range=range)
+        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+        self._input.update({
+            "num_bins": self._num_bins,
+            "range": range,
+        })
 
         # Setup data
         for identifier, bonds_info in self._molecules.items():
