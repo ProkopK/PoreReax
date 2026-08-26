@@ -71,8 +71,7 @@ class MoleculeStructureSampler(Sampler):
                         if atom not in combined_data:
                             combined_data[atom] = {}
                         for structure, count in value.items():
-                            # name = atom + "(" + "+".join([type_to_name[t] for t in structure]) + ")"
-                            name = atom + "+" + "_".join([type_to_name[t] for t in structure])
+                            name = atom + "(" + "+".join([type_to_name[t] for t in structure]) + ")"
                             if name not in combined_data[atom]:
                                 combined_data[atom][name] = 0
                             combined_data[atom][name] += count
