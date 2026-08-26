@@ -68,24 +68,20 @@ class BondLengthSampler(BondSampler):
             self._data[identifier]["num_frames"] += 1
             self._data[identifier]["num_bonds"] += bonds.shape[0]
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = {}
-        input_params = data_list.pop("input_params", None)
-        combined_data["input_params"] = input_params
-        for identifier in data_list:
-            combined_data[identifier] = {}
-
-            num_frames = np.sum(data_list[identifier]["num_frames"])
-            num_bonds = np.sum(data_list[identifier]["num_bonds"])
-            hist = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins)
-            mean = np.sum(data_list[identifier]["mean"]) / num_bonds if num_bonds > 0 else 0.0
-            hist_std = np.std(data_list[identifier]["hist"], axis=0)
-            combined_data[identifier]["num_frames"] = num_frames
-            combined_data[identifier]["num_bonds"] = num_bonds
-            combined_data[identifier]["mean"] = mean
-            combined_data[identifier]["hist"] = hist
-            combined_data[identifier]["hist_std"] = hist_std
-            combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
-            combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-        utils.save_object(combined_data, self._name_out + ".obj")
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        num_frames = np.sum(data["num_frames"])
+        num_bonds = np.sum(data["num_bonds"])
+        mean = np.sum(data["mean"]) / num_bonds if num_bonds > 0 else 0.0
+        hist = np.sum(data["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins)
+        hist_std = np.std(data["hist"], axis=0) # TODO: fix std calculation
+        mean_std = 0 # TODO: fix std calculation
+        bin_edges = data["bin_edges"][0]
+        return {
+            "num_frames": num_frames,
+            "num_bonds": num_bonds,
+            "mean": mean,
+            "hist": hist,
+            "hist_std": hist_std,
+            "mean_std": mean_std,
+            "bin_edges": bin_edges,
+        }

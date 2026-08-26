@@ -161,14 +161,14 @@ def _record_density(data: dict, dimension: Dimension, positions: np.ndarray, fra
         hist, _, _ = np.histogram2d(positions[:, dir_x], positions[:, dir_y], bins=[data["x_edges"], data["y_edges"]])
         data["hist"] += hist
 
-def _join_data(data_list: dict, dimension: Dimension, num_bins: int):
+def _combine_density_data(data: dict, dimension: Dimension, num_bins: int) -> dict:
     """
-    Join data from multiple samplers after parallel processing.
+    Combine one identifier's density data collected from multiple processes.
 
     Parameters
     ----------
-    data_list : dict
-        Dictionary containing lists of data from each process.
+    data : dict
+        Dictionary containing data for a single identifier from each process.
     dimension : str
         Sampling dimension.
     num_bins : int
@@ -177,30 +177,26 @@ def _join_data(data_list: dict, dimension: Dimension, num_bins: int):
     Returns
     -------
     dict
-        Combined data structure.
+        Combined data for this identifier.
     """
-    combined_data = {}
-    input_params = data_list.pop("input_params", None)
-    combined_data["input_params"] = input_params
-    for identifier in data_list:
-        combined_data[identifier] = {}
-        num_frames = np.sum(data_list[identifier]["num_frames"])
-        combined_data[identifier]["num_frames"] = num_frames
+    combined = {}
+    num_frames = np.sum(data["num_frames"])
+    combined["num_frames"] = num_frames
 
-        if dimension == "Time":
-            combined_data[identifier]["densities"] = np.concatenate(data_list[identifier]["densities"])
-        elif dimension == "Cartesian1D" or dimension == "Pore1D":
-            combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(num_bins)
-            combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-            combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0]
-            combined_data[identifier]["direction"] = data_list[identifier]["direction"][0]
-        elif dimension == "Cartesian2D" or dimension == "Pore2D":
-            combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros((num_bins, num_bins))
-            combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-            combined_data[identifier]["x_edges"] = data_list[identifier]["x_edges"][0]
-            combined_data[identifier]["y_edges"] = data_list[identifier]["y_edges"][0]
-            combined_data[identifier]["direction"] = data_list[identifier]["direction"][0]
-    return combined_data
+    if dimension == "Time":
+        combined["densities"] = np.concatenate(data["densities"])
+    elif dimension == "Cartesian1D" or dimension == "Pore1D":
+        combined["hist"] = np.sum(data["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(num_bins)
+        combined["hist_std"] = np.std(data["hist"], axis=0)
+        combined["bin_edges"] = data["bin_edges"][0]
+        combined["direction"] = data["direction"][0]
+    elif dimension == "Cartesian2D" or dimension == "Pore2D":
+        combined["hist"] = np.sum(data["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros((num_bins, num_bins))
+        combined["hist_std"] = np.std(data["hist"], axis=0)
+        combined["x_edges"] = data["x_edges"][0]
+        combined["y_edges"] = data["y_edges"][0]
+        combined["direction"] = data["direction"][0]
+    return combined
 
 
 @Substitution(params=_ATOM_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM)
@@ -219,7 +215,8 @@ class DensitySampler(AtomSampler):
         - "Charge": tuple (min_charge, max_charge)
         - "Angle": tuple (min_angle, max_angle) using angle type all
     """
-    def __init__(self, name_out: str, atoms: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, atoms: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict | None = None):
+        conditions = conditions if conditions is not None else {}
         # Validate parameters
         _validate_dimension(dimension, "DensitySampler")
         _validate_num_bins(num_bins, "DensitySampler")
@@ -308,10 +305,8 @@ class DensitySampler(AtomSampler):
                 angles[:, i * (bonded_atoms.shape[1] - 1) + j - (1 if j > i else 0)] = angle_deg
         return np.array(angles)
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = _join_data(data_list, self._dimension, self._num_bins)
-        utils.save_object(combined_data, self._name_out + ".obj")
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        return _combine_density_data(data, self._dimension, self._num_bins)
 
 
 @Substitution(params=_BOND_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM)
@@ -329,7 +324,8 @@ class BondDensitySampler(BondSampler):
         Additional conditions for sampling.
         - "Bond Length": tuple (min_length, max_length)
     """
-    def __init__(self, name_out: str, bonds: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
+    def __init__(self, name_out: str, bonds: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict | None = None):
+        conditions = conditions if conditions is not None else {}
         # Validate parameters
         _validate_dimension(dimension, "BondDensitySampler")
         _validate_num_bins(num_bins, "BondDensitySampler")
@@ -381,10 +377,8 @@ class BondDensitySampler(BondSampler):
                 frame_id,
             )
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = _join_data(data_list, self._dimension, self._num_bins)
-        utils.save_object(combined_data, self._name_out + ".obj")
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        return _combine_density_data(data, self._dimension, self._num_bins)
 
 
 @Substitution(params=_SAMPLER_INIT_PARAMS, direction=_DIRECTION_PARAM, name_out=_NAME_OUT_PARAM)
@@ -499,7 +493,5 @@ class ReactionSampler(AtomSampler):
                 frame_id - 1,
             )
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = _join_data(data_list, self._dimension, self._num_bins)
-        utils.save_object(combined_data, self._name_out + ".obj")
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        return _combine_density_data(data, self._dimension, self._num_bins)

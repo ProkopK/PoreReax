@@ -7,7 +7,6 @@ The module provides :class:`MoleculeStructureSampler` to sample bonding environm
 import numpy as np
 import porereax.utils as utils
 import matplotlib.pyplot as plt
-import os
 
 from porereax.meta_sampler import Sampler, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
 from porereax.utils import Substitution
@@ -60,10 +59,7 @@ class MoleculeStructureSampler(Sampler):
         combined_data = {}
         num_frames = 0
         type_to_name = {v: k for k, v in self._atom_lib.items()}
-        for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self._name_out + f"_proc_{process_id}.pkl"
-            proc_data = utils.load_object(file_path)
-            os.remove(file_path)
+        for proc_data in super()._iter_process_data(num_cores):
             for identifier, data in proc_data.items():
                 if identifier == "input_params":
                     combined_data["input_params"] = data
@@ -75,6 +71,7 @@ class MoleculeStructureSampler(Sampler):
                         if atom not in combined_data:
                             combined_data[atom] = {}
                         for structure, count in value.items():
+                            # name = atom + "(" + "+".join([type_to_name[t] for t in structure]) + ")"
                             name = atom + "+" + "_".join([type_to_name[t] for t in structure])
                             if name not in combined_data[atom]:
                                 combined_data[atom][name] = 0
@@ -86,3 +83,6 @@ class MoleculeStructureSampler(Sampler):
                     combined_data[atom][structure] /= num_frames
 
         utils.save_object(combined_data, self._name_out + ".obj")
+
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        return {}

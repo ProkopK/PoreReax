@@ -8,6 +8,7 @@ such as the minimum-image convention.
 
 
 import pickle
+import re
 import yaml
 import numpy as np
 import os
@@ -188,11 +189,18 @@ def read_pore_yml(file_path: str) -> dict:
 
     return properties
 
+_PLACEHOLDER_RE = re.compile(r"^([ \t]*)%\((\w+)\)s[ \t]*$", re.MULTILINE)
+
+
 class Substitution:
     """Decorator that fills %(name)s placeholders in a docstring.
 
     Use this to inject a shared block (e.g. a common Parameters section)
-    into multiple docstrings without retyping it.
+    into multiple docstrings without retyping it. Unlike plain %-formatting,
+    only whole-line %(name)s placeholders are replaced, so an unrelated bare
+    '%' elsewhere in the docstring is left untouched. Each line of the
+    replacement text is reindented to match the placeholder's own
+    indentation, so it splices cleanly into an indented class docstring.
     """
 
     def __init__(self, **kwargs):
@@ -200,5 +208,13 @@ class Substitution:
 
     def __call__(self, func):
         if func.__doc__:
-            func.__doc__ = func.__doc__ % self.params
+            def _replace(match):
+                indent, key = match.group(1), match.group(2)
+                if key not in self.params:
+                    return match.group(0)
+                value = str(self.params[key]).strip("\n")
+                lines = [indent + line if line else line for line in value.splitlines()]
+                return "\n".join(lines)
+
+            func.__doc__ = _PLACEHOLDER_RE.sub(_replace, func.__doc__)
         return func

@@ -246,16 +246,49 @@ class Sampler(abc.ABC):
             Transformed positions of atoms in the current frame.
         """
 
-    @abc.abstractmethod
     def join_samplers(self, num_cores: int) -> None:
         """
-        Collect and combine sampler data from multiple processes. This saves the combined data to a single '.obj' file and removes the individual process files. This process is only executed by the main process (process_id == -1).
+        Collect and combine sampler data from multiple processes. This saves the
+        combined data to a single '<name_out>.obj' file and removes the
+        individual process files. This process is only executed by the
+        main process (process_id == -1).
 
         Parameters
         ----------
         num_cores : int
             Number of parallel processes used for sampling.
         """
+        data_list = self._collect_sampler_data(num_cores)
+
+        combined_data = {"input_params": data_list.pop("input_params", None)}
+        for identifier, data in data_list.items():
+            combined_data[identifier] = self._combine_identifier(identifier, data)
+        utils.save_object(combined_data, self._name_out + ".obj")
+
+    def _iter_process_data(self, num_cores: int):
+        """
+        Load and yield each process's raw sampler data, removing its file afterwards.
+
+        Only the main process (process_id == -1) yields anything; any other
+        process yields nothing.
+
+        Parameters
+        ----------
+        num_cores : int
+            Number of parallel processes used for sampling.
+
+        Yields
+        ------
+        proc_data : dict
+            Raw data saved by :meth:`save_object` for one process.
+        """
+        if self._process_id != -1:
+            return
+        for process_id in range(num_cores) if num_cores > 1 else [-1]:
+            file_path = self._name_out + f"_proc_{process_id}.pkl"
+            proc_data = utils.load_object(file_path)
+            os.remove(file_path)
+            yield proc_data
 
     def _collect_sampler_data(self, num_cores: int) -> dict:
         """
@@ -271,13 +304,8 @@ class Sampler(abc.ABC):
         data_list : dict
             Dictionary containing collected data from all processes.
         """
-        if self._process_id != -1:
-            return {}
         data_list = {}
-        for process_id in range(num_cores) if num_cores > 1 else [-1]:
-            file_path = self._name_out + f"_proc_{process_id}.pkl"
-            proc_data = utils.load_object(file_path)
-            os.remove(file_path)
+        for proc_data in self._iter_process_data(num_cores):
             input_params = proc_data.pop("input_params", None)
             data_list["input_params"] = input_params
             for identifier, data in proc_data.items():
@@ -288,6 +316,24 @@ class Sampler(abc.ABC):
                         data_list[identifier][key] = []
                     data_list[identifier][key].append(value)
         return data_list
+
+    @abc.abstractmethod
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        """
+        Combine data for a specific identifier across multiple processes.
+
+        Parameters
+        ----------
+        identifier : str
+            The identifier for which to combine data.
+        data : dict
+            Dictionary containing lists of data from each process for the given identifier.
+
+        Returns
+        -------
+        combined_data : dict
+            Dictionary containing the combined data for the given identifier.
+        """
 
     def get_mols(self):
         """

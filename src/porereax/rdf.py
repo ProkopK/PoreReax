@@ -100,54 +100,43 @@ class RdfSampler(AtomSampler):
             self._data[pair_key]["num_atoms_A"] += atom_indices_A.size
             self._data[pair_key]["num_atoms_B"] += atom_indices_B.size
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = {}
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        combined = {}
+        num_frames = np.sum(data["num_frames"])
+        num_atoms_A = np.sum(data["num_atoms_A"])
+        num_atoms_B = np.sum(data["num_atoms_B"])
+        combined["num_frames"] = num_frames
+        combined["num_atoms_A"] = num_atoms_A
+        combined["num_atoms_B"] = num_atoms_B
 
-        input_params = data_list.pop("input_params", None)
-        combined_data["input_params"] = input_params
-        for identifier in data_list:
-            combined_data[identifier] = {}
+        # Sum histograms and normalize
+        hist_sum = np.sum(data["hist"], axis=0)
 
-            num_frames = np.sum(data_list[identifier]["num_frames"])
-            num_atoms_A = np.sum(data_list[identifier]["num_atoms_A"])
-            num_atoms_B = np.sum(data_list[identifier]["num_atoms_B"])
-            combined_data[identifier]["num_frames"] = num_frames
-            combined_data[identifier]["num_atoms_A"] = num_atoms_A
-            combined_data[identifier]["num_atoms_B"] = num_atoms_B
+        bin_edges = data["bin_edges"][0]
 
-            # Sum histograms and normalize
-            hist_sum = np.sum(data_list[identifier]["hist"], axis=0)
+        # Calculate average number of atoms per frame
+        avg_atoms_A = num_atoms_A / num_frames if num_frames > 0 else 0
+        avg_atoms_B = num_atoms_B / num_frames if num_frames > 0 else 0
 
-            bin_edges = data_list[identifier]["bin_edges"][0]
+        # Calculate box volume
+        box_volume = np.prod(self._box)
 
-            # Calculate average number of atoms per frame
-            avg_atoms_A = num_atoms_A / num_frames if num_frames > 0 else 0
-            avg_atoms_B = num_atoms_B / num_frames if num_frames > 0 else 0
+        # Calculate shell volumes: V = 4/3 * pi * (r_outer^3 - r_inner^3)
+        r_inner = bin_edges[:-1]
+        r_outer = bin_edges[1:]
+        shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
 
-            # Calculate box volume
-            box_volume = np.prod(self._box)
+        # Avoid division by zero
+        shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1e-10)
 
-            # Calculate number density of B atoms
-            rho_B = avg_atoms_B / box_volume if box_volume > 0 else 0
+        # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
+        # This gives g(r) -> 1 for large r in a homogeneous system
+        if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
+            combined["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
+        else:
+            combined["hist"] = np.zeros(self._num_bins)
 
-            # Calculate shell volumes: V = 4/3 * pi * (r_outer^3 - r_inner^3)
-            r_inner = bin_edges[:-1]
-            r_outer = bin_edges[1:]
-            shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
-
-            # Avoid division by zero
-            shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1e-10)
-
-            # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
-            # This gives g(r) -> 1 for large r in a homogeneous system
-            if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
-                combined_data[identifier]["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
-            else:
-                combined_data[identifier]["hist"] = np.zeros(self._num_bins)
-
-            combined_data[identifier]["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
-            combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"], axis=0)
-            combined_data[identifier]["bin_edges"] = bin_edges
-
-        utils.save_object(combined_data, self._name_out + ".obj")
+        combined["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
+        combined["hist_std"] = np.std(data["hist"], axis=0)
+        combined["bin_edges"] = bin_edges
+        return combined

@@ -61,21 +61,20 @@ class ChargeSampler(AtomSampler):
             self._data[identifier]["num_atoms"] += atom_charges.shape[0]
             self._data[identifier]["mean_charge"] += np.sum(atom_charges)
 
-    def join_samplers(self, num_cores: int) -> None:
-        data_list = super()._collect_sampler_data(num_cores)
-        combined_data = {}
-        input_params = data_list.pop("input_params", None)
-        combined_data["input_params"] = input_params
-        for identifier in data_list:
-            combined_data[identifier] = {}
-            if self._dimension == "Histogram":
-                num_frames = np.sum(data_list[identifier]["num_frames"])
-                num_atoms = np.sum(data_list[identifier]["num_atoms"])
-                combined_data[identifier]["num_frames"] = num_frames
-                combined_data[identifier]["num_atoms"] = num_atoms
-                combined_data[identifier]["mean"] = np.sum(data_list[identifier]["mean_charge"]) / num_atoms if num_atoms > 0 else np.nan
-                combined_data[identifier]["hist"] = np.sum(data_list[identifier]["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins) # TODO check normalization
-                combined_data[identifier]["mean_std"] = 0 # TODO: fix std calculation
-                combined_data[identifier]["hist_std"] = np.std(data_list[identifier]["hist"]) # TODO: fix std calculation
-                combined_data[identifier]["bin_edges"] = data_list[identifier]["bin_edges"][0] / 1000.0
-        utils.save_object(combined_data, self._name_out + ".obj")
+    def _combine_identifier(self, identifier: str, data: dict) -> dict:
+        num_frames = np.sum(data["num_frames"])
+        num_atoms = np.sum(data["num_atoms"])
+        mean = np.sum(data["mean_charge"]) / num_atoms if num_atoms > 0 else np.nan
+        hist = np.sum(data["hist"], axis=0) / num_frames if num_frames > 0 else np.zeros(self._num_bins) # TODO check normalization
+        mean_std = 0 # TODO: fix std calculation
+        hist_std = np.std(data["hist"]) # TODO: fix std calculation
+        bin_edges = data["bin_edges"][0] / 1000.0
+        return {
+            "num_frames": num_frames,
+            "num_atoms": num_atoms,
+            "mean": mean,
+            "hist": hist,
+            "mean_std": mean_std,
+            "hist_std": hist_std,
+            "bin_edges": bin_edges,
+        }
