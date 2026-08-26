@@ -18,11 +18,11 @@ All samplers support multiple dimensions for density sampling:
 
 
 import numpy as np
-from porereax.meta_sampler import BondSampler, AtomSampler, Sampler, _build_mol_dictionary, _validate_double_atoms, _ATOM_SAMPLER_INIT_PARAMS, _BOND_SAMPLER_INIT_PARAMS, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
+from porereax.meta_sampler import BondSampler, AtomSampler, _build_mol_dictionary, _validate_double_atoms, _ATOM_SAMPLER_INIT_PARAMS, _BOND_SAMPLER_INIT_PARAMS, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
 import porereax.utils as utils
 from scipy.sparse import coo_matrix
 from typing import Literal
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 _DIRECTION_PARAM = """
@@ -330,53 +330,6 @@ class BondDensitySampler(BondSampler):
         - "Bond Length": tuple (min_length, max_length)
     """
     def __init__(self, name_out: str, bonds: list, dimension: Dimension, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, direction: str, conditions: dict = {}):
-        """
-        Sampler for bond densities.
-
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        bonds : list
-            List of bonds to sample, each specified as a dictionary with keys:
-            - "bond": str, the bond in format "A-B"
-            - "bonds_A": list, optional, list of bonded atom types for atom A
-            - "bonds_B": list, optional, list of bonded atom types for atom B
-        dimension : str
-            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time", "Pore1D", "Pore2D".
-        region : callable
-
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Supported: "Cartesian1D", "Cartesian2D", "Time".
-        bonds : list
-            List of bonds to sample, each specified as a dictionary with keys:
-            - "bond": str, the bond in format "A-B"
-            - "bonds_A": list, optional, list of bonded atom types for atom A
-            - "bonds_B": list, optional, list of bonded atom types for atom B
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        num_bins : int
-            Number of bins for Cartesian sampling along each axis.
-        direction : str
-            Direction for Cartesian sampling. Options:
-            - ("x", "y", or "z") for "Cartesian1D".
-            - ("xy", "xz", or "yz") for "Cartesian2D".
-        conditions : dict, optional
-            Additional conditions for sampling.
-            - "Bond Length": tuple (min_length, max_length)
-        """
         # Validate parameters
         _validate_dimension(dimension, "BondDensitySampler")
         _validate_num_bins(num_bins, "BondDensitySampler")

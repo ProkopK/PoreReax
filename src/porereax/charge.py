@@ -9,7 +9,7 @@ import numpy as np
 import porereax.utils as utils
 
 from porereax.meta_sampler import AtomSampler, _ATOM_SAMPLER_INIT_PARAMS
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 @Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)
@@ -24,30 +24,6 @@ class ChargeSampler(AtomSampler):
         Range (min, max) for histogram sampling.
     """
     def __init__(self, name_out: str, atoms: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, range: tuple):
-        """
-        Sampler for atomic charges.
-
-        Parameters
-        ----------
-        name_out : str
-            Output folder name.
-        dimension : str
-            Sampling dimension. Currently only "Histogram" is supported.
-        atoms : dict
-            Dictionary defining atoms to sample.
-        process_id : int
-            Process ID for parallel sampling.
-        atom_lib : dict
-            Dictionary mapping atom type strings to their type IDs.
-        masses : dict
-            Dictionary mapping atom type strings to their masses.
-        num_frames : int
-            Total number of frames to sample.
-        box : np.ndarray
-            Simulation box dimensions.
-        range : tuple
-            Range (min, max) for histogram sampling.
-        """
         valid_dimensions = ["Histogram"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
             raise ValueError(f"ChargeSampler does not support dimension {dimension}")

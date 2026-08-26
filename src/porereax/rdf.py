@@ -9,7 +9,7 @@ import numpy as np
 import porereax.utils as utils
 
 from porereax.meta_sampler import AtomSampler, _build_mol_dictionary, _validate_double_atoms, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 @Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)
@@ -29,7 +29,7 @@ class RdfSampler(AtomSampler):
     r_max : float
         Maximum distance for RDF calculation.
     """
-    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, num_bins: int, r_max: float, system_properties: dict):
+    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, r_max: float):
         if not isinstance(num_bins, (int)) or num_bins <= 0:
             raise ValueError("RdfSampler requires a positive integer 'num_bins' parameter.")
         if not isinstance(r_max, (float, int)) or r_max <= 0:

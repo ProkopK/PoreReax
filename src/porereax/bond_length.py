@@ -6,7 +6,7 @@ The module provides :class:`BondLengthSampler` to sample bond length histograms 
 
 import numpy as np
 from porereax.meta_sampler import BondSampler, _BOND_SAMPLER_INIT_PARAMS
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 import porereax.utils as utils
 
 

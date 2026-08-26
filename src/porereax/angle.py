@@ -9,7 +9,7 @@ import numpy as np
 import porereax.utils as utils
 
 from porereax.meta_sampler import AtomSampler, _ATOM_SAMPLER_INIT_PARAMS
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 @Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)

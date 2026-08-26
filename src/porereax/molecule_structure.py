@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import os
 
 from porereax.meta_sampler import Sampler, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 @Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)

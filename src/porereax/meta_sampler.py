@@ -10,7 +10,7 @@ import os
 import itertools
 import porereax.utils as utils
 import porereax.regions as regions
-from porereax.utils import Substitution, Appender
+from porereax.utils import Substitution
 
 
 _SAMPLER_INIT_PARAMS = """
@@ -166,15 +166,14 @@ def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False
             raise ValueError(f"{class_name} '{attribute_name}' parameter dictionaries must have an 'atom' key.")
 
 
-@Substitution(params=_SAMPLER_INIT_PARAMS)
+@Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)
 class Sampler(abc.ABC):
     """
     Base sampler class.
 
     Parameters
     ----------
-    name_out : str
-        Name of the output file of the sampler data
+    %(name_out)s
     %(params)s
     """
     def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
