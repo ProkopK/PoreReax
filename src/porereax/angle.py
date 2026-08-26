@@ -47,7 +47,7 @@ class AngleSampler(AtomSampler):
         self._num_bins = num_bins
         self._range = (0, 180)
         super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
-        self._input.update({"num_bins": num_bins, "range": self._range, "angle": angle})
+        self._input.update({"num_bins": num_bins, "range": self._range, "angle": angle_list})
 
         # Remove atomstructures with less than 3 atoms or not matching A-B-C if specified
         molecules_to_remove = []
