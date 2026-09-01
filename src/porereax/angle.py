@@ -70,14 +70,14 @@ class AngleSampler(AtomSampler):
                 "bin_edges": bin_edges, 
             }
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier, bonds_info in self._molecules.items():
-            mol_mask = position_mask & mol_index[identifier]
+            mol_mask = position_mask & molecule_mask[identifier]
             atom_indices = np.where(mol_mask)[0]
-            bonded_atoms = mol_bonds[identifier][atom_indices]
+            bonded_atoms = molecule_bond_atoms[identifier][atom_indices]
             if self._angle:
                 atom_a_type = self._angle[0]
                 atom_c_type = self._angle[2]

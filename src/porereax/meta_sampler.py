@@ -224,7 +224,7 @@ class Sampler(abc.ABC):
         utils.save_object(self._data, self._file_out)
 
     @abc.abstractmethod
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         """
         Sample data for the current frame.
 
@@ -232,9 +232,9 @@ class Sampler(abc.ABC):
         ----------
         frame_id : int
             Frame index in perspective of the subprocess (starts from 0 for each subprocess).
-        mol_index : dict
+        molecule_mask : dict
             Dictionary mapping molecule identifiers to boolean masks indicating which atoms belong to that molecule in the frame.
-        mol_bonds : dict
+        molecule_bond_atoms : dict
             Dictionary mapping molecule identifiers to their bonded atom indices in the frame.
         bond_mask : dict
             Dictionary mapping bond identifiers to boolean masks indicating which bonds belong to that identifier in the frame.

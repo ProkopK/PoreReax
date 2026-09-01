@@ -240,11 +240,11 @@ class DensitySampler(AtomSampler):
                 self._dimension, self._direction, num_frames, self._num_bins, box, "DensitySampler", self._system_properties
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
         for identifier in self._molecules:
-            mol_mask = mol_index[identifier] & position_mask
+            mol_mask = molecule_mask[identifier] & position_mask
             # Apply conditions
             if "Charge" in self._conditions:
                 charges = frame.particles.get("Charge").array if "Charge" in frame.particles else np.zeros(frame.particles.count)
@@ -254,7 +254,7 @@ class DensitySampler(AtomSampler):
             if "Angle" in self._conditions:
                 # atom_indices = np.where(mol_mask)[0]
                 atom_indices = np.arange(positions.shape[0])
-                angles = self._get_atom_angles(atom_indices, positions, mol_bonds[identifier])
+                angles = self._get_atom_angles(atom_indices, positions, molecule_bond_atoms[identifier])
                 min_angle, max_angle = self._conditions["Angle"]
                 angle_mask = (angles >= min_angle) & (angles <= max_angle)
                 angle_mask = np.any(angle_mask, axis=1)
@@ -348,7 +348,7 @@ class BondDensitySampler(BondSampler):
                 self._dimension, self._direction, num_frames, self._num_bins, box, "BondDensitySampler", self._system_properties
             )
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
 
@@ -448,19 +448,19 @@ class ReactionSampler(AtomSampler):
         self._input["reactions"] = self._reactions
         self._pre_positions = None
         self._cur_positions = None
-        self._pre_mol_index = None
-        self._cur_mol_index = None
+        self._pre_molecule_mask = None
+        self._cur_molecule_mask = None
         self._pre_bonds = None
         self._cur_bonds = None
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         cur_topology = frame.particles.bonds.topology.array
 
         self._pre_positions = self._cur_positions
-        self._pre_mol_index = self._cur_mol_index
+        self._pre_molecule_mask = self._cur_molecule_mask
         self._pre_bonds = self._cur_bonds
         self._cur_positions = frame.particles.positions.array
-        self._cur_mol_index = {key: np.copy(value) for key, value in mol_index.items()}
+        self._cur_molecule_mask = {key: np.copy(value) for key, value in molecule_mask.items()}
         self._cur_bonds = coo_matrix((np.ones(cur_topology.shape[0]), (cur_topology[:, 0], cur_topology[:, 1])), shape=(self._cur_positions.shape[0], self._cur_positions.shape[0]), dtype=bool)
         if self._pre_positions is None:
             return
@@ -477,8 +477,8 @@ class ReactionSampler(AtomSampler):
         reaction_indices = np.unique(np.concatenate((reaction_events.row, reaction_events.col)))
 
         for reaction_key, (identifier_reactant, identifier_product) in self._reactions.items():
-            reactant_mask = self._pre_mol_index[identifier_reactant] if identifier_reactant != "X" else True
-            product_mask = self._cur_mol_index[identifier_product] if identifier_product != "X" else True
+            reactant_mask = self._pre_molecule_mask[identifier_reactant] if identifier_reactant != "X" else True
+            product_mask = self._cur_molecule_mask[identifier_product] if identifier_product != "X" else True
             reaction_mask = reactant_mask & product_mask & position_mask
             reaction_key_indices = reaction_indices[reaction_mask[reaction_indices]]
 

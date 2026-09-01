@@ -46,7 +46,7 @@ class BondLengthSampler(BondSampler):
             hist, bin_edges = np.histogram([], bins=self._num_bins, range=self._range)
             self._data[identifier] = {"num_frames": 0, "num_bonds": 0, "mean": 0.0, "hist": hist, "bin_edges": bin_edges, }
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
         position_mask = self._region(positions)

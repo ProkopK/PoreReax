@@ -72,7 +72,7 @@ class RdfSampler(AtomSampler):
         self._input["pairs"] = self._pairs
 
 
-    def sample(self, frame_id: int, mol_index: dict, mol_bonds: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search
@@ -83,8 +83,8 @@ class RdfSampler(AtomSampler):
 
         for pair_key, (identifier_A, identifier_B) in self._pairs.items():
             # Get atom indices for both types
-            atom_mask_A = mol_index[identifier_A] & position_mask
-            atom_mask_B = mol_index[identifier_B] & position_mask
+            atom_mask_A = molecule_mask[identifier_A] & position_mask
+            atom_mask_B = molecule_mask[identifier_B] & position_mask
             atom_indices_A = np.where(atom_mask_A)[0]
             atom_indices_B = np.where(atom_mask_B)[0]
 

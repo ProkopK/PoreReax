@@ -657,6 +657,143 @@ class Sample:
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
 
+    def _group_molecules_by_atom_type(self):
+        """
+        Group registered molecule identifiers by their central atom type.
+
+        Within each atom type, molecules are sorted so that an unconstrained
+        registration (no "bonds" constraint) comes first, followed by the
+        others in increasing order of how many bonded neighbours they require.
+        This ordering lets `_identify_molecules` short-circuit cheaply for
+        atom types that don't distinguish molecules by bonding environment.
+
+        Returns
+        -------
+        molecules_per_atom_type : dict
+            Mapping atom_type -> list of (identifier, bond_permutations) pairs, where
+            bond_permutations is None for an unconstrained molecule or a list of
+            neighbour-type permutations otherwise. Atom types with no registered
+            molecule are omitted.
+            Example (single atom type): [('O', None), ('O()', [[]]), ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
+        """
+        molecules_per_atom_type = {}
+        for atom_type in self.type_to_name:
+            candidates = [(identifier, info["bonds"])
+                          for identifier, info in self.molecules.items()
+                          if info["atom"] == atom_type]
+            if not candidates:
+                continue
+            candidates.sort(key=lambda c: len(c[1][0]) if c[1] is not None else -1)
+            molecules_per_atom_type[atom_type] = candidates
+        return molecules_per_atom_type
+
+    def _init_molecule_arrays(self):
+        """
+        Allocate the per-molecule arrays that are reused (and reset every frame)
+        while identifying molecules.
+
+        Returns
+        -------
+        molecule_mask : dict
+            Mask indicating, for each molecule identifier, which atoms belong to it.
+            Shape: (num_particles, ), dtype: bool.
+        molecule_bond_atoms : dict
+            For each molecule identifier, the indices of the atoms it is bonded to.
+            Shape: (num_particles, num_bonds_per_molecule), dtype: int.
+        """
+        molecule_mask = {}
+        molecule_bond_atoms = {}
+        for identifier, info in self.molecules.items():
+            molecule_mask[identifier] = np.zeros(self.num_particles, dtype=bool)
+            num_bonds = len(info["bonds"][0]) if info["bonds"] is not None else 0
+            molecule_bond_atoms[identifier] = np.zeros((self.num_particles, num_bonds), dtype=int)
+        return molecule_mask, molecule_bond_atoms
+
+    def _identify_molecules(self, molecules_per_atom_type, molecule_mask, molecule_bond_atoms,
+                             atom_types, bond_topology, bond_enum):
+        """
+        Update molecule_mask and molecule_bond_atoms in place for the current frame.
+
+        Parameters
+        ----------
+        molecules_per_atom_type : dict
+            Output of `_group_molecules_by_atom_type`.
+        molecule_mask : dict
+            Per-molecule atom mask to update, as allocated by `_init_molecule_arrays`.
+        molecule_bond_atoms : dict
+            Per-molecule bonded-atom indices to update, as allocated by `_init_molecule_arrays`.
+        atom_types : np.ndarray
+            Particle type of each atom in the current frame.
+        bond_topology : np.ndarray
+            (num_bonds, 2) array of atom index pairs for the current frame.
+        bond_enum : ovito.data.BondsEnumerator
+            Enumerator used to look up the bonds of a given atom.
+        """
+        for identifier in molecule_mask:
+            molecule_mask[identifier][:] = False
+            molecule_bond_atoms[identifier][:] = 0
+
+        for atom_type, candidates in molecules_per_atom_type.items():
+            atoms = np.where(atom_types == atom_type)[0]
+
+            # Sorting guarantees an unconstrained molecule, if registered, comes first.
+            unconstrained_identifier, bond_permutations = candidates[0]
+            if bond_permutations is None:
+                molecule_mask[unconstrained_identifier][atoms] = True
+                if len(candidates) == 1:
+                    continue
+
+            # Remaining candidates require a specific set of bonded neighbour types.
+            for atom in atoms:
+                bond_ids = list(bond_enum.bonds_of_particle(atom))
+                bonded_atoms = bond_topology[bond_ids].flatten()
+                other_atoms = bonded_atoms[bonded_atoms != atom]
+                other_types = list(atom_types[other_atoms])
+                for identifier, bond_permutations in candidates:
+                    if bond_permutations is not None and other_types in bond_permutations:
+                        molecule_mask[identifier][atom] = True
+                        molecule_bond_atoms[identifier][atom] = other_atoms
+
+    def _identify_bonds(self, bond_mask, bond_count, bond_topology, atom_types, molecule_mask):
+        """
+        Rebuild bond_mask in place for the current frame.
+
+        A bond matches a registered bond identifier if its endpoint types match
+        (in either order) and its endpoint atoms belong to the corresponding
+        registered molecules.
+
+        Parameters
+        ----------
+        bond_mask : dict
+            Mask indicating, for each bond identifier, which bonds in the current
+            frame belong to it. Populated in place. Shape: (num_bonds, ), dtype: bool.
+        bond_count : int
+            Number of bonds in the current frame.
+        bond_topology : np.ndarray
+            (num_bonds, 2) array of atom index pairs for the current frame.
+        atom_types : np.ndarray
+            Particle type of each atom in the current frame.
+        molecule_mask : dict
+            Per-molecule atom mask, as produced by `_identify_molecules`.
+        """
+        for identifier in self.bonds:
+            bond_mask[identifier] = np.zeros(bond_count, dtype=bool)
+
+        for bond_id, (atom_a, atom_b) in enumerate(bond_topology):
+            type_a = atom_types[atom_a]
+            type_b = atom_types[atom_b]
+            for identifier, bond_info in self.bonds.items():
+                type_A, type_B = bond_info["bond"]
+                mol_A, mol_B = bond_info["mol_A"], bond_info["mol_B"]
+                if type_a == type_A and type_b == type_B:
+                    atom_in_A, atom_in_B = atom_a, atom_b
+                elif type_a == type_B and type_b == type_A:
+                    atom_in_A, atom_in_B = atom_b, atom_a
+                else:
+                    continue
+                if molecule_mask[mol_A][atom_in_A] and molecule_mask[mol_B][atom_in_B]:
+                    bond_mask[identifier][bond_id] = True
+
     def sample_helper(self):
         """
         Helper function to perform the sampling process.
@@ -666,7 +803,6 @@ class Sample:
         from ovito.data import BondsEnumerator
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
-
         # Load trajectory
         self.pipeline = import_file(self.trajectory_file)
         if self.bond_file:
@@ -674,30 +810,9 @@ class Sample:
             bond_modifier.source.load(self.bond_file)
             self.pipeline.modifiers.append(bond_modifier)
 
-        # Prepare molecule indexing
-        # Example: for one atom type: [('O', None), ('O()', [[]]), ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
-        molecules_per_atom_type = {}
-        for atom_type in self.type_to_name:
-            molecules_per_atom_type[atom_type] = []
-            for identifier in self.molecules:
-                if self.molecules[identifier]["atom"] == atom_type:
-                    bonds = self.molecules[identifier]["bonds"]
-                    molecules_per_atom_type[atom_type].append((identifier, bonds))
-            # Sort molecules: first those without bond constraints, then by increasing number of bond constraints
-            molecules_per_atom_type[atom_type].sort(key=lambda x: len(x[1][0]) if x[1] is not None else -1)
-            # Remove atom types without registered molecules
-            if not molecules_per_atom_type[atom_type]:
-                molecules_per_atom_type.pop(atom_type)
-        molecule_idx = {} # Mask, that indicates for each molecule, which atoms belong to it. Shape: (num_particles, ) type: bool
-        molecule_bonds = {} # Mapping of molecule to the id of atoms it is bonded to. Shape: (num_particles, num_bonds_per_molecule) type: int
-        for identifier in self.molecules:
-            molecule_idx[identifier] = np.zeros(self.num_particles, dtype=bool)
-            if self.molecules[identifier]["bonds"] is not None:
-                molecule_bonds[identifier] = np.zeros((self.num_particles, len(self.molecules[identifier]["bonds"][0]), ), dtype=int)
-            else:
-                molecule_bonds[identifier] = np.zeros((self.num_particles, 0, ), )
-
-        bond_idx = {}
+        molecules_per_atom_type = self._group_molecules_by_atom_type()
+        molecule_mask, molecule_bond_atoms = self._init_molecule_arrays()
+        bond_mask = {}
 
         # Loop over frames
         for frame_idx in self.frames:
@@ -708,65 +823,18 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
-            # Molecule information
-            # Reset molecule indices
-            for mol in molecule_idx:
-                molecule_idx[mol][:] = 0
-                molecule_bonds[mol][:] = 0
+            self._identify_molecules(molecules_per_atom_type, molecule_mask, molecule_bond_atoms,
+                                      atom_types, bond_topology, bond_enum)
+            self._identify_bonds(bond_mask, bond_count, bond_topology, atom_types, molecule_mask)
 
-            # Identify molecules
-            for atom_type in molecules_per_atom_type:
-                atoms = np.where(atom_types == atom_type)[0]
-                # Molecule registered without bond constraints; it is first because of sorting
-                if molecules_per_atom_type[atom_type][0][1] is None:
-                    molecule_idx[molecules_per_atom_type[atom_type][0][0]][atoms] = 1
-                    # No other molecules of this atom type
-                    if len(molecules_per_atom_type[atom_type]) == 1:
-                        continue
-                # Atom with bond constraints
-                for atom in atoms:
-                    bonds = list(bond_enum.bonds_of_particle(atom))
-                    particles = bond_topology[bonds].flatten()
-                    other_particles = particles[particles != atom]
-                    other_types = list(atom_types[other_particles])
-                    for identifier, bond_permutations in molecules_per_atom_type[atom_type]:
-                        if bond_permutations is not None and other_types in bond_permutations:
-                            molecule_idx[identifier][atom] = 1
-                            molecule_bonds[identifier][atom] = other_particles
-
-            # Bond information
-            # Reset bond indices
-            for identifier in self.bonds:
-                bond_idx[identifier] = np.zeros(bond_count, dtype=bool)
-
-            # Identify bonds
-            for bond_id, bond in enumerate(bond_topology):
-                atom_a = bond[0]
-                atom_b = bond[1]
-                type_a = atom_types[atom_a]
-                type_b = atom_types[atom_b]
-                for identifier in self.bonds:
-                    bond_info = self.bonds[identifier]
-                    bond_def = bond_info["bond"]
-                    mol_A = bond_info["mol_A"]
-                    mol_B = bond_info["mol_B"]
-                    if ((type_a == bond_def[0] and type_b == bond_def[1])):
-                        if molecule_idx[mol_A][atom_a] and molecule_idx[mol_B][atom_b]:
-                            bond_idx[identifier][bond_id] = 1
-                    elif ((type_a == bond_def[1] and type_b == bond_def[0])):
-                        if molecule_idx[mol_A][atom_b] and molecule_idx[mol_B][atom_a]:
-                            bond_idx[identifier][bond_id] = 1
-
-            # Calculate positions in transformed coordinates
-            positions = frame.particles.positions.array
-            positions_transformed = self._transform_positions(positions)
+            positions_transformed = self._transform_positions(frame.particles.positions.array)
 
             # Sampling
             for sampler in self.samplers:
                 sampler.sample(frame_id=frame_idx-self.start_frame,
-                               mol_index=molecule_idx,
-                               mol_bonds=molecule_bonds,
-                               bond_mask=bond_idx,
+                               molecule_mask=molecule_mask,
+                               molecule_bond_atoms=molecule_bond_atoms,
+                               bond_mask=bond_mask,
                                frame=frame,
                                bond_enum=bond_enum,
                                positions_transformed=positions_transformed
