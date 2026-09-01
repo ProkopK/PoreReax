@@ -3,6 +3,8 @@ name: Build and Deploy Docs
 on:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -10,8 +12,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -19,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Set up Python
         run: uv python install 3.12
       - name: Install docs dependencies
@@ -27,12 +31,14 @@ jobs:
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build
       - name: Upload documentation
+        if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/build
 
   deploy:
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -84,5 +84,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# uv
-*.lock
+.ruff_cache/

@@ -54,7 +54,7 @@ Issues = "https://github.com/ProkopK/PoreReax/issues"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = "-ra -q --cov=src/porereax --cov-report=term-missing"
+addopts = "-ra -q --cov=src/porereax --cov-report=term-missing --cov-report=xml"
 
 [tool.coverage.run]
 source = ["src/porereax"]
