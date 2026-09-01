@@ -32,7 +32,7 @@ jobs:
         run: uv run sphinx-build -b html docs/source docs/build
       - name: Upload documentation
         if: github.event_name == 'push'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/build
 
