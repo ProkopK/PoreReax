@@ -66,6 +66,7 @@ skip_covered = false
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+extend-exclude = ["src/porereax/templates"]
 
 [tool.ruff.lint]
 select = [
@@ -74,6 +75,8 @@ select = [
     "I",   # isort (import sorting)
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
 ]
 ignore = []
 

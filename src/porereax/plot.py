@@ -1,18 +1,29 @@
 """
 Module for plotting sampled data.
 
-The module provides functions to plot histograms, time series, and 2D density data from sampled data.
+The module provides functions to plot histograms, time series, and 2D density
+data from sampled data.
 """
 
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 import porereax.utils as utils
 
 
-def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data: np.ndarray, color: str, plot_kwargs: dict, std_data: np.ndarray | None = None, mean_data: float | None = None, mean_std: float | None = None):
+def _plot_one_line(
+    axis: Axes,
+    identifier: str,
+    bin_edges: np.ndarray,
+    hist_data: np.ndarray,
+    color: str,
+    plot_kwargs: dict,
+    std_data: np.ndarray | None = None,
+    mean_data: float | None = None,
+    mean_std: float | None = None,
+):
     """
     Plot a histogram curve on the given axis.
 
@@ -44,11 +55,7 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
     if std_data is not None:
         upper_bound = hist_data + std_data
         lower_bound = hist_data - std_data
-        axis.fill_between(bin_centers,
-            lower_bound,
-            upper_bound,
-            color=color,
-            alpha=0.3)
+        axis.fill_between(bin_centers, lower_bound, upper_bound, color=color, alpha=0.3)
     if mean_data is not None:
         axis.axvline(mean_data, linestyle="--", color=color, label=f"Mean {identifier}")
     if mean_std is not None and mean_data is not None:
@@ -57,12 +64,14 @@ def _plot_one_line(axis: Axes, identifier: str, bin_edges: np.ndarray, hist_data
             mean_data - mean_std,
             mean_data + mean_std,
             color=color,
-            alpha=0.2
+            alpha=0.2,
         )
+
 
 def _plot_parameters(input_params: dict, mean: bool, density: bool):
     """
-    Determine the appropriate x and y labels, density normalization, and flags for mean and density based on the sampler type and dimension.
+    Determine the appropriate x and y labels, density normalization, and flags
+    for mean and density based on the sampler type and dimension.
 
     Parameters
     ----------
@@ -103,7 +112,11 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
         else:
             y_label = "Counts"
         density_normalization = "num_bonds"
-    elif sampler_type == "BondDensitySampler" or sampler_type == "DensitySampler" or sampler_type == "ReactionSampler":
+    elif (
+        sampler_type == "BondDensitySampler"
+        or sampler_type == "DensitySampler"
+        or sampler_type == "ReactionSampler"
+    ):
         x_label = f"{input_params['direction']} Position / nm"
         y_label = "Density / atoms"
         density_normalization = None
@@ -116,12 +129,25 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
         mean = False
         density = False
     else:
-        raise ValueError(f"Plotting is not implemented for sampler type {sampler_type} with dimension {input_params['dimension']}.")
+        raise ValueError(
+            f"Plotting is not implemented for sampler type {sampler_type} "
+            f"with dimension {input_params['dimension']}."
+        )
 
     return x_label, y_label, density_normalization, mean, density
 
 
-def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, colors: list, std: bool, mean: bool, density: bool, plot_kwargs: dict):
+def _plot_hist(
+    axis: Axes,
+    data: dict,
+    input_params: dict,
+    identifiers: list,
+    colors: list,
+    std: bool,
+    mean: bool,
+    density: bool,
+    plot_kwargs: dict,
+):
     """
     Plot histograms for the given identifiers on the provided axis.
 
@@ -146,7 +172,9 @@ def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, co
     plot_kwargs : dict
         Additional keyword arguments for the plot function.
     """
-    x_label, y_label, density_normalization, mean, density = _plot_parameters(input_params, mean, density)
+    x_label, y_label, density_normalization, mean, density = _plot_parameters(
+        input_params, mean, density
+    )
 
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
@@ -159,11 +187,24 @@ def _plot_hist(axis: Axes, data: dict, input_params: dict, identifiers: list, co
         hist_std = data[identifier]["hist_std"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
         mean_std = data[identifier]["mean_std"] if std and mean else None
-        _plot_one_line(axis, identifier, bin_edges, hist, colors[i % len(colors)], plot_kwargs, hist_std, mean_value, mean_std)
+        _plot_one_line(
+            axis,
+            identifier,
+            bin_edges,
+            hist,
+            colors[i % len(colors)],
+            plot_kwargs,
+            hist_std,
+            mean_value,
+            mean_std,
+        )
     axis.set_xlabel(x_label)
     axis.set_ylabel(y_label)
 
-def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwargs: dict):
+
+def _plot_2d(
+    axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwargs: dict
+):
     """
     Plot 2D density data for the given identifier on the provided axis.
 
@@ -193,18 +234,23 @@ def _plot_2d(axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwar
     if transpose:
         X, Y = Y, X
     c = axis.pcolormesh(X, Y, hist.T, shading=shading, **plot_kwargs)
-    plt.colorbar(c, ax=axis, label='Density / Counts per frame')
-    unit_x = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][0]]
-    unit_y = ['nm', 'nm', 'nm', 'nm', 'rad', 'nm', 'nm'][density_data['direction'][1]]
-    x_label = ['x','y','z','r',r'$\phi$','z','d'][density_data['direction'][0]] + f" / {unit_x}"
-    y_label = ['x','y','z','r',r'$\phi$','z','d'][density_data['direction'][1]] + f" / {unit_y}"
+    plt.colorbar(c, ax=axis, label="Density / Counts per frame")
+    unit_x = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][0]]
+    unit_y = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][1]]
+    x_label = ["x", "y", "z", "r", r"$\phi$", "z", "d"][
+        density_data["direction"][0]
+    ] + f" / {unit_x}"
+    y_label = ["x", "y", "z", "r", r"$\phi$", "z", "d"][
+        density_data["direction"][1]
+    ] + f" / {unit_y}"
     if transpose:
         axis.set_xlabel(y_label)
         axis.set_ylabel(x_label)
     else:
         axis.set_xlabel(x_label)
         axis.set_ylabel(y_label)
-    axis.set_aspect('equal', adjustable='box')
+    axis.set_aspect("equal", adjustable="box")
+
 
 def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
     """
@@ -228,12 +274,15 @@ def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int)
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
         time_data = data[identifier]
-        time_points = np.arange(0, time_data["num_frames"] * dt, dt) / 1000  # Convert to ps
+        time_points = (
+            np.arange(0, time_data["num_frames"] * dt, dt) / 1000
+        )  # Convert to ps
         density_data = time_data["densities"]
         color = colors[i % len(colors)] if colors else None
         axis.plot(time_points, density_data, label=identifier, color=color)
     axis.set_xlabel("Time / ps")
     axis.set_ylabel("Counts per Frame")
+
 
 def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     """
@@ -258,21 +307,38 @@ def _plot_mol_structure(axis: Axes, data: dict, identifier: str):
     axis.xaxis.set_tick_params(rotation=90)
     axis.set_ylabel("Average Count per Frame")
 
-def plot_data(link_data: str, axis: Axes | None = None, identifiers: list = [], colors: list = [], std: bool = False, mean: bool = False, density: bool = False, dt: int = 50, transpose: bool = False, plot_kwargs_1d: dict = {}, plot_kwargs_2d: dict = {}) -> tuple[Figure | None, Axes]:
+
+def plot_data(
+    link_data: str,
+    axis: Axes | None = None,
+    identifiers: list | None = None,
+    colors: list | None = None,
+    std: bool = False,
+    mean: bool = False,
+    density: bool = False,
+    dt: int = 50,
+    transpose: bool = False,
+    plot_kwargs_1d: dict | None = None,
+    plot_kwargs_2d: dict | None = None,
+) -> tuple[Figure | None, Axes]:
     """
     Plot sampled data from a data file.
-    All types of samplers are supported. Depending on the sampler type and dimension, different types of plots will be generated.
+    All types of samplers are supported. Depending on the sampler type and
+    dimension, different types of plots will be generated.
 
     Parameters
     ----------
     link_data : str
         Path to the data file created by a sampler instance.
     axis : matplotlib.axes.Axes, optional
-        Axis to plot on. If None, a new figure and axis will be created (default is None).
+        Axis to plot on. If None, a new figure and axis will be created
+        (default is None).
     identifiers : list, optional
-        List of identifiers to plot. If empty, all identifiers will be plotted (default is []).
+        List of identifiers to plot. If empty, all identifiers will be plotted
+        (default is None).
     colors : list, optional
-        List of colors to use for plotting. If empty, default colors will be used (default is []).
+        List of colors to use for plotting. If empty, default colors will be
+        used (default is None).
     std : bool, optional
         Whether to plot standard deviation shading (default is False).
     mean : bool, optional
@@ -284,15 +350,19 @@ def plot_data(link_data: str, axis: Axes | None = None, identifiers: list = [], 
     transpose : bool, optional
         Whether to transpose the axes for 2D density plots (default is False).
     plot_kwargs_1d : dict, optional
-        Additional keyword arguments for 1D plots (default is {}).
+        Additional keyword arguments for 1D plots (default is None).
     plot_kwargs_2d : dict, optional
-        Additional keyword arguments for 2D plots (default is {}).
+        Additional keyword arguments for 2D plots (default is None).
 
     Returns
     -------
     tuple
-        A tuple containing the figure and axis objects. If an axis was provided, the figure will be None.
+        A tuple containing the figure and axis objects. If an axis was
+        provided, the figure will be None.
     """
+    plot_kwargs_1d = plot_kwargs_1d if plot_kwargs_1d is not None else {}
+    plot_kwargs_2d = plot_kwargs_2d if plot_kwargs_2d is not None else {}
+
     data = utils.load_object(link_data)
     input_params = data.pop("input_params", None)
     sampler_type = input_params["sampler_type"]
@@ -302,16 +372,37 @@ def plot_data(link_data: str, axis: Axes | None = None, identifiers: list = [], 
     else:
         fig = None
         ax = axis
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if not colors else colors
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"] if not colors else colors
     identifiers = identifiers if identifiers else list(data.keys())
 
     if sampler_type == "MoleculeStructureSampler":
-        _plot_mol_structure(ax, data, identifiers[0] if identifiers else list(data.keys())[0])
+        _plot_mol_structure(
+            ax, data, identifiers[0] if identifiers else next(iter(data.keys()))
+        )
     elif input_params["dimension"] == "Time":
         _plot_time(ax, data, identifiers, colors, dt)
-    elif input_params["dimension"] == "Cartesian2D" or input_params["dimension"] == "Pore2D":
-        _plot_2d(ax, data, identifiers[0] if identifiers else list(data.keys())[0], transpose, plot_kwargs_2d)
+    elif (
+        input_params["dimension"] == "Cartesian2D"
+        or input_params["dimension"] == "Pore2D"
+    ):
+        _plot_2d(
+            ax,
+            data,
+            identifiers[0] if identifiers else next(iter(data.keys())),
+            transpose,
+            plot_kwargs_2d,
+        )
     else:
-        _plot_hist(ax, data, input_params, identifiers, colors, std, mean, density, plot_kwargs_1d)
+        _plot_hist(
+            ax,
+            data,
+            input_params,
+            identifiers,
+            colors,
+            std,
+            mean,
+            density,
+            plot_kwargs_1d,
+        )
 
     return fig, ax

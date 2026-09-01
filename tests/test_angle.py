@@ -1,8 +1,4 @@
 import pytest
-import warnings
-
-from porereax.sample import Sample
-from pathlib import Path
 
 atoms = [{"atom": "O", "bonds": ["H", "H"]}, {"atom": "O", "bonds": ["Si", "H"]}]
 

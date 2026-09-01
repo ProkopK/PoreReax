@@ -1,9 +1,10 @@
-import pytest
 import warnings
+from pathlib import Path
+
+import pytest
+from conftest import assert_sample_object_files
 
 from porereax.sample import Sample
-from conftest import assert_sample_object_files
-from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 atom_lib = {"Si": 1, "O": 2, "H": 3}
@@ -24,7 +25,7 @@ pairs = [({"atom": "O", "bonds": ["Si", "H"]}, {"atom": "O", "bonds": ["H", "H"]
 
 
 def test_sample_initialization():
-    sampler = Sample(
+    Sample(
         atom_lib=atom_lib,
         masses=masses,
         trajectory_file=traj_file,
@@ -33,7 +34,7 @@ def test_sample_initialization():
 
 
 def test_sample_initialization_with_system_yaml():
-    sampler = Sample(
+    Sample(
         atom_lib=atom_lib,
         masses=masses,
         trajectory_file=traj_file,
@@ -165,7 +166,9 @@ def test_sample_sampling_parallel(
         assert_sample_object_files(path + f"/{file_name}", TEST_DATA_DIR / file_name)
 
 
-def test_sample_sampling_serial(full_sampler_with_path, list_of_sample_object_file_names):
+def test_sample_sampling_serial(
+    full_sampler_with_path, list_of_sample_object_file_names
+):
     warnings.filterwarnings("ignore", message=".*OVITO.*PyPI")
     full_sampler, path = full_sampler_with_path
     full_sampler.sample(is_parallel=False)
@@ -174,6 +177,7 @@ def test_sample_sampling_serial(full_sampler_with_path, list_of_sample_object_fi
         assert_sample_object_files(
             path + f"/{file_name}", TEST_DATA_DIR / file_name, check_for_std=False
         )
+
 
 # System dependent tests
 # def test_sample_ovito_conflicts(tmp_path):

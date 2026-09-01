@@ -9,22 +9,22 @@ sampling parameters, and execute the sampling process either in parallel or
 serially.
 """
 
-import numpy as np
 import multiprocessing as mp
 import os
 import sys
-import porereax.utils as utils
-
 from collections.abc import Callable
+
+import numpy as np
 from numpy.typing import NDArray
-from porereax.charge import ChargeSampler
-from porereax.density import DensitySampler, BondDensitySampler, ReactionSampler
+
+import porereax.utils as utils
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
+from porereax.charge import ChargeSampler
+from porereax.density import BondDensitySampler, DensitySampler, ReactionSampler
+from porereax.meta_sampler import Sampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
-from porereax.meta_sampler import Sampler
-
 
 type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
 
@@ -34,7 +34,15 @@ class Sample:
     Class to manage sampling of molecular trajectories.
     """
 
-    def __init__(self, atom_lib, masses, trajectory_file, bond_file=None, system=None, start_end_nthframe=(0, -1, 1)):
+    def __init__(
+        self,
+        atom_lib,
+        masses,
+        trajectory_file,
+        bond_file=None,
+        system=None,
+        start_end_nthframe=(0, -1, 1),
+    ):
         """
         Initialize Sample instance.
 
@@ -67,18 +75,51 @@ class Sample:
                 raise RuntimeError(
                     "The 'ovito' module is already imported. Please remove it from the "
                     "loaded modules to avoid conflicts during parallel processing. "
-                    "This is necessary because the OS does not support the 'spawn' start method."
+                    "This is necessary because the OS does not support the "
+                    "'spawn' start method."
                 )
         with ctx.Pool(1) as pool:
-            num_particles, num_frames, box = pool.apply_async(self.get_trajectory_data, (trajectory_file, bond_file, atom_lib, )).get()
+            num_particles, num_frames, box = pool.apply_async(
+                self.get_trajectory_data,
+                (
+                    trajectory_file,
+                    bond_file,
+                    atom_lib,
+                ),
+            ).get()
 
         print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
 
         start_frame, end_frame, nth_frame = start_end_nthframe
 
-        self.init_helper(atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box)
+        self.init_helper(
+            atom_lib,
+            masses,
+            trajectory_file,
+            bond_file,
+            system,
+            start_frame,
+            end_frame,
+            nth_frame,
+            num_particles,
+            num_frames,
+            box,
+        )
 
-    def init_helper(self, atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box):
+    def init_helper(
+        self,
+        atom_lib,
+        masses,
+        trajectory_file,
+        bond_file,
+        system,
+        start_frame,
+        end_frame,
+        nth_frame,
+        num_particles,
+        num_frames,
+        box,
+    ):
         """
         Helper function to initialize Sample instance.
 
@@ -109,27 +150,44 @@ class Sample:
         """
         self.trajectory_file = os.path.abspath(trajectory_file)
         self.bond_file = os.path.abspath(bond_file) if bond_file else None
-        self.system = system # is only used to pass to the subprocesses
+        self.system = system  # is only used to pass to the subprocesses
 
-        self.sampler_inputs = {"charge_samplers": [],
-                               "density_samplers": [],
-                               "bond_density_samplers": [],
-                               "angle_samplers": [],
-                               "bond_length_samplers": [],
-                               "molecule_structure_samplers": [],
-                               "rdf_samplers": [],
-                               "reaction_samplers": [],
-                               }
+        self.sampler_inputs = {
+            "charge_samplers": [],
+            "density_samplers": [],
+            "bond_density_samplers": [],
+            "angle_samplers": [],
+            "bond_length_samplers": [],
+            "molecule_structure_samplers": [],
+            "rdf_samplers": [],
+            "reaction_samplers": [],
+        }
         # Registry mapping sampler_inputs key -> (SamplerClass, kind, extra_kwarg_keys)
         self._SAMPLER_REGISTRY = {
-            "charge_samplers":            (ChargeSampler,           "atom", ["atoms", "range"]),
-            "density_samplers":           (DensitySampler,          "atom", ["atoms", "num_bins", "direction", "conditions"]),
-            "bond_density_samplers":      (BondDensitySampler,      "bond", ["bonds", "num_bins", "direction", "conditions"]),
-            "angle_samplers":             (AngleSampler,            "atom", ["atoms", "num_bins", "angle"]),
-            "bond_length_samplers":       (BondLengthSampler,       "bond", ["bonds", "num_bins", "range"]),
-            "molecule_structure_samplers":(MoleculeStructureSampler,"atom", []),
-            "rdf_samplers":               (RdfSampler,              "atom", ["pairs", "num_bins", "r_max"]),
-            "reaction_samplers":          (ReactionSampler,         "atom", ["reactions", "num_bins", "direction", "position"]),
+            "charge_samplers": (ChargeSampler, "atom", ["atoms", "range"]),
+            "density_samplers": (
+                DensitySampler,
+                "atom",
+                ["atoms", "num_bins", "direction", "conditions"],
+            ),
+            "bond_density_samplers": (
+                BondDensitySampler,
+                "bond",
+                ["bonds", "num_bins", "direction", "conditions"],
+            ),
+            "angle_samplers": (AngleSampler, "atom", ["atoms", "num_bins", "angle"]),
+            "bond_length_samplers": (
+                BondLengthSampler,
+                "bond",
+                ["bonds", "num_bins", "range"],
+            ),
+            "molecule_structure_samplers": (MoleculeStructureSampler, "atom", []),
+            "rdf_samplers": (RdfSampler, "atom", ["pairs", "num_bins", "r_max"]),
+            "reaction_samplers": (
+                ReactionSampler,
+                "atom",
+                ["reactions", "num_bins", "direction", "position"],
+            ),
         }
 
         self.samplers: list[Sampler] = []
@@ -138,9 +196,15 @@ class Sample:
 
         # Check atom library
         if not isinstance(atom_lib, dict):
-            raise TypeError("atom_lib must be a dictionary mapping atom names to types.")
-        if len(atom_lib) != len(set(atom_lib.values())) or len(atom_lib) != len(set(atom_lib.keys())):
-            raise ValueError("atom_lib must have a one-to-one mapping of atom names to types.")
+            raise TypeError(
+                "atom_lib must be a dictionary mapping atom names to types."
+            )
+        if len(atom_lib) != len(set(atom_lib.values())) or len(atom_lib) != len(
+            set(atom_lib.keys())
+        ):
+            raise ValueError(
+                "atom_lib must have a one-to-one mapping of atom names to types."
+            )
         self.type_to_name = {v: k for k, v in atom_lib.items()}
         self.name_to_type = atom_lib
 
@@ -152,8 +216,18 @@ class Sample:
         self.masses = masses
 
         # Validate start and end frame values
-        if (start_frame < 0) or (end_frame < -1) or (start_frame > end_frame and end_frame != -1) or (start_frame >= num_frames) or (end_frame >= num_frames):
-            raise ValueError(f"Invalid start_end frame range. The trajectory has {num_frames} frames and the provided range is ({start_frame}, {end_frame}).")
+        if (
+            (start_frame < 0)
+            or (end_frame < -1)
+            or (start_frame > end_frame and end_frame != -1)
+            or (start_frame >= num_frames)
+            or (end_frame >= num_frames)
+        ):
+            raise ValueError(
+                f"Invalid start_end frame range. The trajectory has "
+                f"{num_frames} frames and the provided range is "
+                f"({start_frame}, {end_frame})."
+            )
 
         self.start_frame = start_frame
         self.end_frame = end_frame if end_frame != -1 else num_frames - 1
@@ -190,6 +264,7 @@ class Sample:
         """
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
+
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
@@ -208,15 +283,24 @@ class Sample:
         if first_frame.particles.count == 0:
             raise ValueError("No particles found in the trajectory file.")
         if first_frame.particles.bonds is None:
-            raise ValueError("No bonds found. Ensure bond_file is provided or the trajectory contains bond data.")
+            raise ValueError(
+                "No bonds found. Ensure bond_file is provided or the "
+                "trajectory contains bond data."
+            )
         type_set = set(first_frame.particles.particle_types.array)
         atom_type_set = set(atom_lib.values())
         if type_set != atom_type_set:
-            raise ValueError(f"Atom types in trajectory {type_set} do not match those in atom_lib {atom_type_set}.")
+            raise ValueError(
+                f"Atom types in trajectory {type_set} do not match those in "
+                f"atom_lib {atom_type_set}."
+            )
 
         num_particles = first_frame.particles.count
         if pipeline.source is None:
-            raise ValueError("Pipeline source is None. Make sure the trajectory file is valid and contains frames.")
+            raise ValueError(
+                "Pipeline source is None. Make sure the trajectory file is "
+                "valid and contains frames."
+            )
         num_frames = pipeline.source.num_frames
         box = np.diagonal(first_frame.cell.matrix)
 
@@ -225,66 +309,107 @@ class Sample:
     # --------------------------- Add Sampler Methods ---------------------------
     def add_molecule_structure_sampling(self, name_out: str, region: Region = "Box"):
         """
-        Add sampling for molecule structures to analyse the bonding of atoms and identify substructures.
+        Add sampling for molecule structures to analyse the bonding of atoms
+        and identify substructures.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         """
         dimension = "MoleculeStructure"
-        inputs = {"name_out": name_out,
-                  "dimension": dimension,
-                  "region": region,}
+        inputs = {
+            "name_out": name_out,
+            "dimension": dimension,
+            "region": region,
+        }
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
-    def add_charge_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", range=(-2.0, 2.0)):
+    def add_charge_sampling(
+        self,
+        name_out: str,
+        atoms: list[dict],
+        region: Region = "Box",
+        range=(-2.0, 2.0),
+    ):
         """
-        Add sampling for charge distribution of the central atom in the specified atom structures.
+        Add sampling for charge distribution of the central atom in the
+        specified atom structures.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         atoms : list
-            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
-            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
+            List of atom structures to sample. Each atom structure is defined
+            as a dictionary in the format: {"atom": "a", "bonds": [b, b, c,
+            ...]}, where a is the central atom and b, c, ... are the bonded
+            atoms. With a, b, c being atom identifiers. The order of atoms in
+            the "bonds" list does not matter. The "bonds" list can be empty
+            to indicate that the atom is not bonded to any other atoms. If
+            the dictionary does not contain the "bonds" key, every atom of
+            type a will be sampled regardless of its bonding environment.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         range : tuple, optional
-            Range (min, max) in e for which to compute the histogram. Default is (-2.0, 2.0).
+            Range (min, max) in e for which to compute the histogram. Default
+            is (-2.0, 2.0).
         """
         dimension = "Histogram"
-        inputs = {"name_out": name_out,
-                  "atoms": atoms,
-                  "dimension": dimension,
-                  "region": region,
-                  "range": range,}
+        inputs = {
+            "name_out": name_out,
+            "atoms": atoms,
+            "dimension": dimension,
+            "region": region,
+            "range": range,
+        }
         self.sampler_inputs["charge_samplers"].append(inputs)
 
-    def add_density_sampling(self, name_out: str, atoms: list[dict], dimension: str, region: Region = "Box", num_bins=200, direction="z", conditions={}):
+    def add_density_sampling(
+        self,
+        name_out: str,
+        atoms: list[dict],
+        dimension: str,
+        region: Region = "Box",
+        num_bins=200,
+        direction="z",
+        conditions: dict | None = None,
+    ):
         """
-        Add sampling for time or position density distribution of the specified atom structures. For positional sampling the position of the central atom is used.
+        Add sampling for time or position density distribution of the
+        specified atom structures. For positional sampling the position of
+        the central atom is used.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         atoms : list
-            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
-            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
+            List of atom structures to sample. Each atom structure is defined
+            as a dictionary in the format: {"atom": "a", "bonds": [b, b, c,
+            ...]}, where a is the central atom and b, c, ... are the bonded
+            atoms. With a, b, c being atom identifiers. The order of atoms in
+            the "bonds" list does not matter. The "bonds" list can be empty
+            to indicate that the atom is not bonded to any other atoms. If
+            the dictionary does not contain the "bonds" key, every atom of
+            type a will be sampled regardless of its bonding environment.
         dimension : str
             Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
             - "Time": Samples the amount of atom structures over time.
-            - "Cartesian1D": Samples the amount of atom structures along a specified direction (x, y, or z) in the simulation box.
-            - "Cartesian2D": Samples the amount of atom structures in a 2D plane (xy, xz, or yz) in the simulation box.
+            - "Cartesian1D": Samples the amount of atom structures along a
+              specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of atom structures in a 2D
+              plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Not used for time sampling.
         direction : str, optional
@@ -294,67 +419,114 @@ class Sample:
         conditions : dict, optional
             Dictionary of conditions to filter atoms during sampling.
             Supported conditions:
-            - "Charge": tuple (min_charge, max_charge) to filter atoms by charge.
-            - "Angle": tuple (min_angle, max_angle) to filter atoms by angle formed with bonded atoms.
+            - "Charge": tuple (min_charge, max_charge) to filter atoms by
+              charge.
+            - "Angle": tuple (min_angle, max_angle) to filter atoms by angle
+              formed with bonded atoms.
         """
-        inputs = {"name_out": name_out,
-                  "atoms": atoms,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "direction": direction,
-                  "conditions": conditions,}
+        inputs = {
+            "name_out": name_out,
+            "atoms": atoms,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "direction": direction,
+            "conditions": conditions if conditions is not None else {},
+        }
         self.sampler_inputs["density_samplers"].append(inputs)
 
-    def add_angle_sampling(self, name_out: str, atoms: list[dict], region: Region = "Box", num_bins=180, angle="all"):
+    def add_angle_sampling(
+        self,
+        name_out: str,
+        atoms: list[dict],
+        region: Region = "Box",
+        num_bins=180,
+        angle="all",
+    ):
         """
-        Add sampling for angle distribution of the specified atom structures. The angle is defined by the central atom and its bonded atoms. 
+        Add sampling for angle distribution of the specified atom structures.
+        The angle is defined by the central atom and its bonded atoms.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         atoms : list
-            List of atom structures to sample. Each atom structure is defined as a dictionary in the format:
-            {"atom": "a", "bonds": [b, b, c, ...]}, where a is the central atom and b, c, ... are the bonded atoms. With a, b, c being atom identifiers. The order of atoms in the "bonds" list does not matter. The "bonds" list can be empty to indicate that the atom is not bonded to any other atoms. If the dictionary does not contain the "bonds" key, every atom of type a will be sampled regardless of its bonding environment.
+            List of atom structures to sample. Each atom structure is defined
+            as a dictionary in the format: {"atom": "a", "bonds": [b, b, c,
+            ...]}, where a is the central atom and b, c, ... are the bonded
+            atoms. With a, b, c being atom identifiers. The order of atoms in
+            the "bonds" list does not matter. The "bonds" list can be empty
+            to indicate that the atom is not bonded to any other atoms. If
+            the dictionary does not contain the "bonds" key, every atom of
+            type a will be sampled regardless of its bonding environment.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 180.
         angle : str, optional
             Angle of interested atoms. Supported: "all", "a-b-c"
-            - "all": Samples all angles formed by the central atom and all of its bonded atoms.
-            - "a-b-c": Samples only the angle formed by the central atom (b) and two specific bonded atoms (a and c), regardless of other bonded atoms d, ... With a, b, c being atom identifiers. 
+            - "all": Samples all angles formed by the central atom and all of
+              its bonded atoms.
+            - "a-b-c": Samples only the angle formed by the central atom (b)
+              and two specific bonded atoms (a and c), regardless of other
+              bonded atoms d, ... With a, b, c being atom identifiers.
         """
         dimension = "Histogram"
-        inputs = {"name_out": name_out,
-                  "atoms": atoms,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "angle": angle,}
+        inputs = {
+            "name_out": name_out,
+            "atoms": atoms,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "angle": angle,
+        }
         self.sampler_inputs["angle_samplers"].append(inputs)
 
-    def add_bond_density_sampling(self, name_out: str, bonds: list[dict], dimension: str, region: Region = "Box", num_bins=200, direction="z", conditions={}):
+    def add_bond_density_sampling(
+        self,
+        name_out: str,
+        bonds: list[dict],
+        dimension: str,
+        region: Region = "Box",
+        num_bins=200,
+        direction="z",
+        conditions: dict | None = None,
+    ):
         """
-        Add sampling for time or position density distribution of the specified bonds. For positional sampling the position of the bond center is used.
+        Add sampling for time or position density distribution of the
+        specified bonds. For positional sampling the position of the bond
+        center is used.
 
         Parameters
         ----------
         name_out : str
             Name of the output directory and object file of the sampler data
         bonds : list
-            List of bonds to sample. Each bond is defined as a dictionary in the format:
-            {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d, ...]}, where a and b are the bonded atoms, and c, d, ... are the atoms bonded to A and B, respectively. With a, b, c, d being atom identifiers. Atom b/a does not need to be added to the "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and "bonds_B" lists does not matter. The "bonds_A" and "bonds_B" lists can be empty to indicate that the atoms a and b are not bonded to any other atoms. If the dictionary does not contain the "bonds_A" or "bonds_B" keys, every bond of type a-b will be sampled regardless of its bonding environment.
+            List of bonds to sample. Each bond is defined as a dictionary in
+            the format: {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d,
+            ...]}, where a and b are the bonded atoms, and c, d, ... are the
+            atoms bonded to A and B, respectively. With a, b, c, d being atom
+            identifiers. Atom b/a does not need to be added to the
+            "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and
+            "bonds_B" lists does not matter. The "bonds_A" and "bonds_B"
+            lists can be empty to indicate that the atoms a and b are not
+            bonded to any other atoms. If the dictionary does not contain the
+            "bonds_A" or "bonds_B" keys, every bond of type a-b will be
+            sampled regardless of its bonding environment.
         dimension : str
             Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
             - "Time": Samples the amount of the specified bonds over time.
-            - "Cartesian1D": Samples the amount of the specified bonds along a specified direction (x, y, or z) in the simulation box.
-            - "Cartesian2D": Samples the amount of the specified bonds in a 2D plane (xy, xz, or yz) in the simulation box.
+            - "Cartesian1D": Samples the amount of the specified bonds along
+              a specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of the specified bonds in a
+              2D plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Not used for time sampling.
         direction : str, optional
@@ -366,16 +538,26 @@ class Sample:
             Supported conditions:
             - "Bond Length": tuple (min_len, max_len) to filter bonds by bond length.
         """
-        inputs = {"name_out": name_out,
-                  "bonds": bonds,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "direction": direction,
-                  "conditions": conditions,}
+        inputs = {
+            "name_out": name_out,
+            "bonds": bonds,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "direction": direction,
+            "conditions": conditions if conditions is not None else {},
+        }
         self.sampler_inputs["bond_density_samplers"].append(inputs)
 
-    def add_bond_length_sampling(self, name_out: str, bonds: list[dict], dimension: str, region: Region = "Box", num_bins=200, range=(0.0, 3.0)):
+    def add_bond_length_sampling(
+        self,
+        name_out: str,
+        bonds: list[dict],
+        dimension: str,
+        region: Region = "Box",
+        num_bins=200,
+        range=(0.0, 3.0),
+    ):
         """
         Add sampling for bond length or bond order distribution of the specified bonds.
 
@@ -384,29 +566,50 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         bonds : list
-            List of bonds to sample. Each bond is defined as a dictionary in the format:
-            {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d, ...]}, where a and b are the bonded atoms, and c, d, ... are the atoms bonded to A and B, respectively. With a, b, c, d being atom identifiers. Atom b/a does not need to be added to the "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and "bonds_B" lists does not matter. The "bonds_A" and "bonds_B" lists can be empty to indicate that the atoms a and b are not bonded to any other atoms. If the dictionary does not contain the "bonds_A" or "bonds_B" keys, every bond of type a-b will be sampled regardless of its bonding environment.
+            List of bonds to sample. Each bond is defined as a dictionary in
+            the format: {"bond": "a-b", "bonds_A": [c, ...], "bonds_B": [d,
+            ...]}, where a and b are the bonded atoms, and c, d, ... are the
+            atoms bonded to A and B, respectively. With a, b, c, d being atom
+            identifiers. Atom b/a does not need to be added to the
+            "bonds_A"/"bonds_B" list. The order of atoms in the "bonds_A" and
+            "bonds_B" lists does not matter. The "bonds_A" and "bonds_B"
+            lists can be empty to indicate that the atoms a and b are not
+            bonded to any other atoms. If the dictionary does not contain the
+            "bonds_A" or "bonds_B" keys, every bond of type a-b will be
+            sampled regardless of its bonding environment.
         dimension : str
             Sampling dimension. Supported: "Bond Length" and "Bond Order"
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 200.
         range : tuple, optional
-            Range (min, max) for which to compute the histogram. Default is (0.0, 3.0).
+            Range (min, max) for which to compute the histogram. Default is
+            (0.0, 3.0).
             - For "Bond Length": range is in Angstroms.
-            - For "Bond Order": range is in bond order units defined by the ReaxFF force field.
+            - For "Bond Order": range is in bond order units defined by the
+              ReaxFF force field.
         """
-        inputs = {"name_out": name_out,
-                  "bonds": bonds,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "range": range,}
+        inputs = {
+            "name_out": name_out,
+            "bonds": bonds,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "range": range,
+        }
         self.sampler_inputs["bond_length_samplers"].append(inputs)
 
-    def add_rdf_sampling(self, name_out: str, pairs: list[tuple[dict, dict]], region: Region = "Box", num_bins=200, r_max=7.0):
+    def add_rdf_sampling(
+        self,
+        name_out: str,
+        pairs: list[tuple[dict, dict]],
+        region: Region = "Box",
+        num_bins=200,
+        r_max=7.0,
+    ):
         """
         Add sampling for radial distribution function (RDF) of the specified atom pairs.
 
@@ -415,28 +618,45 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         pairs : list
-            List of atom pairs to sample. Each pair is defined as a tuple of two dictionaries in the format:
-            ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
-            and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
+            List of atom pairs to sample. Each pair is defined as a tuple of
+            two dictionaries in the format: ({"atom": "a", "bonds": [...]},
+            {"atom": "b", "bonds": [...]}) where a and b are atom
+            identifiers, and bonds are lists of atom identifiers that atoms a
+            and b are bonded to, respectively. Each dictionary works the same
+            way as other samplers, with `atoms` as a parameter.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for the histogram. Default is 200.
         r_max : float, optional
-            Maximum distance in Angstroms for which to compute the histogram. Default is 7.0.
-            Be aware that the maximum distance significantly affects the computation time.
+            Maximum distance in Angstroms for which to compute the
+            histogram. Default is 7.0.
+            Be aware that the maximum distance significantly affects the
+            computation time.
         """
         dimension = "Histogram"
-        inputs = {"name_out": name_out,
-                  "pairs": pairs,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "r_max": r_max,}
+        inputs = {
+            "name_out": name_out,
+            "pairs": pairs,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "r_max": r_max,
+        }
         self.sampler_inputs["rdf_samplers"].append(inputs)
 
-    def add_reaction_sampling(self, name_out: str, reactions: list[tuple], dimension: str, region: Region = "Box", num_bins=200, direction="z", position="center"):
+    def add_reaction_sampling(
+        self,
+        name_out: str,
+        reactions: list[tuple],
+        dimension: str,
+        region: Region = "Box",
+        num_bins=200,
+        direction="z",
+        position="center",
+    ):
         """
         Add sampling for reaction events of the specified reactions.
 
@@ -445,17 +665,23 @@ class Sample:
         name_out : str
             Name of the output directory and object file of the sampler data
         reactions : list
-            List of reactions to sample. Each reaction is defined as a tuple of two dictionaries in the format:
-            ({"atom": "a", "bonds": [...]}, {"atom": "b", "bonds": [...]}) where a and b are atom identifiers,
-            and bonds are lists of atom identifiers that atoms a and b are bonded to, respectively. Each dictionary works the same way as other samplers, with `atoms` as a parameter.
+            List of reactions to sample. Each reaction is defined as a tuple
+            of two dictionaries in the format: ({"atom": "a", "bonds": [...]},
+            {"atom": "b", "bonds": [...]}) where a and b are atom
+            identifiers, and bonds are lists of atom identifiers that atoms a
+            and b are bonded to, respectively. Each dictionary works the same
+            way as other samplers, with `atoms` as a parameter.
         dimension : str
             Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
             - "Time": Samples the amount of the specified reactions over time.
-            - "Cartesian1D": Samples the amount of the specified reactions along a specified direction (x, y, or z) in the simulation box.
-            - "Cartesian2D": Samples the amount of the specified reactions in a 2D plane (xy, xz, or yz) in the simulation box.
+            - "Cartesian1D": Samples the amount of the specified reactions
+              along a specified direction (x, y, or z) in the simulation box.
+            - "Cartesian2D": Samples the amount of the specified reactions in
+              a 2D plane (xy, xz, or yz) in the simulation box.
         region : Region, optional
-            Region of the box to sample. Supported: "Box", "Reservoir", "Pore", "Wall", or a user-defined
-            function that takes atom positions (N, 3) as input and returns a boolean mask (N,).
+            Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
+            "Wall", or a user-defined function that takes atom positions
+            (N, 3) as input and returns a boolean mask (N,).
         num_bins : int, optional
             Number of bins for position sampling. Default is 200.
         direction : str, optional
@@ -463,18 +689,24 @@ class Sample:
             - For "Cartesian1D": use ("x", "y", or "z").
             - For "Cartesian2D": use ("xy", "xz", or "yz").
         position : str, optional
-            Position of the reaction event to sample. Supported: "center", "reactant", "product"
-            - "center": Samples the position of the reaction event at the center between the reactant and product atoms.
-            - "reactant": Samples the position of the reaction event at the position of the reactant atoms.
-            - "product": Samples the position of the reaction event at the position of the product atoms.
+            Position of the reaction event to sample. Supported: "center",
+            "reactant", "product"
+            - "center": Samples the position of the reaction event at the
+              center between the reactant and product atoms.
+            - "reactant": Samples the position of the reaction event at the
+              position of the reactant atoms.
+            - "product": Samples the position of the reaction event at the
+              position of the product atoms.
         """
-        inputs = {"name_out": name_out,
-                  "reactions": reactions,
-                  "dimension": dimension,
-                  "region": region,
-                  "num_bins": num_bins,
-                  "direction": direction,
-                  "position": position,}
+        inputs = {
+            "name_out": name_out,
+            "reactions": reactions,
+            "dimension": dimension,
+            "region": region,
+            "num_bins": num_bins,
+            "direction": direction,
+            "position": position,
+        }
         self.sampler_inputs["reaction_samplers"].append(inputs)
 
     def _add_sampler(self, sampler: Sampler):
@@ -490,7 +722,9 @@ class Sample:
             raise TypeError("sampler must be an instance of Sampler class.")
         self.samplers.append(sampler)
 
-    def _transform_positions(self, positions: NDArray[np.float64]) -> NDArray[np.float64]:
+    def _transform_positions(
+        self, positions: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
         if self.system_properties and self.system_properties["type"] == "cylinder":
             # Coordinate transformation to cylindrical coordinates (r, phi, z)
             center = self.system_properties["center"]
@@ -502,7 +736,11 @@ class Sample:
             pore_range = self.system_properties["range"]
             left_wall = pore_range[0]
             right_wall = pore_range[1]
-            d = np.minimum(np.abs(z - left_wall), np.abs(z - right_wall)) * np.sign(z - left_wall) * np.sign(z - right_wall)
+            d = (
+                np.minimum(np.abs(z - left_wall), np.abs(z - right_wall))
+                * np.sign(z - left_wall)
+                * np.sign(z - right_wall)
+            )
             return np.column_stack((r, phi, z, d))
         else:
             return positions
@@ -518,14 +756,14 @@ class Sample:
         process_id : int
             Process ID for parallel sampling.
         """
-        common_kwargs = dict(
-            process_id=process_id,
-            atom_lib=self.name_to_type,
-            masses=self.masses,
-            num_frames=self.num_frames,
-            box=self.box,
-            system_properties=self.system_properties,
-        )
+        common_kwargs = {
+            "process_id": process_id,
+            "atom_lib": self.name_to_type,
+            "masses": self.masses,
+            "num_frames": self.num_frames,
+            "box": self.box,
+            "system_properties": self.system_properties,
+        }
 
         for sampler_type, sampler_configs in sampler_inputs.items():
             if sampler_type not in self._SAMPLER_REGISTRY:
@@ -564,17 +802,25 @@ class Sample:
             os.getenv("SLURM_NTASKS")
             or os.getenv("PBS_NP")
             or os.getenv("LSB_DJOB_NUMPROC")
-            or os.getenv("NSLOTS"))
+            or os.getenv("NSLOTS")
+        )
         cluster_tasks = int(cluster_tasks) if cluster_tasks else None
-        max_cores = min(avail_cores, cluster_tasks, self.num_frames) if cluster_tasks else min(avail_cores-1, self.num_frames)
-        num_cores = num_cores if num_cores and num_cores<=max_cores else max_cores
+        max_cores = (
+            min(avail_cores, cluster_tasks, self.num_frames)
+            if cluster_tasks
+            else min(avail_cores - 1, self.num_frames)
+        )
+        num_cores = num_cores if num_cores and num_cores <= max_cores else max_cores
 
-        # Run initialization of samplers in the main process to catch any potential issues before spawning subprocesses
+        # Run initialization of samplers in the main process to catch any
+        # potential issues before spawning subprocesses
         self.init_samplers(self.sampler_inputs, process_id=-1)
 
         if is_parallel and num_cores > 1:
             frames_per_core = np.array_split(self.frames, num_cores)
-            start_end_nthframe_list = [(frames[0], frames[-1], 1) for frames in frames_per_core]
+            start_end_nthframe_list = [
+                (frames[0], frames[-1], 1) for frames in frames_per_core
+            ]
             for i, (start_frame, end_frame, _) in enumerate(start_end_nthframe_list):
                 print(f"Process {i}: frames {start_frame} to {end_frame}")
             print(f"Starting parallel sampling with {num_cores} cores...")
@@ -586,26 +832,32 @@ class Sample:
                 ctx = mp.get_context("fork")
                 if "ovito" in sys.modules:
                     raise RuntimeError(
-                        "The 'ovito' module is already imported. Please remove it from the "
-                        "loaded modules to avoid conflicts during parallel processing. "
-                        "This is necessary because the OS does not support the 'spawn' start method."
+                        "The 'ovito' module is already imported. Please "
+                        "remove it from the loaded modules to avoid "
+                        "conflicts during parallel processing. This is "
+                        "necessary because the OS does not support the "
+                        "'spawn' start method."
                     )
             with ctx.Pool(num_cores) as pool:
-                results = [pool.apply_async(self.init_subprocess_sampler, (self.name_to_type,
-                                                                           self.masses,
-                                                                           self.trajectory_file,
-                                                                           self.bond_file,
-                                                                           self.system,
-                                                                           start_end_nthframe_list[process_id],
-                                                                           self.sampler_inputs,
-                                                                           process_id,
-                                                                           self.num_particles,
-                                                                           np.inf,
-                                                                           self.box
-                                                                           )) for process_id in range(num_cores)]
+                for process_id in range(num_cores):
+                    pool.apply_async(
+                        self.init_subprocess_sampler,
+                        (
+                            self.name_to_type,
+                            self.masses,
+                            self.trajectory_file,
+                            self.bond_file,
+                            self.system,
+                            start_end_nthframe_list[process_id],
+                            self.sampler_inputs,
+                            process_id,
+                            self.num_particles,
+                            np.inf,
+                            self.box,
+                        ),
+                    )
                 pool.close()
                 pool.join()
-            # print([r.get() for r in results])
             print("Parallel sampling completed.")
         else:
             print("Starting serial sampling...")
@@ -616,11 +868,24 @@ class Sample:
             sampler.join_samplers(num_cores=num_cores if is_parallel else 1)
 
     @staticmethod
-    def init_subprocess_sampler(atom_lib, masses, trajectory_file, bond_file, system, start_end_nthframe, sampler_inputs, process_id, num_particles, num_frames, box):
+    def init_subprocess_sampler(
+        atom_lib,
+        masses,
+        trajectory_file,
+        bond_file,
+        system,
+        start_end_nthframe,
+        sampler_inputs,
+        process_id,
+        num_particles,
+        num_frames,
+        box,
+    ):
         """
         Initialize and run sampling in a subprocess.
 
-        This static method is designed to be called within a subprocess for parallel sampling.
+        This static method is designed to be called within a subprocess for
+        parallel sampling.
 
         Parameters
         ----------
@@ -652,7 +917,19 @@ class Sample:
         """
         sample_instance = Sample.__new__(Sample)
         start_frame, end_frame, nth_frame = start_end_nthframe
-        sample_instance.init_helper(atom_lib, masses, trajectory_file, bond_file, system, start_frame, end_frame, nth_frame, num_particles, num_frames, box)
+        sample_instance.init_helper(
+            atom_lib,
+            masses,
+            trajectory_file,
+            bond_file,
+            system,
+            start_frame,
+            end_frame,
+            nth_frame,
+            num_particles,
+            num_frames,
+            box,
+        )
         sample_instance.init_samplers(sampler_inputs, process_id)
         sample_instance.sample_helper()
         return f"Process {process_id} finished sampling."
@@ -674,13 +951,16 @@ class Sample:
             bond_permutations is None for an unconstrained molecule or a list of
             neighbour-type permutations otherwise. Atom types with no registered
             molecule are omitted.
-            Example (single atom type): [('O', None), ('O()', [[]]), ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
+            Example (single atom type): [('O', None), ('O()', [[]]),
+            ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
         """
         molecules_per_atom_type = {}
         for atom_type in self.type_to_name:
-            candidates = [(identifier, info["bonds"])
-                          for identifier, info in self.molecules.items()
-                          if info["atom"] == atom_type]
+            candidates = [
+                (identifier, info["bonds"])
+                for identifier, info in self.molecules.items()
+                if info["atom"] == atom_type
+            ]
             if not candidates:
                 continue
             candidates.sort(key=lambda c: len(c[1][0]) if c[1] is not None else -1)
@@ -706,11 +986,20 @@ class Sample:
         for identifier, info in self.molecules.items():
             molecule_mask[identifier] = np.zeros(self.num_particles, dtype=bool)
             num_bonds = len(info["bonds"][0]) if info["bonds"] is not None else 0
-            molecule_bond_atoms[identifier] = np.zeros((self.num_particles, num_bonds), dtype=int)
+            molecule_bond_atoms[identifier] = np.zeros(
+                (self.num_particles, num_bonds), dtype=int
+            )
         return molecule_mask, molecule_bond_atoms
 
-    def _identify_molecules(self, molecules_per_atom_type, molecule_mask, molecule_bond_atoms,
-                             atom_types, bond_topology, bond_enum):
+    def _identify_molecules(
+        self,
+        molecules_per_atom_type,
+        molecule_mask,
+        molecule_bond_atoms,
+        atom_types,
+        bond_topology,
+        bond_enum,
+    ):
         """
         Update molecule_mask and molecule_bond_atoms in place for the current frame.
 
@@ -721,7 +1010,8 @@ class Sample:
         molecule_mask : dict
             Per-molecule atom mask to update, as allocated by `_init_molecule_arrays`.
         molecule_bond_atoms : dict
-            Per-molecule bonded-atom indices to update, as allocated by `_init_molecule_arrays`.
+            Per-molecule bonded-atom indices to update, as allocated by
+            `_init_molecule_arrays`.
         atom_types : np.ndarray
             Particle type of each atom in the current frame.
         bond_topology : np.ndarray
@@ -750,11 +1040,16 @@ class Sample:
                 other_atoms = bonded_atoms[bonded_atoms != atom]
                 other_types = list(atom_types[other_atoms])
                 for identifier, bond_permutations in candidates:
-                    if bond_permutations is not None and other_types in bond_permutations:
+                    if (
+                        bond_permutations is not None
+                        and other_types in bond_permutations
+                    ):
                         molecule_mask[identifier][atom] = True
                         molecule_bond_atoms[identifier][atom] = other_atoms
 
-    def _identify_bonds(self, bond_mask, bond_count, bond_topology, atom_types, molecule_mask):
+    def _identify_bonds(
+        self, bond_mask, bond_count, bond_topology, atom_types, molecule_mask
+    ):
         """
         Rebuild bond_mask in place for the current frame.
 
@@ -798,9 +1093,10 @@ class Sample:
         """
         Helper function to perform the sampling process.
         """
+        from ovito.data import BondsEnumerator
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
-        from ovito.data import BondsEnumerator
+
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
@@ -823,21 +1119,32 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
-            self._identify_molecules(molecules_per_atom_type, molecule_mask, molecule_bond_atoms,
-                                      atom_types, bond_topology, bond_enum)
-            self._identify_bonds(bond_mask, bond_count, bond_topology, atom_types, molecule_mask)
+            self._identify_molecules(
+                molecules_per_atom_type,
+                molecule_mask,
+                molecule_bond_atoms,
+                atom_types,
+                bond_topology,
+                bond_enum,
+            )
+            self._identify_bonds(
+                bond_mask, bond_count, bond_topology, atom_types, molecule_mask
+            )
 
-            positions_transformed = self._transform_positions(frame.particles.positions.array)
+            positions_transformed = self._transform_positions(
+                frame.particles.positions.array
+            )
 
             # Sampling
             for sampler in self.samplers:
-                sampler.sample(frame_id=frame_idx-self.start_frame,
-                               molecule_mask=molecule_mask,
-                               molecule_bond_atoms=molecule_bond_atoms,
-                               bond_mask=bond_mask,
-                               frame=frame,
-                               bond_enum=bond_enum,
-                               positions_transformed=positions_transformed
+                sampler.sample(
+                    frame_id=frame_idx - self.start_frame,
+                    molecule_mask=molecule_mask,
+                    molecule_bond_atoms=molecule_bond_atoms,
+                    bond_mask=bond_mask,
+                    frame=frame,
+                    bond_enum=bond_enum,
+                    positions_transformed=positions_transformed,
                 )
 
         for sampler in self.samplers:

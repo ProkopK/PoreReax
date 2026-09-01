@@ -6,12 +6,12 @@ pickle, loading YAML configuration files, and common mathematical operations
 such as the minimum-image convention.
 """
 
-
+import os
 import pickle
 import re
-import yaml
+
 import numpy as np
-import os
+import yaml
 
 
 def save_object(obj, filename):
@@ -25,8 +25,9 @@ def save_object(obj, filename):
     filename : str
         The path to the file where the object will be saved.
     """
-    with open(filename, 'wb') as f:
+    with open(filename, "wb") as f:
         pickle.dump(obj, f)
+
 
 def load_object(file_path):
     """
@@ -45,8 +46,9 @@ def load_object(file_path):
     file_path = os.path.abspath(file_path)
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"The file {file_path} does not exist.")
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         return pickle.load(f)
+
 
 def load_yaml(file_path: str) -> dict:
     """
@@ -65,9 +67,10 @@ def load_yaml(file_path: str) -> dict:
     file_path = os.path.abspath(file_path)
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"The file {file_path} does not exist.")
-    with open(file_path, 'r') as f:
+    with open(file_path) as f:
         data = yaml.safe_load(f)
     return data
+
 
 def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
     """
@@ -87,7 +90,10 @@ def min_image_convention(vec: np.ndarray, box: np.ndarray) -> np.ndarray:
     """
     return vec - box * np.round(vec / box)
 
-def min_image_midpoint(vec1: np.ndarray, vec2: np.ndarray, box: np.ndarray) -> np.ndarray:
+
+def min_image_midpoint(
+    vec1: np.ndarray, vec2: np.ndarray, box: np.ndarray
+) -> np.ndarray:
     """
     Calculate the midpoint between two vectors considering the minimal image convention.
 
@@ -111,6 +117,7 @@ def min_image_midpoint(vec1: np.ndarray, vec2: np.ndarray, box: np.ndarray) -> n
     midpoint %= box
     return midpoint
 
+
 def get_identifiers(link_data: str) -> list:
     """
     Retrieve the list of identifiers from a data file.
@@ -126,7 +133,12 @@ def get_identifiers(link_data: str) -> list:
         List of identifiers present in the data file.
     """
     data = load_object(link_data)
-    return [identifier for identifier in data.keys() if identifier != "input_params" and identifier != "num_frames"]
+    return [
+        identifier
+        for identifier in data.keys()
+        if identifier != "input_params" and identifier != "num_frames"
+    ]
+
 
 def get_data(link_data: str, identifier: str) -> dict:
     """
@@ -149,15 +161,17 @@ def get_data(link_data: str, identifier: str) -> dict:
         raise ValueError(f"Identifier '{identifier}' not found in the data file.")
     return data[identifier]
 
+
 def read_pore_yml(file_path: str) -> dict:
     """
-    Read a YAML file containing pore system properties and extract relevant depending on the pore shape.
+    Read a YAML file containing pore system properties and extract relevant
+    depending on the pore shape.
 
     Parameters
     ----------
     file_path : str
         Path to the YAML file containing pore system properties.
-    
+
     Returns
     -------
     dict
@@ -171,14 +185,16 @@ def read_pore_yml(file_path: str) -> dict:
     properties["reservoir"] = reservoir * 10
     if system_data["shape_00"]["shape"] == "CYLINDER":
         if system_data["shape_00"]["parameter"]["central"] != [0, 0, 1]:
-            raise NotImplementedError("Only CYLINDER pores with central axis along z (0,0,1) are supported.")
+            raise NotImplementedError(
+                "Only CYLINDER pores with central axis along z (0,0,1) are supported."
+            )
         pore_length = 2 * system_data["system"]["centroid"][2] * 10
         box_length = system_data["system"]["dimensions"][2] * 10
         center = np.array(system_data["shape_00"]["parameter"]["centroid"]) * 10
         center[2] = box_length / 2
         gap = (box_length - pore_length - 2 * reservoir) / 2
         pore_range = np.array([reservoir + gap, box_length - reservoir - gap])
-        
+
         properties["type"] = "cylinder"
         properties["radius"] = system_data["shape_00"]["diameter"] / 2 * 10
         properties["length"] = pore_length
@@ -188,6 +204,7 @@ def read_pore_yml(file_path: str) -> dict:
         raise NotImplementedError("Currently, only CYLINDER pores are supported.")
 
     return properties
+
 
 _PLACEHOLDER_RE = re.compile(r"^([ \t]*)%\((\w+)\)s[ \t]*$", re.MULTILINE)
 
@@ -208,6 +225,7 @@ class Substitution:
 
     def __call__(self, func):
         if func.__doc__:
+
             def _replace(match):
                 indent, key = match.group(1), match.group(2)
                 if key not in self.params:

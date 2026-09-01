@@ -1,6 +1,5 @@
 import pytest
 
-
 bonds = [{"bond": "Si-O", "bonds_A": ["O", "O", "O"], "bonds_B": ["H"]}]
 
 
@@ -26,21 +25,24 @@ bonds = [{"bond": "Si-O", "bonds_A": ["O", "O", "O"], "bonds_B": ["H"]}]
             10,
             (1, 0),
             ValueError,
-            "BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers",
+            "BondLengthSampler requires a 'range' parameter as a list or tuple "
+            "of two numbers",
         ),
         (
             "Bond Length",
             10,
             (0, 1, 2),
             ValueError,
-            "BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers",
+            "BondLengthSampler requires a 'range' parameter as a list or tuple "
+            "of two numbers",
         ),
         (
             "Bond Length",
             10,
             "not_a_tuple",
             ValueError,
-            "BondLengthSampler requires a 'range' parameter as a list or tuple of two numbers",
+            "BondLengthSampler requires a 'range' parameter as a list or tuple "
+            "of two numbers",
         ),
     ],
 )

@@ -1,24 +1,29 @@
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import pytest
+
 from porereax.plot import plot_data
 from porereax.utils import get_identifiers
-from pathlib import Path
-import matplotlib.pyplot as plt
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 
 
 def test_plot_not_implemented():
     with pytest.raises(ValueError):
-        plot_data(TEST_DATA_DIR / "molecule_structures.obj", identifiers=["not_implemented"])
+        plot_data(
+            TEST_DATA_DIR / "molecule_structures.obj", identifiers=["not_implemented"]
+        )
     with pytest.raises(ValueError):
-        plot_data(TEST_DATA_DIR / "density_sampling_2d.obj", identifiers=["not_implemented"])
-    
+        plot_data(
+            TEST_DATA_DIR / "density_sampling_2d.obj", identifiers=["not_implemented"]
+        )
 
 
 def test_plot(list_of_sample_object_file_names):
     for file_name in list_of_sample_object_file_names:
         plot_data(TEST_DATA_DIR / file_name)
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         plot_data(
             TEST_DATA_DIR / file_name,
             axis=ax,
@@ -30,6 +35,7 @@ def test_plot(list_of_sample_object_file_names):
             dt=10,
             transpose=True,
         )
+
 
 def test_plot_kwargs():
     file = TEST_DATA_DIR / "angle_all_sampling.obj"

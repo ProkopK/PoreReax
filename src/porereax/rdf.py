@@ -1,14 +1,19 @@
 """
 Module for sampling radial distribution functions (RDF).
 
-The module provides :class:`RdfSampler` for pair-distribution sampling of specified atom pairs.
+The module provides :class:`RdfSampler` for pair-distribution sampling of
+specified atom pairs.
 """
 
-
 import numpy as np
-import porereax.utils as utils
 
-from porereax.meta_sampler import AtomSampler, _build_mol_dictionary, _validate_double_atoms, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
+from porereax.meta_sampler import (
+    _NAME_OUT_PARAM,
+    _SAMPLER_INIT_PARAMS,
+    AtomSampler,
+    _build_mol_dictionary,
+    _validate_double_atoms,
+)
 from porereax.utils import Substitution
 
 
@@ -21,7 +26,8 @@ class RdfSampler(AtomSampler):
     ----------
     %(name_out)s
     pairs : list
-        List of atom pairs to sample, each specified as a list or tuple of two dictionaries:
+        List of atom pairs to sample, each specified as a list or tuple of two
+        dictionaries:
         - Each dictionary should have keys: "atom" (str), "bonds" (list, optional)
     %(params)s
     num_bins : int
@@ -29,9 +35,26 @@ class RdfSampler(AtomSampler):
     r_max : float
         Maximum distance for RDF calculation.
     """
-    def __init__(self, name_out: str, pairs: list, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict, num_bins: int, r_max: float):
+
+    def __init__(
+        self,
+        name_out: str,
+        pairs: list,
+        dimension: str,
+        region,
+        process_id: int,
+        atom_lib: dict,
+        masses: dict,
+        num_frames: int,
+        box: np.ndarray,
+        system_properties: dict,
+        num_bins: int,
+        r_max: float,
+    ):
         if not isinstance(num_bins, (int)) or num_bins <= 0:
-            raise ValueError("RdfSampler requires a positive integer 'num_bins' parameter.")
+            raise ValueError(
+                "RdfSampler requires a positive integer 'num_bins' parameter."
+            )
         if not isinstance(r_max, (float, int)) or r_max <= 0:
             raise ValueError("RdfSampler requires a positive 'r_max' parameter.")
 
@@ -46,33 +69,60 @@ class RdfSampler(AtomSampler):
             atoms.append(atom1)
             atoms.append(atom2)
 
-        super().__init__(name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
-        self._input.update({
-            "num_bins": num_bins,
-            "r_max": r_max,
-        })
+        super().__init__(
+            name_out,
+            atoms,
+            dimension,
+            region,
+            process_id,
+            atom_lib,
+            masses,
+            num_frames,
+            box,
+            system_properties,
+        )
+        self._input.update(
+            {
+                "num_bins": num_bins,
+                "r_max": r_max,
+            }
+        )
 
         # Build pair identifiers and setup data structures for each pair
         self._pairs = {}
         for pair in pairs:
             pair_A, pair_B = pair
-            identifier_A = _build_mol_dictionary(pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler")[0]
-            identifier_B = _build_mol_dictionary(pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler")[0]
+            identifier_A = _build_mol_dictionary(
+                pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler"
+            )[0]
+            identifier_B = _build_mol_dictionary(
+                pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler"
+            )[0]
             pair_key = f"{identifier_A}-{identifier_B}"
             self._pairs[pair_key] = (identifier_A, identifier_B)
 
-            hist, bin_edges = np.histogram([], bins=self._num_bins, range=(0, self._r_max))
+            hist, bin_edges = np.histogram(
+                [], bins=self._num_bins, range=(0, self._r_max)
+            )
             self._data[pair_key] = {
                 "num_frames": 0,
-                "num_atoms_A": 0, # needed for normalization
-                "num_atoms_B": 0, # needed for normalization
+                "num_atoms_A": 0,  # needed for normalization
+                "num_atoms_B": 0,  # needed for normalization
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
         self._input["pairs"] = self._pairs
 
-
-    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(
+        self,
+        frame_id: int,
+        molecule_mask: dict,
+        molecule_bond_atoms: dict,
+        bond_mask: dict,
+        frame: object,
+        bond_enum: object,
+        positions_transformed: np.ndarray,
+    ):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search
@@ -94,7 +144,9 @@ class RdfSampler(AtomSampler):
             filtered_vectors = pair_vectors[mask]
             distances = np.linalg.norm(filtered_vectors, axis=1)
 
-            hist, _ = np.histogram(distances, bins=self._num_bins, range=(0, self._r_max))
+            hist, _ = np.histogram(
+                distances, bins=self._num_bins, range=(0, self._r_max)
+            )
             self._data[pair_key]["hist"] += hist
             self._data[pair_key]["num_frames"] += 1
             self._data[pair_key]["num_atoms_A"] += atom_indices_A.size
@@ -132,11 +184,17 @@ class RdfSampler(AtomSampler):
         # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
         # This gives g(r) -> 1 for large r in a homogeneous system
         if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
-            combined["hist"] = box_volume * hist_sum / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
+            combined["hist"] = (
+                box_volume
+                * hist_sum
+                / (num_frames * avg_atoms_A * avg_atoms_B * shell_volumes)
+            )
         else:
             combined["hist"] = np.zeros(self._num_bins)
 
-        combined["hist_raw"] = hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
+        combined["hist_raw"] = (
+            hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
+        )
         combined["hist_std"] = np.std(data["hist"], axis=0)
         combined["bin_edges"] = bin_edges
         return combined

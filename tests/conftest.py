@@ -1,10 +1,11 @@
-import pytest
-
-from porereax.simulate import Simulate
-from porereax.sample import Sample
-from porereax.utils import load_object
 from pathlib import Path
+
+import pytest
 from numpy.testing import assert_array_almost_equal
+
+from porereax.sample import Sample
+from porereax.simulate import Simulate
+from porereax.utils import load_object
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 gro_lib = {
@@ -61,7 +62,11 @@ def assert_input_params(obj_1, obj_2):
         "Keys of 'input_params' do not match."
     )
     for key in obj_1["input_params"].keys():
-        err_msg = f"Values for key '{key}' in 'input_params' do not match. Expected: {obj_1['input_params'][key]}, Got: {obj_2['input_params'][key]}"
+        err_msg = (
+            f"Values for key '{key}' in 'input_params' do not match. "
+            f"Expected: {obj_1['input_params'][key]}, "
+            f"Got: {obj_2['input_params'][key]}"
+        )
         if key == "box":
             assert_array_almost_equal(
                 obj_1["input_params"][key],
@@ -69,7 +74,10 @@ def assert_input_params(obj_1, obj_2):
                 err_msg=err_msg,
             )
         elif key == "name_out":
-            continue  # skip this key as it may differ depending on the user's file naming conventions, and saved files are different for test run and create test data
+            # skip this key as it may differ depending on the user's file naming
+            # conventions, and saved files are different for test run and create
+            # test data
+            continue
         else:
             assert obj_1["input_params"][key] == obj_2["input_params"][key], err_msg
 
@@ -81,7 +89,7 @@ def assert_sampler_data(obj_1, obj_2, check_for_std):
             continue
         elif identifier == "num_frames":
             assert obj_1[identifier] == obj_2[identifier], (
-                f"Values for 'num_frames' do not match."
+                "Values for 'num_frames' do not match."
             )
             continue
         assert obj_1[identifier].keys() == obj_2[identifier].keys(), (
@@ -93,14 +101,22 @@ def assert_sampler_data(obj_1, obj_2, check_for_std):
             assert_array_almost_equal(
                 obj_1[identifier][data_key],
                 obj_2[identifier][data_key],
-                err_msg=f"Values for data key '{data_key}' in identifier '{identifier}' do not match. Expected: {obj_1[identifier][data_key]}, Got: {obj_2[identifier][data_key]}",
+                err_msg=(
+                    f"Values for data key '{data_key}' in identifier "
+                    f"'{identifier}' do not match. "
+                    f"Expected: {obj_1[identifier][data_key]}, "
+                    f"Got: {obj_2[identifier][data_key]}"
+                ),
             )
 
 
 def assert_sample_object_files(file_1, file_2, check_for_std=True):
     obj_1 = load_object(file_1)
     obj_2 = load_object(file_2)
-    assert obj_1.keys() == obj_2.keys(), f"Keys of the two objects do not match. Expected: {obj_1.keys()}, Got: {obj_2.keys()}"
+    assert obj_1.keys() == obj_2.keys(), (
+        f"Keys of the two objects do not match. "
+        f"Expected: {obj_1.keys()}, Got: {obj_2.keys()}"
+    )
     assert_input_params(obj_1, obj_2)
     assert_sampler_data(obj_1, obj_2, check_for_std)
 

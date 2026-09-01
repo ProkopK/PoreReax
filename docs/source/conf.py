@@ -1,12 +1,12 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath("../../src"))
 from porereax import __version__
 
-
-project = 'PoreReax'
-copyright = '2026, Karl Prokop'
-author = 'Karl Prokop'
+project = "PoreReax"
+copyright = "2026, Karl Prokop"
+author = "Karl Prokop"
 release = __version__
 version = __version__
 
@@ -41,11 +41,11 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 
 html_theme = "furo"
-html_static_path = ['_static']
+html_static_path = ["_static"]
 html_logo = "_static/logo_text.svg"
 html_favicon = "_static/logo.svg"

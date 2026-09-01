@@ -28,6 +28,7 @@ Depending on your setup, generated outputs include:
 
 ```python
 from porereax import Simulate
+
 gro_lib = {"OM": "O", "OW": "O", "Si": "Si", "HW": "H", "MW": ""}
 gro_charges = {"OM": -0.64, "OW": -1.1128, "Si": 1.28, "HW": 0.5564}
 atom_masses = {"Si": 28.086, "O": 15.9994, "H": 2.016}
@@ -48,8 +49,25 @@ Multiple simulation stages can be added with the `add_sim()` method. The followi
 from porereax import Simulate
 
 # Set up a dictionary to translate GRO atom types to ReaxFF atom types as well as masses and charges
-gro_lib = {"OM": "O", "SI": "Si", "Si": "Si", "O": "O", "H": "H", "OW": "O", "HW": "H", "MW": ""}
-gro_charges = {"OM": -0.64, "SI": 1.28, "Si": 1.28, "O": -0.74, "H": 0.42, "OW": -1.1128, "HW": 0.5564}
+gro_lib = {
+    "OM": "O",
+    "SI": "Si",
+    "Si": "Si",
+    "O": "O",
+    "H": "H",
+    "OW": "O",
+    "HW": "H",
+    "MW": "",
+}
+gro_charges = {
+    "OM": -0.64,
+    "SI": 1.28,
+    "Si": 1.28,
+    "O": -0.74,
+    "H": 0.42,
+    "OW": -1.1128,
+    "HW": 0.5564,
+}
 atom_masses = {"Si": 28.086, "O": 15.9994, "H": 2.016}
 
 # Create a simulation object
@@ -75,13 +93,13 @@ sim.add_sim(
     type="npt",
     nsteps=2000000,
     temp=300,
-    pressure=1.0, 
-    dt=0.5, 
-    nodes=1, 
-    tasks_per_node=64, 
-    wall_time="20:00:00", 
-    dump_freq=2000, 
-    thermo_freq=2000
+    pressure=1.0,
+    dt=0.5,
+    nodes=1,
+    tasks_per_node=64,
+    wall_time="20:00:00",
+    dump_freq=2000,
+    thermo_freq=2000,
 )
 
 # Generate the simulation files
@@ -92,15 +110,15 @@ LAMMPS can create image dumps of the simulation trajectory. To add this feature,
 
 ```python
 sim.add_image_dump(
-    plane="xy", 
-    dump_freq=None, 
-    zoom=3.5, 
-    image_width=1200, 
-    image_height=1200, 
-    atom_sizes={"Si": 3, "O": 2, "H": 1}, 
-    atom_colors={"Si": "orange", "O": "red", "H": "white"}, 
+    plane="xy",
+    dump_freq=None,
+    zoom=3.5,
+    image_width=1200,
+    image_height=1200,
+    atom_sizes={"Si": 3, "O": 2, "H": 1},
+    atom_colors={"Si": "orange", "O": "red", "H": "white"},
     # map_by_charge="-1 2 ca 0.0 3 min royalblue 0 green max orangered", # shadows the atom_colors argument
-    kwargs="shiny 0.1 box no 0.01"
+    kwargs="shiny 0.1 box no 0.01",
 )
 ```
 

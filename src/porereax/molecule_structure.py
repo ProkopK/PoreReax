@@ -1,14 +1,14 @@
 """
 Module for sampling molecular structure statistics.
 
-The module provides :class:`MoleculeStructureSampler` to sample bonding environments of all atomtypes and reveal the atom structures.
+The module provides :class:`MoleculeStructureSampler` to sample bonding
+environments of all atomtypes and reveal the atom structures.
 """
 
 import numpy as np
-import porereax.utils as utils
-import matplotlib.pyplot as plt
 
-from porereax.meta_sampler import Sampler, _SAMPLER_INIT_PARAMS, _NAME_OUT_PARAM
+import porereax.utils as utils
+from porereax.meta_sampler import _NAME_OUT_PARAM, _SAMPLER_INIT_PARAMS, Sampler
 from porereax.utils import Substitution
 
 
@@ -22,11 +22,35 @@ class MoleculeStructureSampler(Sampler):
     %(name_out)s
     %(params)s
     """
-    def __init__(self, name_out: str, dimension: str, region, process_id: int, atom_lib: dict, masses: dict, num_frames: int, box: np.ndarray, system_properties: dict):
+
+    def __init__(
+        self,
+        name_out: str,
+        dimension: str,
+        region,
+        process_id: int,
+        atom_lib: dict,
+        masses: dict,
+        num_frames: int,
+        box: np.ndarray,
+        system_properties: dict,
+    ):
         valid_dimensions = ["MoleculeStructure"]
         if not isinstance(dimension, str) or dimension not in valid_dimensions:
-            raise ValueError(f"MoleculeStructureSampler does not support dimension {dimension}")
-        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+            raise ValueError(
+                f"MoleculeStructureSampler does not support dimension {dimension}"
+            )
+        super().__init__(
+            name_out,
+            dimension,
+            region,
+            process_id,
+            atom_lib,
+            masses,
+            num_frames,
+            box,
+            system_properties,
+        )
 
         # Setup data
         self._data["num_frames"] = 0
@@ -34,7 +58,16 @@ class MoleculeStructureSampler(Sampler):
         for atom_type in atom_lib.values():
             self._data["structure_counts"][atom_type] = {}
 
-    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(
+        self,
+        frame_id: int,
+        molecule_mask: dict,
+        molecule_bond_atoms: dict,
+        bond_mask: dict,
+        frame: object,
+        bond_enum: object,
+        positions_transformed: np.ndarray,
+    ):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
         positions = frame.particles.positions.array
@@ -71,13 +104,24 @@ class MoleculeStructureSampler(Sampler):
                         if atom not in combined_data:
                             combined_data[atom] = {}
                         for structure, count in value.items():
-                            name = atom + "(" + "+".join([type_to_name[t] for t in structure]) + ")"
+                            name = (
+                                atom
+                                + "("
+                                + "+".join([type_to_name[t] for t in structure])
+                                + ")"
+                            )
                             if name not in combined_data[atom]:
                                 combined_data[atom][name] = 0
                             combined_data[atom][name] += count
         for atom in combined_data:
             if atom != "input_params":
-                combined_data[atom] = dict(sorted(combined_data[atom].items(), key=lambda item: item[1], reverse=True))
+                combined_data[atom] = dict(
+                    sorted(
+                        combined_data[atom].items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                )
                 for structure in combined_data[atom]:
                     combined_data[atom][structure] /= num_frames
 

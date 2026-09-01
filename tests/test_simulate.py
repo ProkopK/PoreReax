@@ -1,7 +1,8 @@
+from pathlib import Path
+
 import pytest
 
 from porereax.simulate import Simulate
-from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 
@@ -36,7 +37,10 @@ def test_simulate_pore_with_setup(simulate_pore, tmp_path):
 
     job_file_path = TEST_DATA_DIR / "test_job.job"
     submit_command = "sbatch"
-    lammps_command = "mpirun --bind-to none --map-by node lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+    lammps_command = (
+        "mpirun --bind-to none --map-by node lmp -in {input_file} -log "
+        "{log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+    )
     simulate_pore.set_job_file(
         job_file=job_file_path,
         submit_command=submit_command,

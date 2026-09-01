@@ -26,16 +26,17 @@ Example
 
 import os
 import shutil
-import numpy as np
-
-from jinja2 import Template
-from importlib.resources import files
-from porereax.utils import read_pore_yml
 from collections.abc import Callable
+from importlib.resources import files
 from io import TextIOWrapper
 
+import numpy as np
+from jinja2 import Template
 
-class Simulate():
+from porereax.utils import read_pore_yml
+
+
+class Simulate:
     """
     Main class for setting up and managing ReaxFF molecular dynamics simulations.
 
@@ -51,48 +52,62 @@ class Simulate():
     >>> sim = Simulate(gro_lib, gro_charges, atom_masses, 'system.gro')
     """
 
-    def __init__(self, gro_lib: dict, gro_charges: dict, atom_masses: dict, structure_file: str | None = None):
+    def __init__(
+        self,
+        gro_lib: dict,
+        gro_charges: dict,
+        atom_masses: dict,
+        structure_file: str | None = None,
+    ):
         """
         Initialize the Simulate object with atom mappings and structure file.
 
         Parameters
         ----------
         gro_lib : dict
-            Dictionary mapping GROMACS atom names (keys) to ReaxFF atom type names (values).
-            Use empty string "" for virtual sites or atoms to exclude from ReaxFF simulation.
+            Dictionary mapping GROMACS atom names (keys) to ReaxFF atom type
+            names (values). Use empty string "" for virtual sites or atoms to
+            exclude from ReaxFF simulation.
             Example: {"Si": "Si", "O": "O", "OM": "O", "HW": "H", "MW": ""}
         gro_charges : dict
-            Dictionary mapping GROMACS atom names (keys) to partial charges (values) in
-            elementary charge units. Must include charges for all atoms in gro_lib except
-            those mapped to empty string.
+            Dictionary mapping GROMACS atom names (keys) to partial charges
+            (values) in elementary charge units. Must include charges for all
+            atoms in gro_lib except those mapped to empty string.
             Example: {'Si': 2.4, 'O': -1.2, 'H': 0.6, 'OM': -0.8}
         atom_masses : dict
-            Dictionary mapping ReaxFF atom type names (keys) to atomic masses (values) in
-            atomic mass units (amu). Must include masses for all atom types used in gro_lib.
+            Dictionary mapping ReaxFF atom type names (keys) to atomic masses
+            (values) in atomic mass units (amu). Must include masses for all
+            atom types used in gro_lib.
             Example: {'Si': 28.085, 'O': 15.999, 'H': 1.008}
         structure_file : str, optional
-            Path to the GROMACS structure file (.gro) to use as input. If None, the method
-            will look for 'nvt.gro' in the parent directory's 'nvt' folder. Default is None.
+            Path to the GROMACS structure file (.gro) to use as input. If
+            None, the method will look for 'nvt.gro' in the parent
+            directory's 'nvt' folder. Default is None.
 
         Raises
         ------
         FileNotFoundError
             If the specified structure file does not exist.
         ValueError
-            If gro_lib, gro_charges, or atom_masses are not properly formatted dictionaries,
-            or if there are missing mappings between these dictionaries.
+            If gro_lib, gro_charges, or atom_masses are not properly
+            formatted dictionaries, or if there are missing mappings between
+            these dictionaries.
 
         Notes
         -----
-        The constructor performs extensive validation to ensure all required mappings are
-        present and correctly formatted. Virtual sites or excluded atoms should be mapped
-        to empty string "" in gro_lib.
+        The constructor performs extensive validation to ensure all required
+        mappings are present and correctly formatted. Virtual sites or
+        excluded atoms should be mapped to empty string "" in gro_lib.
         """
         self._path = os.getcwd()
         if structure_file is None:
             self._name = os.path.basename(os.path.split(self._path)[0])
-            self._structure_file = os.path.join(os.path.split(self._path)[0], "nvt", "nvt.gro")
-            self._system_file = os.path.join(os.path.split(self._path)[0], "_gro", "pore.yml")
+            self._structure_file = os.path.join(
+                os.path.split(self._path)[0], "nvt", "nvt.gro"
+            )
+            self._system_file = os.path.join(
+                os.path.split(self._path)[0], "_gro", "pore.yml"
+            )
             if not os.path.isfile(self._system_file):
                 raise FileNotFoundError(f"System file {self._system_file} not found.")
         else:
@@ -104,37 +119,67 @@ class Simulate():
 
         # Validate gro_lib
         if not isinstance(gro_lib, dict):
-            raise ValueError("gro_lib must be provided as a dictionary mapping atom names to atom types.")
+            raise ValueError(
+                "gro_lib must be provided as a dictionary mapping atom names "
+                "to atom types."
+            )
         if not all(isinstance(k, str) for k in gro_lib.keys()):
-            raise ValueError("All keys in gro_lib must be strings representing atom names.")
+            raise ValueError(
+                "All keys in gro_lib must be strings representing atom names."
+            )
         if not all(isinstance(v, str) for v in gro_lib.values()):
-            raise ValueError("All values in gro_lib must be strings representing atom names in the reaxFF force field.")
+            raise ValueError(
+                "All values in gro_lib must be strings representing atom "
+                "names in the reaxFF force field."
+            )
         self._gro_lib = gro_lib
-        gro_lib_values = sorted(set(v for v in gro_lib.values() if v != ""))
+        gro_lib_values = sorted({v for v in gro_lib.values() if v != ""})
         self._type_to_name = dict(enumerate(gro_lib_values, start=1))
         self._name_to_type = {v: k for k, v in self._type_to_name.items()}
         self._num_atom_types = max(self._type_to_name.keys())
 
         # Validate gro_charges
         if not isinstance(gro_charges, dict):
-            raise ValueError("gro_charges must be provided as a dictionary mapping atom names to charges.")
+            raise ValueError(
+                "gro_charges must be provided as a dictionary mapping atom "
+                "names to charges."
+            )
         if not all(isinstance(k, str) for k in gro_charges.keys()):
-            raise ValueError("All keys in gro_charges must be strings representing atom names.")
+            raise ValueError(
+                "All keys in gro_charges must be strings representing atom names."
+            )
         if not all(isinstance(v, (int, float)) for v in gro_charges.values()):
-            raise ValueError("All values in gro_charges must be numbers representing charges.")
-        if not all(gro_charges.get(k) is not None for k in gro_lib.keys() if gro_lib[k] != ""):
-            raise ValueError("All atom names in gro_lib (except those mapped to \"\") must have corresponding charges in gro_charges.")
+            raise ValueError(
+                "All values in gro_charges must be numbers representing charges."
+            )
+        if not all(
+            gro_charges.get(k) is not None for k in gro_lib.keys() if gro_lib[k] != ""
+        ):
+            raise ValueError(
+                'All atom names in gro_lib (except those mapped to "") must '
+                "have corresponding charges in gro_charges."
+            )
         self._gro_charges = gro_charges
 
         # Validate atom_masses
         if not isinstance(atom_masses, dict):
-            raise ValueError("atom_masses must be provided as a dictionary mapping atom types to masses.")
+            raise ValueError(
+                "atom_masses must be provided as a dictionary mapping atom "
+                "types to masses."
+            )
         if not all(isinstance(k, str) for k in atom_masses.keys()):
-            raise ValueError("All keys in atom_masses must be strings representing atom names.")
+            raise ValueError(
+                "All keys in atom_masses must be strings representing atom names."
+            )
         if not all(isinstance(v, (int, float)) and v > 0 for v in atom_masses.values()):
-            raise ValueError("All values in atom_masses must be positive numbers representing masses.")
+            raise ValueError(
+                "All values in atom_masses must be positive numbers "
+                "representing masses."
+            )
         if not all(atom_masses.get(v) is not None for v in self._type_to_name.values()):
-            raise ValueError("All atoms in gro_lib must have corresponding masses in atom_masses.")
+            raise ValueError(
+                "All atoms in gro_lib must have corresponding masses in atom_masses."
+            )
         self._atom_masses = atom_masses
 
         self._job_file = None
@@ -146,7 +191,12 @@ class Simulate():
         self._frozen_atoms = None
         self._frozen_region = lambda x, y, z: False
 
-    def set_job_file(self, job_file: str | None = None, submit_command: str | None = None, lammps_command: str | None = None):
+    def set_job_file(
+        self,
+        job_file: str | None = None,
+        submit_command: str | None = None,
+        lammps_command: str | None = None,
+    ):
         """
         Specify a custom job submission template file and command.
 
@@ -181,11 +231,17 @@ class Simulate():
 
         Example
         -------
-        >>> sim.set_job_file('/path/to/custom.job', 'sbatch', 'mpirun lmp -in {input_file} -log {log_file}')
+        >>> sim.set_job_file(
+        ...     '/path/to/custom.job',
+        ...     'sbatch',
+        ...     'mpirun lmp -in {input_file} -log {log_file}',
+        ... )
         """
         # Validate and set job file path
         if job_file is None and self._job_file is None:
-            f_path = os.path.abspath(files("porereax").joinpath("templates", "reax.job"))
+            f_path = os.path.abspath(
+                files("porereax").joinpath("templates", "reax.job")
+            )
         else:
             f_path = os.path.abspath(job_file)
 
@@ -199,7 +255,10 @@ class Simulate():
 
         # Validate and set LAMMPS command
         if lammps_command is None and self._lammps_command is None:
-            l_command = "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk -pk kokkos neigh half newton on comm host"
+            l_command = (
+                "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk "
+                "-pk kokkos neigh half newton on comm host"
+            )
         else:
             if not isinstance(lammps_command, str) or lammps_command == "":
                 raise ValueError("lammps_command must be a non-empty string.")
@@ -218,8 +277,9 @@ class Simulate():
         Parameters
         ----------
         force_field : str
-            Path to the ReaxFF force field parameter file (ffield). This file contains
-            all the reactive force field parameters for the atom types in the system.
+            Path to the ReaxFF force field parameter file (ffield). This file
+            contains all the reactive force field parameters for the atom
+            types in the system.
 
         Raises
         ------
@@ -236,8 +296,13 @@ class Simulate():
         >>> sim.set_force_field('/path/to/reax.ffield')
         """
         if force_field is None:
-            ffield = os.path.abspath(files("porereax").joinpath("templates", "reax.ffield"))
-            print("Using force field from https://doi.org/10.1063/1.3407433 for Si/O/H systems.")
+            ffield = os.path.abspath(
+                files("porereax").joinpath("templates", "reax.ffield")
+            )
+            print(
+                "Using force field from https://doi.org/10.1063/1.3407433 "
+                "for Si/O/H systems."
+            )
         else:
             ffield = os.path.abspath(force_field)
 
@@ -245,18 +310,30 @@ class Simulate():
             raise FileNotFoundError(f"Force field file {ffield} not found.")
         self._force_field = ffield
 
-    def add_image_dump(self, plane="xy", dump_freq=None, zoom=1.5, image_width=1200, image_height=1200, atom_colors=None, atom_sizes=None, map_by_charge=None, kwargs=None):
+    def add_image_dump(
+        self,
+        plane="xy",
+        dump_freq=None,
+        zoom=1.5,
+        image_width=1200,
+        image_height=1200,
+        atom_colors=None,
+        atom_sizes=None,
+        map_by_charge=None,
+        kwargs=None,
+    ):
         """
         Add an image rendering during LAMMPS simulations.
         It allows for the generation of image snapshots of the simulation at
-        specified intervals, with customizable viewing planes, zoom levels, 
+        specified intervals, with customizable viewing planes, zoom levels,
         and atom visualizations.
-        Multiple image dumps can be added to the simulation workflow with different settings.
+        Multiple image dumps can be added to the simulation workflow with
+        different settings.
 
         Parameters
         ----------
         plane : str or None, optional
-            Viewing plane for the snapshot. Supported values are 
+            Viewing plane for the snapshot. Supported values are
             "xy", "xz", "yz". Default is "xy".
         dump_freq : int, optional
             Frequency (in steps) for writing image snapshots.
@@ -276,15 +353,19 @@ class Simulate():
         map_by_charge : str or None, optional
             If not None, must be a string representing an amap string to
             map atom colors by their partial charges using a color gradient.
-            If provided, this overrides atom_colors. 
+            If provided, this overrides atom_colors.
             Example: "-1 2 ca 0.0 3 min royalblue 0 green max orangered"
         kwargs : str or None, optional
-            Additional keyword arguments for the LAMMPS dump command. 
+            Additional keyword arguments for the LAMMPS dump command.
             This can be used to pass extra options to the dump command.
         """
         if not isinstance(plane, str) or plane not in {"xy", "xz", "yz"}:
             raise ValueError("plane must be one of: 'xy', 'xz', 'yz'.")
-        if dump_freq is not None and (isinstance(dump_freq, bool) or not isinstance(dump_freq, int) or dump_freq <= 0):
+        if dump_freq is not None and (
+            isinstance(dump_freq, bool)
+            or not isinstance(dump_freq, int)
+            or dump_freq <= 0
+        ):
             raise ValueError("dump_freq must be a positive integer or None.")
         if not isinstance(zoom, (int, float)) or zoom <= 0:
             raise ValueError("zoom must be a positive number.")
@@ -295,37 +376,58 @@ class Simulate():
         if atom_colors is not None:
             if not isinstance(atom_colors, dict):
                 raise ValueError("atom_colors must be provided as a dictionary.")
-            if not all(isinstance(k, str) and isinstance(v, str) for k, v in atom_colors.items()):
+            if not all(
+                isinstance(k, str) and isinstance(v, str)
+                for k, v in atom_colors.items()
+            ):
                 raise ValueError("atom_colors keys and values must be strings.")
-            unknown_atoms = [atom for atom in atom_colors if atom not in self._name_to_type]
+            unknown_atoms = [
+                atom for atom in atom_colors if atom not in self._name_to_type
+            ]
             if unknown_atoms:
-                raise ValueError(f"Unknown atom names in atom_colors: {', '.join(unknown_atoms)}.")
+                raise ValueError(
+                    f"Unknown atom names in atom_colors: {', '.join(unknown_atoms)}."
+                )
         if atom_sizes is not None:
             if not isinstance(atom_sizes, dict):
                 raise ValueError("atom_sizes must be provided as a dictionary.")
-            if not all(isinstance(k, str) and isinstance(v, (int, float)) and v > 0 for k, v in atom_sizes.items()):
-                raise ValueError("atom_sizes keys must be strings and values must be positive numbers.")
-            unknown_atoms = [atom for atom in atom_sizes if atom not in self._name_to_type]
+            if not all(
+                isinstance(k, str) and isinstance(v, (int, float)) and v > 0
+                for k, v in atom_sizes.items()
+            ):
+                raise ValueError(
+                    "atom_sizes keys must be strings and values must be "
+                    "positive numbers."
+                )
+            unknown_atoms = [
+                atom for atom in atom_sizes if atom not in self._name_to_type
+            ]
             if unknown_atoms:
-                raise ValueError(f"Unknown atom names in atom_sizes: {', '.join(unknown_atoms)}.")
+                raise ValueError(
+                    f"Unknown atom names in atom_sizes: {', '.join(unknown_atoms)}."
+                )
         if map_by_charge is not None and not isinstance(map_by_charge, str):
-            raise ValueError("map_by_charge must be a string representing an amap string or None.")
+            raise ValueError(
+                "map_by_charge must be a string representing an amap string or None."
+            )
         if kwargs is not None and not isinstance(kwargs, str):
             raise ValueError("kwargs must be a string or None.")
 
         if self._image_dump is None:
             self._image_dump = []
-        self._image_dump.append({
-            "plane": plane,
-            "dump_freq": dump_freq,
-            "zoom": zoom,
-            "image_width": image_width,
-            "image_height": image_height,
-            "atom_colors": atom_colors or {},
-            "atom_sizes": atom_sizes or {},
-            "map_by_charge": map_by_charge,
-            "kwargs": kwargs,
-        })
+        self._image_dump.append(
+            {
+                "plane": plane,
+                "dump_freq": dump_freq,
+                "zoom": zoom,
+                "image_width": image_width,
+                "image_height": image_height,
+                "atom_colors": atom_colors or {},
+                "atom_sizes": atom_sizes or {},
+                "map_by_charge": map_by_charge,
+                "kwargs": kwargs,
+            }
+        )
 
     def _image_dump_template_data(self, step: dict) -> dict:
         """
@@ -366,7 +468,9 @@ class Simulate():
             plane = dump["plane"]
             view = plane_settings[plane]
             if dump["map_by_charge"]:
-                color_modify = f"dump_modify imagedump_{dump_id} amap {dump['map_by_charge']}"
+                color_modify = (
+                    f"dump_modify imagedump_{dump_id} amap {dump['map_by_charge']}"
+                )
             else:
                 color_modify = f"dump_modify imagedump_{dump_id} "
                 for atom_name, color in dump["atom_colors"].items():
@@ -375,28 +479,44 @@ class Simulate():
             for atom_name, size in dump["atom_sizes"].items():
                 size_modify += f"adiam {self._name_to_type[atom_name]} {size} "
 
-            image_dumps.append({
-                "plane": plane,
-                "dump_id": dump_id,
-                "region_id": f"image_half_{plane}",
-                "dump_freq": dump["dump_freq"] or step["dump_freq"],
-                "zoom": dump["zoom"],
-                "image_width": dump["image_width"],
-                "image_height": dump["image_height"],
-                "view_theta": view["theta"],
-                "view_phi": view["phi"],
-                "center_x": 0.5,
-                "center_y": 0.5,
-                "center_z": 0.5,
-                "color_modify": color_modify if dump["atom_colors"] or dump["map_by_charge"] else "",
-                "size_modify": size_modify if dump["atom_sizes"] else "",
-                "type": "type" if not dump["map_by_charge"] else "q",
-                "kwargs": dump["kwargs"] if dump["kwargs"] else "",
-            })
+            image_dumps.append(
+                {
+                    "plane": plane,
+                    "dump_id": dump_id,
+                    "region_id": f"image_half_{plane}",
+                    "dump_freq": dump["dump_freq"] or step["dump_freq"],
+                    "zoom": dump["zoom"],
+                    "image_width": dump["image_width"],
+                    "image_height": dump["image_height"],
+                    "view_theta": view["theta"],
+                    "view_phi": view["phi"],
+                    "center_x": 0.5,
+                    "center_y": 0.5,
+                    "center_z": 0.5,
+                    "color_modify": color_modify
+                    if dump["atom_colors"] or dump["map_by_charge"]
+                    else "",
+                    "size_modify": size_modify if dump["atom_sizes"] else "",
+                    "type": "type" if not dump["map_by_charge"] else "q",
+                    "kwargs": dump["kwargs"] if dump["kwargs"] else "",
+                }
+            )
 
         return {"IMAGE_DUMP_ENABLED": True, "IMAGE_DUMPS": image_dumps}
 
-    def add_sim(self, type: str, nsteps: int, temp: float, pressure: float = 1.0, dt: float = 0.5, nodes: int = 1, tasks_per_node: int = 64, wall_time: str = "20:00:00", dump_freq: int = 100, thermo_freq: int = 100) -> None:
+    def add_sim(
+        self,
+        type: str,
+        nsteps: int,
+        temp: float,
+        pressure: float = 1.0,
+        dt: float = 0.5,
+        nodes: int = 1,
+        tasks_per_node: int = 64,
+        wall_time: str = "20:00:00",
+        dump_freq: int = 100,
+        thermo_freq: int = 100,
+    ) -> None:
         """
         Add a simulation step to the workflow.
 
@@ -442,18 +562,20 @@ class Simulate():
         >>> # Add production run
         >>> sim.add_sim('nvt', nsteps=50000, temp=300, dt=0.5)
         """
-        self._sim.append({
-            "type": type,
-            "nsteps": nsteps,
-            "temp": temp,
-            "pressure": pressure,
-            "dt": dt,
-            "thermo_freq": thermo_freq,
-            "dump_freq": dump_freq,
-            "nodes": nodes,
-            "tasks_per_node": tasks_per_node,
-            "wall_time": wall_time,
-        })
+        self._sim.append(
+            {
+                "type": type,
+                "nsteps": nsteps,
+                "temp": temp,
+                "pressure": pressure,
+                "dt": dt,
+                "thermo_freq": thermo_freq,
+                "dump_freq": dump_freq,
+                "nodes": nodes,
+                "tasks_per_node": tasks_per_node,
+                "wall_time": wall_time,
+            }
+        )
 
     def freeze_region(self, region: Callable[[float, float, float], bool]):
         """
@@ -462,8 +584,9 @@ class Simulate():
         Parameters
         ----------
         region : callable
-            A function that takes three arguments (x, y, z) representing the coordinates
-            of an atom in Angstroms and returns True if the atom should be frozen, or False otherwise.
+            A function that takes three arguments (x, y, z) representing the
+            coordinates of an atom in Angstroms and returns True if the atom
+            should be frozen, or False otherwise.
 
         Raises
         ------
@@ -472,12 +595,16 @@ class Simulate():
 
         Notes
         -----
-        This method modifies the atom types to create frozen versions of the specified
-        atom types. Frozen atoms will not move during the simulation, allowing for
-        the study of surface interactions or confinement effects.
+        This method modifies the atom types to create frozen versions of the
+        specified atom types. Frozen atoms will not move during the
+        simulation, allowing for the study of surface interactions or
+        confinement effects.
         """
         if not callable(region):
-            raise ValueError("region must be a callable function that takes (x, y, z) and returns a boolean.")
+            raise ValueError(
+                "region must be a callable function that takes (x, y, z) "
+                "and returns a boolean."
+            )
         if not self._frozen_atoms:
             self._frozen_atoms = {}
             for a_name, a_type in self._name_to_type.items():
@@ -487,47 +614,66 @@ class Simulate():
                 self._type_to_name[frozen_type] = frozen_name
                 self._atom_masses[frozen_name] = self._atom_masses[a_name]
             self._num_atom_types *= 2
-            self._name_to_type.update({k: v for k, v in self._frozen_atoms.items()})
+            self._name_to_type.update(dict(self._frozen_atoms.items()))
             self._frozen_region = region
 
     def auto_freeze(self, reactive_radius: float = 10.0):
         """
-        Automatically freeze some atoms of the pore structure and leave a reactive layer between frozen and solvent.
+        Automatically freeze some atoms of the pore structure and leave a
+        reactive layer between frozen and solvent.
 
         Parameters
         ----------
         reactive_radius : float, optional
-            The thickness of the reactive layer in Angstroms. Atoms within this distance from the pore wall will remain unfrozen. Default is 10.0 Angstroms.
+            The thickness of the reactive layer in Angstroms. Atoms within
+            this distance from the pore wall will remain unfrozen. Default is
+            10.0 Angstroms.
 
         Raises
         ------
         NotImplementedError
-            If the pore type specified in the system YAML file is not "cylinder". Currently, only cylindrical pores are supported for automatic freezing.
+            If the pore type specified in the system YAML file is not
+            "cylinder". Currently, only cylindrical pores are supported for
+            automatic freezing.
         """
         if self._system_file is None:
-            raise ValueError("System file is not specified. Cannot perform auto_freeze without a system YAML file.")
+            raise ValueError(
+                "System file is not specified. Cannot perform auto_freeze "
+                "without a system YAML file."
+            )
         pore_properties = read_pore_yml(self._system_file)
         if pore_properties["type"] == "cylinder":
             pore_radius = pore_properties["radius"]
             pore_center = pore_properties["center"]
             pore_range = pore_properties["range"]
+
             def region(x, y, z):
                 d = np.linalg.norm(np.array([x, y]) - np.array(pore_center[:2]))
-                return d > (pore_radius + reactive_radius) and pore_range[0] + reactive_radius + 1 < z < pore_range[1] - reactive_radius - 1
+                return (
+                    d > (pore_radius + reactive_radius)
+                    and pore_range[0] + reactive_radius + 1
+                    < z
+                    < pore_range[1] - reactive_radius - 1
+                )
+
             self.freeze_region(region)
         else:
-            raise NotImplementedError("Only cylindrical pores are supported for auto_freeze.")
+            raise NotImplementedError(
+                "Only cylindrical pores are supported for auto_freeze."
+            )
 
     def generate(self):
         """
         Generate all simulation files and scripts.
 
-        This method is the main entry point for generating a complete simulation workflow.
+        This method is the main entry point for generating a complete
+        simulation workflow.
         It creates all necessary files for running ReaxFF simulations:
 
         - Converts GROMACS structure to LAMMPS data file (system.data)
         - Copies or uses default ReaxFF force field file (reax.ffield)
-        - Generates LAMMPS input scripts for initial equilibration and all simulation steps
+        - Generates LAMMPS input scripts for initial equilibration and all
+          simulation steps
         - Creates job submission scripts for each simulation stage
         - Generates analysis script (ana.py) for post-processing
 
@@ -567,37 +713,49 @@ class Simulate():
         # Setup and copy force field file
         if self._force_field is None:
             self.set_force_field(None)
-        target_force_field = os.path.join(self._path, 'reax.ffield')
+        target_force_field = os.path.join(self._path, "reax.ffield")
         if os.path.abspath(self._force_field) != os.path.abspath(target_force_field):
             shutil.copy2(self._force_field, target_force_field)
 
-        if self._job_file is None or self._submit_cmd is None or self._lammps_command is None:
+        if (
+            self._job_file is None
+            or self._submit_cmd is None
+            or self._lammps_command is None
+        ):
             self.set_job_file(None, None, None)
 
         # Setup figure folder
         if self._image_dump is not None:
             os.makedirs(os.path.join(self._path, "figures"), exist_ok=True)
 
-        with open(self._job_file, 'r') as f:
+        with open(self._job_file) as f:
             job_template = Template(f.read())
-        run_template_path = os.path.abspath(files("porereax").joinpath("templates", "run_n.lmp"))
-        with open(run_template_path, 'r') as f:
+        run_template_path = os.path.abspath(
+            files("porereax").joinpath("templates", "run_n.lmp")
+        )
+        with open(run_template_path) as f:
             lmp_step_template = Template(f.read())
 
         if self._frozen_atoms:
-            atoms = ' '.join(self._type_to_name[1 + (k%(self._num_atom_types//2))] for k in range(self._num_atom_types))
+            atoms = " ".join(
+                self._type_to_name[1 + (k % (self._num_atom_types // 2))]
+                for k in range(self._num_atom_types)
+            )
         else:
-            atoms = ' '.join(self._type_to_name[k] for k in range(1, self._num_atom_types + 1))
+            atoms = " ".join(
+                self._type_to_name[k] for k in range(1, self._num_atom_types + 1)
+            )
 
         for step_idx, step in enumerate(self._sim):
             file_name = f"run_{step_idx}"
             lmp_file = os.path.join(self._path, f"{file_name}.lmp")
-            lammps_command = "mkdir -p figures \n" if self._image_dump is not None else ""
-            lammps_command += self._lammps_command.format(
-                input_file=f"{file_name}.lmp",
-                log_file=f"{file_name}.log"
+            lammps_command = (
+                "mkdir -p figures \n" if self._image_dump is not None else ""
             )
-            with open(lmp_file, 'w') as f:
+            lammps_command += self._lammps_command.format(
+                input_file=f"{file_name}.lmp", log_file=f"{file_name}.log"
+            )
+            with open(lmp_file, "w") as f:
                 file_content = lmp_step_template.render(
                     SIMNUMBER=step_idx,
                     TIMESTEP=step["dt"],
@@ -613,7 +771,7 @@ class Simulate():
                 )
                 f.write(file_content)
             job_file = os.path.join(self._path, f"{file_name}.job")
-            with open(job_file, 'w') as f:
+            with open(job_file, "w") as f:
                 file_content = job_template.render(
                     SIMULATIONNODES=step["nodes"],
                     SIMULATIONTASKSPERNODE=step["tasks_per_node"],
@@ -622,14 +780,16 @@ class Simulate():
                     LAMMPS_COMMAND=lammps_command,
                 )
                 f.write(file_content)
-                if step_idx+1<len(self._sim):
-                    f.write(f"\n\n{self._submit_cmd} run_{step_idx+1}.job\n")
+                if step_idx + 1 < len(self._sim):
+                    f.write(f"\n\n{self._submit_cmd} run_{step_idx + 1}.job\n")
 
         # Create ana files
-        ana_template_path = os.path.abspath(files("porereax").joinpath("templates", "ana.py"))
-        with open(ana_template_path, 'r') as f:
+        ana_template_path = os.path.abspath(
+            files("porereax").joinpath("templates", "ana.py")
+        )
+        with open(ana_template_path) as f:
             ana_template = Template(f.read())
-        with open(os.path.join(self._path, "ana.py"), 'w') as f:
+        with open(os.path.join(self._path, "ana.py"), "w") as f:
             file_content = ana_template.render(
                 NUMSIMS=len(self._sim),
                 NAME_TO_TYPE=self._name_to_type,
@@ -695,8 +855,9 @@ class Simulate():
         """
         Read and parse a GROMACS structure file.
 
-        This internal method reads the structure file, extracts simulation box dimensions,
-        and parses all atom information including positions and velocities.
+        This internal method reads the structure file, extracts simulation
+        box dimensions, and parses all atom information including positions
+        and velocities.
 
         Returns
         -------
@@ -711,14 +872,18 @@ class Simulate():
         Notes
         -----
         - Box dimensions are read from the last line of the .gro file
-        - Atom data is read from lines 3 to second-to-last (skipping header and box line)
+        - Atom data is read from lines 3 to second-to-last (skipping header
+          and box line)
         - Prints box dimensions to stdout for user verification
         """
-        with open(self._structure_file, 'r') as file:
-            lines = [l for l in file.readlines() if l.strip()]
+        with open(self._structure_file) as file:
+            lines = [line for line in file.readlines() if line.strip()]
 
         box_dims = [float(dim) * 10 for dim in lines[-1].strip().split()]
-        print(f"Box dimensions (Angstroms): [{', '.join(f'{dim:.3f}' for dim in box_dims)}]")
+        print(
+            "Box dimensions (Angstroms): "
+            f"[{', '.join(f'{dim:.3f}' for dim in box_dims)}]"
+        )
 
         gro_data = [self._line_mapper(line) for line in lines[2:-1]]
 
@@ -789,7 +954,7 @@ class Simulate():
         - Charge neutrality should be verified by the user from printed output
         """
         charge_count = 0.0
-        atom_count = {atom_type: 0 for atom_type in range(1, self._num_atom_types + 1)}
+        atom_count = dict.fromkeys(range(1, self._num_atom_types + 1), 0)
         file.write("\nAtoms\n\n")
         for i, data in enumerate(gro_data, start=1):
             res_id, _, atom_name, x, y, z, _, _, _ = data
@@ -798,12 +963,17 @@ class Simulate():
             if atom_type is None:
                 raise ValueError(f"Atom name '{atom_name}' not found in gro_lib.")
             if charge is None:
-                raise ValueError(f"Charge for atom name '{atom_name}' not found in gro_charges.")
+                raise ValueError(
+                    f"Charge for atom name '{atom_name}' not found in gro_charges."
+                )
             if self._frozen_atoms and self._frozen_region(x, y, z):
                 atom_type += self._num_atom_types // 2
             charge_count += float(f"{charge:.4f}")
             atom_count[atom_type] += 1
-            file.write(f"{i:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} {y:8.3f} {z:8.3f}\n")
+            file.write(
+                f"{i:5d} {res_id:5d} {atom_type:5d} {charge:8.4f} {x:8.3f} "
+                f"{y:8.3f} {z:8.3f}\n"
+            )
         file.write("\nVelocities\n\n")
         for i, data in enumerate(gro_data, start=1):
             _, _, _, _, _, _, vx, vy, vz = data
@@ -835,9 +1005,11 @@ class Simulate():
         - The created file is in LAMMPS 'charge' atom style format
         """
         box_dims, gro_data = self._read_gro_file()
-        gro_data = [data for data in gro_data if self._gro_lib.get(data[2], 0) != ""] # Filter out ghost particles e.g. from tip4p water model
+        gro_data = [
+            data for data in gro_data if self._gro_lib.get(data[2], 0) != ""
+        ]  # Filter out ghost particles e.g. from tip4p water model
         num_atoms = len(gro_data)
-        with open(out_path, 'w') as file:
+        with open(out_path, "w") as file:
             self._write_lammps_header(file, num_atoms, box_dims)
             self._write_lammps_data(file, gro_data)
         print(f"LAMMPS data file written to {out_path}")

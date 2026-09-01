@@ -1,24 +1,28 @@
 """
 Module providing parent Sampler classes
 
-The module provides :class:`Sampler`, :class:`AtomSampler`, and :class:`BondSampler` as base classes for sampling various properties of MD simulations.
+The module provides :class:`Sampler`, :class:`AtomSampler`, and
+:class:`BondSampler` as base classes for sampling various properties of MD
+simulations.
 """
 
 import abc
-import numpy as np
-import os
 import itertools
-import porereax.utils as utils
-import porereax.regions as regions
-from porereax.utils import Substitution
+import os
 
+import numpy as np
+
+import porereax.regions as regions
+import porereax.utils as utils
+from porereax.utils import Substitution
 
 _SAMPLER_INIT_PARAMS = """
 dimension : str
     Dimension along which to sample.
 region : str or Callable
     Region specification for sampling.
-    Can be a string defining a geometric region or a function that takes coordinates and returns a boolean mask.
+    Can be a string defining a geometric region or a function that takes
+    coordinates and returns a boolean mask.
 process_id : int
     Process ID for parallel processing.
 atom_lib : dict
@@ -38,22 +42,30 @@ name_out : str
     Name of the output file of the sampler data
 """
 
-_ATOM_SAMPLER_INIT_PARAMS = _NAME_OUT_PARAM + """
+_ATOM_SAMPLER_INIT_PARAMS = (
+    _NAME_OUT_PARAM
+    + """
 atoms : list
     List of atoms to sample, each specified as a dictionary with keys:
 
     - "atom": str, the atom type
     - "bonds": list, optional, list of bonded atom types
-""" + _SAMPLER_INIT_PARAMS
+"""
+    + _SAMPLER_INIT_PARAMS
+)
 
-_BOND_SAMPLER_INIT_PARAMS = _NAME_OUT_PARAM + """
+_BOND_SAMPLER_INIT_PARAMS = (
+    _NAME_OUT_PARAM
+    + """
 bonds : list
     List of bonds to sample, each specified as a dictionary with keys:
 
     - "bond": str, the bond in format "A-B"
     - "bonds_A": list, optional, list of bonded atom types for atom A
     - "bonds_B": list, optional, list of bonded atom types for atom B
-""" + _SAMPLER_INIT_PARAMS
+"""
+    + _SAMPLER_INIT_PARAMS
+)
 
 
 def _permutate_bonds(bonds, atom_lib, class_name):
@@ -81,7 +93,10 @@ def _permutate_bonds(bonds, atom_lib, class_name):
         # elif bonded_atom == "X":
         #     bond_types.append("X")
         else:
-            raise ValueError(f"Error in {class_name}: Bonded atom {bonded_atom} not found in atom library.")
+            raise ValueError(
+                f"Error in {class_name}: Bonded atom {bonded_atom} not found "
+                "in atom library."
+            )
     options = [atom_lib.values() if x == "X" else [x] for x in bond_types]
     expanded = itertools.product(*options)
     bond_permutations = []
@@ -92,6 +107,7 @@ def _permutate_bonds(bonds, atom_lib, class_name):
                 seen_permutations.add(perm)
                 bond_permutations.append(list(perm))
     return bond_permutations
+
 
 def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
     """
@@ -113,14 +129,17 @@ def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
     identifier : str
         Unique identifier for the molecule.
     mol : dict
-        Molecule dictionary containing atom type ID and bonded atom type ID permutations.
+        Molecule dictionary containing atom type ID and bonded atom type ID
+        permutations.
     """
     if atom in atom_lib:
         atom_id = atom_lib[atom]
     elif atom == "X":
         atom_id = "X"
     else:
-        raise ValueError(f"Error in {class_name}: Atom {atom} not found in atom library.")
+        raise ValueError(
+            f"Error in {class_name}: Atom {atom} not found in atom library."
+        )
     bonds = sorted(bonds) if bonds is not None else None
     identifier = atom + "(" + "+".join(bonds) + ")" if bonds is not None else atom
     if bonds is not None:
@@ -129,6 +148,7 @@ def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
         bond_permutations = None
     mol = {"atom": atom_id, "bonds": bond_permutations}
     return identifier, mol
+
 
 def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False):
     """
@@ -148,22 +168,44 @@ def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False
     Raises
     ------
     ValueError
-        If the pairs are not in the expected format or contain invalid atom types.
+        If the pairs are not in the expected format or contain invalid atom
+        types.
     """
     if not isinstance(doubles, list) or len(doubles) == 0:
-        raise ValueError(f"{class_name} '{attribute_name}' parameter must be a non-empty list.")
+        raise ValueError(
+            f"{class_name} '{attribute_name}' parameter must be a non-empty list."
+        )
     for double in doubles:
-        if (not isinstance(double, (list, tuple)) or len(double) != 2):
-            raise ValueError(f"{class_name} '{attribute_name}' parameter must be a list of doubles (lists or tuples of length 2).")
+        if not isinstance(double, (list, tuple)) or len(double) != 2:
+            raise ValueError(
+                f"{class_name} '{attribute_name}' parameter must be a list "
+                "of doubles (lists or tuples of length 2)."
+            )
         atom1, atom2 = double
-        if (not isinstance(atom1, dict) or not isinstance(atom2, dict)) and not allow_none:
-            raise ValueError(f"{class_name} '{attribute_name}' parameter must contain dictionaries with 'atom' and optional 'bonds' keys.")
-        elif allow_none and (not (atom1 is None and isinstance(atom2, dict)) and
-                             not (atom2 is None and isinstance(atom1, dict)) and
-                             not (isinstance(atom1, dict) and isinstance(atom2, dict))):
-            raise ValueError(f"{class_name} '{attribute_name}' parameter must contain dictionaries with 'atom' and optional 'bonds' keys, while one of the double can be None.")
-        if (atom1 is not None and "atom" not in atom1) or (atom2 is not None and "atom" not in atom2):
-            raise ValueError(f"{class_name} '{attribute_name}' parameter dictionaries must have an 'atom' key.")
+        if (
+            not isinstance(atom1, dict) or not isinstance(atom2, dict)
+        ) and not allow_none:
+            raise ValueError(
+                f"{class_name} '{attribute_name}' parameter must contain "
+                "dictionaries with 'atom' and optional 'bonds' keys."
+            )
+        elif allow_none and (
+            not (atom1 is None and isinstance(atom2, dict))
+            and not (atom2 is None and isinstance(atom1, dict))
+            and not (isinstance(atom1, dict) and isinstance(atom2, dict))
+        ):
+            raise ValueError(
+                f"{class_name} '{attribute_name}' parameter must contain "
+                "dictionaries with 'atom' and optional 'bonds' keys, while "
+                "one of the double can be None."
+            )
+        if (atom1 is not None and "atom" not in atom1) or (
+            atom2 is not None and "atom" not in atom2
+        ):
+            raise ValueError(
+                f"{class_name} '{attribute_name}' parameter dictionaries "
+                "must have an 'atom' key."
+            )
 
 
 @Substitution(params=_SAMPLER_INIT_PARAMS, name_out=_NAME_OUT_PARAM)
@@ -176,29 +218,64 @@ class Sampler(abc.ABC):
     %(name_out)s
     %(params)s
     """
-    def __init__(self, name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
+
+    def __init__(
+        self,
+        name_out,
+        dimension,
+        region,
+        process_id,
+        atom_lib,
+        masses,
+        num_frames,
+        box,
+        system_properties,
+    ):
         if not isinstance(name_out, str) or name_out == "":
-            raise ValueError(f"{self.__class__.__name__} requires a valid 'name_out' string parameter.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a valid 'name_out' "
+                "string parameter."
+            )
         if not isinstance(process_id, int):
-            raise ValueError(f"{self.__class__.__name__} requires an integer 'process_id' parameter.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires an integer 'process_id' parameter."
+            )
         if not isinstance(atom_lib, dict):
-            raise ValueError(f"{self.__class__.__name__} requires a dictionary 'atom_lib' parameter.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a dictionary 'atom_lib' parameter."
+            )
         if not isinstance(masses, dict):
-            raise ValueError(f"{self.__class__.__name__} requires a dictionary 'masses' parameter.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a dictionary 'masses' parameter."
+            )
         if not isinstance(num_frames, int) or num_frames <= 0:
-            raise ValueError(f"{self.__class__.__name__} requires a positive integer 'num_frames' parameter.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a positive integer "
+                "'num_frames' parameter."
+            )
         if not isinstance(box, np.ndarray) or box.shape != (3,):
-            raise ValueError(f"{self.__class__.__name__} requires a numpy array 'box' parameter with shape (3,).")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a numpy array 'box' "
+                "parameter with shape (3,)."
+            )
         if system_properties is not None and not isinstance(system_properties, dict):
-            raise ValueError(f"{self.__class__.__name__} requires a dictionary 'system_properties' parameter or None.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a dictionary "
+                "'system_properties' parameter or None."
+            )
         if isinstance(region, str):
-            region_function = regions.get_region_function(region, box, system_properties)
+            region_function = regions.get_region_function(
+                region, box, system_properties
+            )
             region_name = region
         elif callable(region):
             region_function = region
             region_name = "Custom Function"
         else:
-            raise ValueError(f"{self.__class__.__name__} requires a valid 'region' parameter as a string or callable function.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a valid 'region' "
+                "parameter as a string or callable function."
+            )
 
         self._validate_region_function(region_function)
         self._region = region_function
@@ -214,7 +291,16 @@ class Sampler(abc.ABC):
         self._molecules = {}
         self._data = {}
         self._input = {}
-        self._input.update({"name_out": name_out, "dimension": dimension, "region": region_name, "box": box, "system_properties": system_properties, "sampler_type": self.__class__.__name__})
+        self._input.update(
+            {
+                "name_out": name_out,
+                "dimension": dimension,
+                "region": region_name,
+                "box": box,
+                "system_properties": system_properties,
+                "sampler_type": self.__class__.__name__,
+            }
+        )
 
     def save_object(self):
         """
@@ -224,20 +310,33 @@ class Sampler(abc.ABC):
         utils.save_object(self._data, self._file_out)
 
     @abc.abstractmethod
-    def sample(self, frame_id: int, molecule_mask: dict, molecule_bond_atoms: dict, bond_mask: dict, frame: object, bond_enum: object, positions_transformed: np.ndarray):
+    def sample(
+        self,
+        frame_id: int,
+        molecule_mask: dict,
+        molecule_bond_atoms: dict,
+        bond_mask: dict,
+        frame: object,
+        bond_enum: object,
+        positions_transformed: np.ndarray,
+    ):
         """
         Sample data for the current frame.
 
         Parameters
         ----------
         frame_id : int
-            Frame index in perspective of the subprocess (starts from 0 for each subprocess).
+            Frame index in perspective of the subprocess (starts from 0 for
+            each subprocess).
         molecule_mask : dict
-            Dictionary mapping molecule identifiers to boolean masks indicating which atoms belong to that molecule in the frame.
+            Dictionary mapping molecule identifiers to boolean masks
+            indicating which atoms belong to that molecule in the frame.
         molecule_bond_atoms : dict
-            Dictionary mapping molecule identifiers to their bonded atom indices in the frame.
+            Dictionary mapping molecule identifiers to their bonded atom
+            indices in the frame.
         bond_mask : dict
-            Dictionary mapping bond identifiers to boolean masks indicating which bonds belong to that identifier in the frame.
+            Dictionary mapping bond identifiers to boolean masks indicating
+            which bonds belong to that identifier in the frame.
         frame : OVITO frame object
             Current frame object from OVITO containing atomic data.
         bond_enum : OVITO BondsEnumerator
@@ -327,7 +426,8 @@ class Sampler(abc.ABC):
         identifier : str
             The identifier for which to combine data.
         data : dict
-            Dictionary containing lists of data from each process for the given identifier.
+            Dictionary containing lists of data from each process for the
+            given identifier.
 
         Returns
         -------
@@ -348,7 +448,8 @@ class Sampler(abc.ABC):
 
     def _validate_region_function(self, region_function):
         """
-        Validate the region function to ensure it returns a boolean mask for given coordinates.
+        Validate the region function to ensure it returns a boolean mask for
+        given coordinates.
 
         Parameters
         ----------
@@ -363,10 +464,20 @@ class Sampler(abc.ABC):
         test_coords = np.array([[0.0, 0.0, 0.0]])
         try:
             mask = region_function(test_coords)
-            if not isinstance(mask, np.ndarray) or mask.dtype != bool or mask.shape != (1,):
-                raise ValueError(f"Region function for {self.__class__.__name__} must return a boolean numpy array of shape (N,) for input coordinates of shape (N, 3).")
+            if (
+                not isinstance(mask, np.ndarray)
+                or mask.dtype != bool
+                or mask.shape != (1,)
+            ):
+                raise ValueError(
+                    f"Region function for {self.__class__.__name__} must "
+                    "return a boolean numpy array of shape (N,) for input "
+                    "coordinates of shape (N, 3)."
+                )
         except Exception as e:
-            raise ValueError(f"Error in region function for {self.__class__.__name__}: {e}")
+            raise ValueError(
+                f"Error in region function for {self.__class__.__name__}: {e}"
+            ) from e
 
 
 @Substitution(params=_ATOM_SAMPLER_INIT_PARAMS)
@@ -378,18 +489,51 @@ class AtomSampler(Sampler):
     ----------
     %(params)s
     """
-    def __init__(self, name_out, atoms, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
-        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+
+    def __init__(
+        self,
+        name_out,
+        atoms,
+        dimension,
+        region,
+        process_id,
+        atom_lib,
+        masses,
+        num_frames,
+        box,
+        system_properties,
+    ):
+        super().__init__(
+            name_out,
+            dimension,
+            region,
+            process_id,
+            atom_lib,
+            masses,
+            num_frames,
+            box,
+            system_properties,
+        )
         if not isinstance(atoms, list) or len(atoms) == 0:
-            raise ValueError(f"{self.__class__.__name__} requires a non-empty list of atoms.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a non-empty list of atoms."
+            )
         for atom_info in atoms:
             if "atom" not in atom_info or not isinstance(atom_info["atom"], str):
-                raise ValueError(f"{self.__class__.__name__} requires each atom entry to have an 'atom' key with a string value.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires each atom entry to "
+                    "have an 'atom' key with a string value."
+                )
             if "bonds" in atom_info and not isinstance(atom_info["bonds"], list):
-                raise ValueError(f"{self.__class__.__name__} requires the 'bonds' key to be a list if provided.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires the 'bonds' key to "
+                    "be a list if provided."
+                )
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
-            identifier, mol = _build_mol_dictionary(atom, bonds, atom_lib, self.__class__.__name__)
+            identifier, mol = _build_mol_dictionary(
+                atom, bonds, atom_lib, self.__class__.__name__
+            )
             self._molecules[identifier] = mol
 
 
@@ -402,20 +546,57 @@ class BondSampler(Sampler):
     ----------
     %(params)s
     """
-    def __init__(self, name_out, bonds, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties):
-        super().__init__(name_out, dimension, region, process_id, atom_lib, masses, num_frames, box, system_properties)
+
+    def __init__(
+        self,
+        name_out,
+        bonds,
+        dimension,
+        region,
+        process_id,
+        atom_lib,
+        masses,
+        num_frames,
+        box,
+        system_properties,
+    ):
+        super().__init__(
+            name_out,
+            dimension,
+            region,
+            process_id,
+            atom_lib,
+            masses,
+            num_frames,
+            box,
+            system_properties,
+        )
         if not isinstance(bonds, list) or len(bonds) == 0:
-            raise ValueError(f"{self.__class__.__name__} requires a non-empty list of bonds.")
+            raise ValueError(
+                f"{self.__class__.__name__} requires a non-empty list of bonds."
+            )
         self._bonds = {}
         for bond_info in bonds:
             if "bond" not in bond_info or not isinstance(bond_info["bond"], str):
-                raise ValueError(f"{self.__class__.__name__} requires each bond entry to have a 'bond' key with a string value.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires each bond entry to "
+                    "have a 'bond' key with a string value."
+                )
             if len(bond_info["bond"].split("-")) != 2:
-                raise ValueError(f"{self.__class__.__name__} requires the 'bond' key to be in the format 'A-B'.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires the 'bond' key to "
+                    "be in the format 'A-B'."
+                )
             if "bonds_A" in bond_info and not isinstance(bond_info["bonds_A"], list):
-                raise ValueError(f"{self.__class__.__name__} requires the 'bonds_A' key to be a list if provided.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires the 'bonds_A' key "
+                    "to be a list if provided."
+                )
             if "bonds_B" in bond_info and not isinstance(bond_info["bonds_B"], list):
-                raise ValueError(f"{self.__class__.__name__} requires the 'bonds_B' key to be a list if provided.")
+                raise ValueError(
+                    f"{self.__class__.__name__} requires the 'bonds_B' key "
+                    "to be a list if provided."
+                )
 
             bond = bond_info["bond"]
             atom_A, atom_B = bond.split("-")
@@ -438,12 +619,20 @@ class BondSampler(Sampler):
                 bonds_B.append(atom_A)
                 bonds_B.sort()
 
-            mol_identifier_A, mol_A = _build_mol_dictionary(atom_A, bonds_A, atom_lib, self.__class__.__name__)
-            mol_identifier_B, mol_B = _build_mol_dictionary(atom_B, bonds_B, atom_lib, self.__class__.__name__)
+            mol_identifier_A, mol_A = _build_mol_dictionary(
+                atom_A, bonds_A, atom_lib, self.__class__.__name__
+            )
+            mol_identifier_B, mol_B = _build_mol_dictionary(
+                atom_B, bonds_B, atom_lib, self.__class__.__name__
+            )
             self._molecules[mol_identifier_A] = mol_A
             self._molecules[mol_identifier_B] = mol_B
 
-            self._bonds[identifier] = {"bond": [atom_lib[atom_A], atom_lib[atom_B]], "mol_A": mol_identifier_A, "mol_B": mol_identifier_B}
+            self._bonds[identifier] = {
+                "bond": [atom_lib[atom_A], atom_lib[atom_B]],
+                "mol_A": mol_identifier_A,
+                "mol_B": mol_identifier_B,
+            }
 
     def get_bonds(self) -> dict:
         """
