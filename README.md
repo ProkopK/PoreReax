@@ -1,5 +1,13 @@
 ![PoreReax](docs/source/_static/logo_text_sub.svg)
 
+[![CI](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/ci.yml?branch=main&label=CI)](https://github.com/ProkopK/PoreReax/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/docs.yml?branch=main&label=docs)](https://prokopk.github.io/PoreReax/)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/codeql.yml?branch=main&label=CodeQL)](https://github.com/ProkopK/PoreReax/actions/workflows/codeql.yml)
+[![codecov](https://img.shields.io/codecov/c/github/ProkopK/PoreReax?label=coverage)](https://codecov.io/gh/ProkopK/PoreReax)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![License: GPLv3](https://img.shields.io/github/license/ProkopK/PoreReax)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 ---
 
 <!-- start elevator-pitch -->
