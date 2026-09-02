@@ -68,6 +68,20 @@ Bonds must contain a `bond` key with two atom identifiers separated by a `-` cha
 {"bond": "O-H", "bonds_A": ["H"], "bonds_B": []}
 ```
 
+### Nested bonding environments
+
+Each entry of a `bonds`/`bonds_A`/`bonds_B` list may itself be a dictionary with the same `atom`/`bonds` shape, instead of a plain atom identifier string. This describes a required bonding environment for that specific neighbour, one hop further out, and can be nested arbitrarily deep. For example, to sample an oxygen atom `A` bonded to two hydrogens `B` (one of which must have no other bonds) and one oxygen `C` that is itself bonded to a silicon `D`:
+
+```python
+{"atom": "A", "bonds": [
+    {"atom": "B", "bonds": []},   # this B has no other bonds
+    "B",                          # the other B is unconstrained
+    {"atom": "C", "bonds": ["D"]},  # C is also bonded to D
+]}
+```
+
+This produces the identifier `A(B+B()+C(D))`, following the same alphabetical-join convention as the flat form.
+
 ## Visualise the results
 
 All results are stored in `.obj` files. To get the raw data, you can load the files with the `load_object` function returning a dictionary. For example, to load the charge data:

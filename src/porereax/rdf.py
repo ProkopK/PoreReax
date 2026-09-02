@@ -93,10 +93,10 @@ class RdfSampler(AtomSampler):
         for pair in pairs:
             pair_A, pair_B = pair
             identifier_A = _build_mol_dictionary(
-                pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler"
+                pair_A["atom"], pair_A.get("bonds", None), atom_lib, "RDF Sampler", True
             )[0]
             identifier_B = _build_mol_dictionary(
-                pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler"
+                pair_B["atom"], pair_B.get("bonds", None), atom_lib, "RDF Sampler", True
             )[0]
             pair_key = f"{identifier_A}-{identifier_B}"
             self._pairs[pair_key] = (identifier_A, identifier_B)

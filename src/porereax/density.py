@@ -191,6 +191,12 @@ def _setup_data_structure(
                     "direction": dir_indices,
                     "num_frames": 0,
                 }
+            else:
+                raise ValueError(
+                    f"{sampler_name} with 'Pore' dimension requires "
+                    "'direction' parameter to be one of 'r', 'p', 'd' for "
+                    "'Pore1D' or 'rp', 'rz', 'pz' for 'Pore2D'."
+                )
 
 
 def _record_density(
@@ -684,6 +690,7 @@ class ReactionSampler(AtomSampler):
                     reactant.get("bonds", None),
                     atom_lib,
                     "Reaction Sampler",
+                    True,
                 )[0]
                 if reactant is not None
                 else "X"
@@ -694,6 +701,7 @@ class ReactionSampler(AtomSampler):
                     product.get("bonds", None),
                     atom_lib,
                     "Reaction Sampler",
+                    True,
                 )[0]
                 if product is not None
                 else "X"

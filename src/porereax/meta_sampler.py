@@ -49,7 +49,16 @@ atoms : list
     List of atoms to sample, each specified as a dictionary with keys:
 
     - "atom": str, the atom type
-    - "bonds": list, optional, list of bonded atom types
+    - "bonds": list, optional, list of bonded atom types. Each entry may
+      either be a plain atom type string (no constraint on what that
+      neighbour is itself bonded to) or a dictionary with the same "atom"/
+      "bonds" shape, describing a required bonding environment for that
+      specific neighbour one hop further out. Nesting may repeat to
+      describe arbitrarily deep bonding environments. An entry's atom type
+      (plain string or the "atom" key of a nested dictionary) may be "X" to
+      match any atom type; a nested "X" entry may still carry its own
+      "bonds" requirement, constraining that wildcard neighbour's further
+      bonding environment without constraining its own type.
 """
     + _SAMPLER_INIT_PARAMS
 )
@@ -61,8 +70,13 @@ bonds : list
     List of bonds to sample, each specified as a dictionary with keys:
 
     - "bond": str, the bond in format "A-B"
-    - "bonds_A": list, optional, list of bonded atom types for atom A
-    - "bonds_B": list, optional, list of bonded atom types for atom B
+    - "bonds_A": list, optional, list of bonded atom types for atom A. Each
+      entry may be a plain atom type string or a nested dictionary
+      describing a required bonding environment for that neighbour, see
+      "bonds" in :class:`AtomSampler`, including "X" as a wildcard atom
+      type.
+    - "bonds_B": list, optional, list of bonded atom types for atom B, with
+      the same nested-dictionary support as "bonds_A".
 """
     + _SAMPLER_INIT_PARAMS
 )
@@ -90,8 +104,8 @@ def _permutate_bonds(bonds, atom_lib, class_name):
     for bonded_atom in bonds:
         if bonded_atom in atom_lib:
             bond_types.append(atom_lib[bonded_atom])
-        # elif bonded_atom == "X":
-        #     bond_types.append("X")
+        elif bonded_atom == "X":
+            bond_types.append("X")
         else:
             raise ValueError(
                 f"Error in {class_name}: Bonded atom {bonded_atom} not found "
@@ -109,7 +123,77 @@ def _permutate_bonds(bonds, atom_lib, class_name):
     return bond_permutations
 
 
-def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
+def _normalize_bond_entry(entry, class_name):
+    """
+    Normalize one entry of a "bonds"/"bonds_A"/"bonds_B" list to a
+    ``{"atom": str, "bonds": list or None}`` dictionary, validating its shape.
+
+    A plain string entry (today's flat format) becomes an unconstrained
+    entry; a dictionary entry may additionally carry its own nested "bonds"
+    key, describing a required bonding environment for that specific
+    neighbour one hop further out.
+
+    Parameters
+    ----------
+    entry : str or dict
+        One entry of a bonds list.
+    class_name : str
+        Name of the calling class for error messages.
+
+    Returns
+    -------
+    normalized : dict
+        Dictionary with keys "atom" (str) and "bonds" (list or None).
+    """
+    if isinstance(entry, str):
+        return {"atom": entry, "bonds": None}
+    if isinstance(entry, dict):
+        if "atom" not in entry or not isinstance(entry["atom"], str):
+            raise ValueError(
+                f"Error in {class_name}: each nested bond entry requires an "
+                "'atom' key with a string value."
+            )
+        bonds = entry.get("bonds", None)
+        if bonds is not None and not isinstance(bonds, list):
+            raise ValueError(
+                f"Error in {class_name}: the nested 'bonds' key must be a "
+                "list if provided."
+            )
+        return {"atom": entry["atom"], "bonds": bonds}
+    raise ValueError(
+        f"Error in {class_name}: each bond entry must be either a string or "
+        "a dictionary with an 'atom' key."
+    )
+
+
+def _validate_bonds_list(bonds, class_name):
+    """
+    Recursively validate a "bonds"/"bonds_A"/"bonds_B" list.
+
+    Parameters
+    ----------
+    bonds : list or None
+        List of bond entries (strings or nested dictionaries), or None.
+    class_name : str
+        Name of the calling class for error messages.
+
+    Raises
+    ------
+    ValueError
+        If the list, or any nested entry within it, has an invalid shape.
+    """
+    if bonds is None:
+        return
+    if not isinstance(bonds, list):
+        raise ValueError(
+            f"Error in {class_name}: 'bonds' key must be a list if provided."
+        )
+    for entry in bonds:
+        normalized = _normalize_bond_entry(entry, class_name)
+        _validate_bonds_list(normalized["bonds"], class_name)
+
+
+def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name, initial):
     """
     Build molecule dictionary for sampling.
 
@@ -118,7 +202,95 @@ def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
     atom : str
         Atom type string.
     bonds : list or None
-        List of bonded atom type strings or None.
+        List of bonded atom type entries (strings or nested dictionaries
+        describing a required bonding environment one hop further out), or
+        None.
+    atom_lib : dict
+        Dictionary mapping atom type strings to their type IDs.
+    class_name : str
+        Name of the calling class for error messages.
+    initial : bool
+        Whether this is the initial call (root atom) or a recursive call for
+        a bonded neighbour.
+
+    Returns
+    -------
+    identifier : str
+        Unique identifier for the molecule.
+    mol : dict
+        Molecule dictionary with keys:
+
+        - "atom": the atom type ID (or "X" for a wildcard atom).
+        - "bonds": bonded atom type ID permutations (see
+          :func:`_permutate_bonds`), or None if unconstrained.
+        - "bonds_spec": None unless at least one bonded neighbour carries its
+          own nested bonding requirement, in which case a list (one entry
+          per required neighbour, in the same order as "bonds") of
+          ``{"type_ids": frozenset, "mol": mol}`` dictionaries, where "mol"
+          is that neighbour's own recursively built molecule dictionary.
+    """
+    if atom in atom_lib:
+        atom_id = atom_lib[atom]
+    elif atom == "X":
+        if initial:
+            raise ValueError(
+                f"Error in {class_name}: Root atom cannot be a wildcard 'X'."
+            )
+        atom_id = "X"
+    else:
+        raise ValueError(
+            f"Error in {class_name}: Atom {atom} not found in atom library."
+        )
+
+    if bonds is None:
+        return atom, {"atom": atom_id, "bonds": None, "bonds_spec": None}
+
+    normalized = [_normalize_bond_entry(entry, class_name) for entry in bonds]
+    sub_results = [
+        _build_mol_dictionary(
+            entry["atom"], entry["bonds"], atom_lib, class_name, False
+        )
+        for entry in normalized
+    ]
+    order = sorted(range(len(sub_results)), key=lambda i: sub_results[i][0])
+    sorted_identifiers = [sub_results[i][0] for i in order]
+    sorted_mols = [sub_results[i][1] for i in order]
+    top_level_names = [normalized[i]["atom"] for i in order]
+
+    identifier = atom + "(" + "+".join(sorted_identifiers) + ")"
+    bond_permutations = _permutate_bonds(top_level_names, atom_lib, class_name)
+
+    if any(sub_mol["bonds"] is not None for sub_mol in sorted_mols):
+        bonds_spec = [
+            {
+                "type_ids": frozenset(atom_lib.values())
+                if name == "X"
+                else frozenset({atom_lib[name]}),
+                "mol": sub_mol,
+            }
+            for name, sub_mol in zip(top_level_names, sorted_mols, strict=True)
+        ]
+    else:
+        bonds_spec = None
+
+    mol = {"atom": atom_id, "bonds": bond_permutations, "bonds_spec": bonds_spec}
+    return identifier, mol
+
+
+def _sorted_bond_identifiers(bonds, atom_lib, class_name):
+    """
+    Compute the sorted list of molecule identifiers for a "bonds_A"/"bonds_B"
+    list, without appending the bond partner atom.
+
+    Used by :class:`BondSampler` to build its bond-level identifier (which
+    only reflects the additional neighbours the user specified, not the bond
+    partner that gets appended internally before building each endpoint's
+    full molecule dictionary).
+
+    Parameters
+    ----------
+    bonds : list
+        List of bond entries (strings or nested dictionaries).
     atom_lib : dict
         Dictionary mapping atom type strings to their type IDs.
     class_name : str
@@ -126,28 +298,17 @@ def _build_mol_dictionary(atom: str, bonds, atom_lib, class_name):
 
     Returns
     -------
-    identifier : str
-        Unique identifier for the molecule.
-    mol : dict
-        Molecule dictionary containing atom type ID and bonded atom type ID
-        permutations.
+    identifiers : list
+        Sorted list of molecule identifier strings, one per entry in `bonds`.
     """
-    if atom in atom_lib:
-        atom_id = atom_lib[atom]
-    elif atom == "X":
-        atom_id = "X"
-    else:
-        raise ValueError(
-            f"Error in {class_name}: Atom {atom} not found in atom library."
-        )
-    bonds = sorted(bonds) if bonds is not None else None
-    identifier = atom + "(" + "+".join(bonds) + ")" if bonds is not None else atom
-    if bonds is not None:
-        bond_permutations = _permutate_bonds(bonds, atom_lib, class_name)
-    else:
-        bond_permutations = None
-    mol = {"atom": atom_id, "bonds": bond_permutations}
-    return identifier, mol
+    normalized = [_normalize_bond_entry(entry, class_name) for entry in bonds]
+    identifiers = [
+        _build_mol_dictionary(
+            entry["atom"], entry["bonds"], atom_lib, class_name, False
+        )[0]
+        for entry in normalized
+    ]
+    return sorted(identifiers)
 
 
 def _validate_double_atoms(doubles, class_name, attribute_name, allow_none=False):
@@ -524,15 +685,11 @@ class AtomSampler(Sampler):
                     f"{self.__class__.__name__} requires each atom entry to "
                     "have an 'atom' key with a string value."
                 )
-            if "bonds" in atom_info and not isinstance(atom_info["bonds"], list):
-                raise ValueError(
-                    f"{self.__class__.__name__} requires the 'bonds' key to "
-                    "be a list if provided."
-                )
+            _validate_bonds_list(atom_info.get("bonds"), self.__class__.__name__)
             atom = atom_info["atom"]
             bonds = atom_info.get("bonds", None)
             identifier, mol = _build_mol_dictionary(
-                atom, bonds, atom_lib, self.__class__.__name__
+                atom, bonds, atom_lib, self.__class__.__name__, True
             )
             self._molecules[identifier] = mol
 
@@ -587,16 +744,8 @@ class BondSampler(Sampler):
                     f"{self.__class__.__name__} requires the 'bond' key to "
                     "be in the format 'A-B'."
                 )
-            if "bonds_A" in bond_info and not isinstance(bond_info["bonds_A"], list):
-                raise ValueError(
-                    f"{self.__class__.__name__} requires the 'bonds_A' key "
-                    "to be a list if provided."
-                )
-            if "bonds_B" in bond_info and not isinstance(bond_info["bonds_B"], list):
-                raise ValueError(
-                    f"{self.__class__.__name__} requires the 'bonds_B' key "
-                    "to be a list if provided."
-                )
+            _validate_bonds_list(bond_info.get("bonds_A"), self.__class__.__name__)
+            _validate_bonds_list(bond_info.get("bonds_B"), self.__class__.__name__)
 
             bond = bond_info["bond"]
             atom_A, atom_B = bond.split("-")
@@ -604,26 +753,36 @@ class BondSampler(Sampler):
             bonds_B = bond_info.get("bonds_B", None)
             bonds_A = bonds_A.copy() if bonds_A is not None else None
             bonds_B = bonds_B.copy() if bonds_B is not None else None
-            if bonds_A is not None:
-                bonds_A.sort()
-            if bonds_B is not None:
-                bonds_B.sort()
-            bond_info_A = "(" + "_".join(bonds_A) + ")" if bonds_A is not None else ""
-            bond_info_B = "(" + "_".join(bonds_B) + ")" if bonds_B is not None else ""
+            bond_info_A = (
+                "("
+                + "_".join(
+                    _sorted_bond_identifiers(bonds_A, atom_lib, self.__class__.__name__)
+                )
+                + ")"
+                if bonds_A is not None
+                else ""
+            )
+            bond_info_B = (
+                "("
+                + "_".join(
+                    _sorted_bond_identifiers(bonds_B, atom_lib, self.__class__.__name__)
+                )
+                + ")"
+                if bonds_B is not None
+                else ""
+            )
             identifier = bond_info_A + atom_A + "-" + atom_B + bond_info_B
 
             if bonds_A is not None:
                 bonds_A.append(atom_B)
-                bonds_A.sort()
             if bonds_B is not None:
                 bonds_B.append(atom_A)
-                bonds_B.sort()
 
             mol_identifier_A, mol_A = _build_mol_dictionary(
-                atom_A, bonds_A, atom_lib, self.__class__.__name__
+                atom_A, bonds_A, atom_lib, self.__class__.__name__, True
             )
             mol_identifier_B, mol_B = _build_mol_dictionary(
-                atom_B, bonds_B, atom_lib, self.__class__.__name__
+                atom_B, bonds_B, atom_lib, self.__class__.__name__, True
             )
             self._molecules[mol_identifier_A] = mol_A
             self._molecules[mol_identifier_B] = mol_B

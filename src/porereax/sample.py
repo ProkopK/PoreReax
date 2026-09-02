@@ -9,6 +9,7 @@ sampling parameters, and execute the sampling process either in parallel or
 serially.
 """
 
+import itertools
 import multiprocessing as mp
 import os
 import sys
@@ -27,6 +28,134 @@ from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
 
 type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
+
+
+def _neighbor_atoms_excluding(atom_idx, exclude_atom, bond_topology, bond_enum):
+    """
+    Find the atoms bonded to `atom_idx`, excluding `atom_idx` itself and one
+    occurrence of `exclude_atom` (the edge leading back to the parent atom in
+    a nested bonding-environment match).
+
+    Parameters
+    ----------
+    atom_idx : int
+        Index of the atom whose bonded neighbours to look up.
+    exclude_atom : int or None
+        Index of the parent atom whose bond back to `atom_idx` should not
+        count as one of `atom_idx`'s "other" bonds, or None to exclude nothing.
+    bond_topology : np.ndarray
+        (num_bonds, 2) array of atom index pairs for the current frame.
+    bond_enum : ovito.data.BondsEnumerator
+        Enumerator used to look up the bonds of a given atom.
+
+    Returns
+    -------
+    other_atoms : np.ndarray
+        Indices of the bonded neighbours of `atom_idx`, excluding itself and
+        the single edge back to `exclude_atom`.
+    """
+    bond_ids = list(bond_enum.bonds_of_particle(atom_idx))
+    bonded_atoms = bond_topology[bond_ids].flatten()
+    other_atoms = bonded_atoms[bonded_atoms != atom_idx]
+    if exclude_atom is not None:
+        match = np.where(other_atoms == exclude_atom)[0]
+        if match.size:
+            other_atoms = np.delete(other_atoms, match[0])
+    return other_atoms
+
+
+def _matches_bond_spec(
+    neighbor_atoms, atom_types, specs, bond_topology, bond_enum, parent_atom
+):
+    """
+    Check whether the bonded neighbours of an atom can be matched, one-to-one,
+    to a list of required nested bonding-environment specs.
+
+    Parameters
+    ----------
+    neighbor_atoms : np.ndarray
+        Indices of the atom's bonded neighbours (excluding the edge back to
+        its own parent, if any).
+    atom_types : np.ndarray
+        Particle type of each atom in the current frame.
+    specs : list
+        `bonds_spec` list built by `_build_mol_dictionary`: one
+        `{"type_ids": frozenset, "mol": mol}` entry per required neighbour.
+    bond_topology : np.ndarray
+        (num_bonds, 2) array of atom index pairs for the current frame.
+    bond_enum : ovito.data.BondsEnumerator
+        Enumerator used to look up the bonds of a given atom.
+    parent_atom : int
+        Index of the atom whose neighbours are being matched (becomes the
+        "exclude_atom" when recursing one hop further).
+
+    Returns
+    -------
+    bool
+        True if some assignment of `neighbor_atoms` to `specs` satisfies
+        every spec's type and (if present) its own nested bonding requirement.
+    """
+    if len(neighbor_atoms) != len(specs):
+        return False
+    for permutation in itertools.permutations(neighbor_atoms):
+        if all(
+            _matches_single_spec(
+                neighbor, spec, atom_types, bond_topology, bond_enum, parent_atom
+            )
+            for neighbor, spec in zip(permutation, specs, strict=True)
+        ):
+            return True
+    return False
+
+
+def _matches_single_spec(
+    neighbor, spec, atom_types, bond_topology, bond_enum, parent_atom
+):
+    """
+    Check whether one bonded neighbour satisfies one required nested spec.
+
+    Parameters
+    ----------
+    neighbor : int
+        Index of the candidate neighbour atom.
+    spec : dict
+        One `{"type_ids": frozenset, "mol": mol}` entry, see `_matches_bond_spec`.
+    atom_types : np.ndarray
+        Particle type of each atom in the current frame.
+    bond_topology : np.ndarray
+        (num_bonds, 2) array of atom index pairs for the current frame.
+    bond_enum : ovito.data.BondsEnumerator
+        Enumerator used to look up the bonds of a given atom.
+    parent_atom : int
+        Index of the atom `neighbor` is bonded to in this match (excluded
+        when looking up `neighbor`'s own further bonds).
+
+    Returns
+    -------
+    bool
+        True if `neighbor` has the required type and, if the spec requires
+        it, its own further bonding environment also matches.
+    """
+    if atom_types[neighbor] not in spec["type_ids"]:
+        return False
+    mol = spec["mol"]
+    if mol["bonds"] is None:
+        return True
+    further_atoms = _neighbor_atoms_excluding(
+        neighbor, parent_atom, bond_topology, bond_enum
+    )
+    if list(atom_types[further_atoms]) not in mol["bonds"]:
+        return False
+    if mol["bonds_spec"] is not None:
+        return _matches_bond_spec(
+            further_atoms,
+            atom_types,
+            mol["bonds_spec"],
+            bond_topology,
+            bond_enum,
+            neighbor,
+        )
+    return True
 
 
 class Sample:
@@ -947,17 +1076,20 @@ class Sample:
         Returns
         -------
         molecules_per_atom_type : dict
-            Mapping atom_type -> list of (identifier, bond_permutations) pairs, where
-            bond_permutations is None for an unconstrained molecule or a list of
-            neighbour-type permutations otherwise. Atom types with no registered
+            Mapping atom_type -> list of (identifier, bond_permutations,
+            bonds_spec) triples, where bond_permutations is None for an
+            unconstrained molecule or a list of neighbour-type permutations
+            otherwise, and bonds_spec is None unless the molecule also
+            requires a bonding environment on one or more of its neighbours
+            (see `_build_mol_dictionary`). Atom types with no registered
             molecule are omitted.
-            Example (single atom type): [('O', None), ('O()', [[]]),
-            ('O(H+H)', [[1, 1]]), ('O(H+Si)', [[1, 2], [2, 1]])]
+            Example (single atom type): [('O', None, None), ('O()', [[]], None),
+            ('O(H+H)', [[1, 1]], None), ('O(H+Si)', [[1, 2], [2, 1]], None)]
         """
         molecules_per_atom_type = {}
         for atom_type in self.type_to_name:
             candidates = [
-                (identifier, info["bonds"])
+                (identifier, info["bonds"], info["bonds_spec"])
                 for identifier, info in self.molecules.items()
                 if info["atom"] == atom_type
             ]
@@ -993,7 +1125,6 @@ class Sample:
 
     def _identify_molecules(
         self,
-        molecules_per_atom_type,
         molecule_mask,
         molecule_bond_atoms,
         atom_types,
@@ -1005,8 +1136,6 @@ class Sample:
 
         Parameters
         ----------
-        molecules_per_atom_type : dict
-            Output of `_group_molecules_by_atom_type`.
         molecule_mask : dict
             Per-molecule atom mask to update, as allocated by `_init_molecule_arrays`.
         molecule_bond_atoms : dict
@@ -1023,11 +1152,11 @@ class Sample:
             molecule_mask[identifier][:] = False
             molecule_bond_atoms[identifier][:] = 0
 
-        for atom_type, candidates in molecules_per_atom_type.items():
+        for atom_type, candidates in self._molecules_per_atom_type.items():
             atoms = np.where(atom_types == atom_type)[0]
 
             # Sorting guarantees an unconstrained molecule, if registered, comes first.
-            unconstrained_identifier, bond_permutations = candidates[0]
+            unconstrained_identifier, bond_permutations, _ = candidates[0]
             if bond_permutations is None:
                 molecule_mask[unconstrained_identifier][atoms] = True
                 if len(candidates) == 1:
@@ -1035,17 +1164,27 @@ class Sample:
 
             # Remaining candidates require a specific set of bonded neighbour types.
             for atom in atoms:
-                bond_ids = list(bond_enum.bonds_of_particle(atom))
-                bonded_atoms = bond_topology[bond_ids].flatten()
-                other_atoms = bonded_atoms[bonded_atoms != atom]
+                other_atoms = _neighbor_atoms_excluding(
+                    atom, None, bond_topology, bond_enum
+                )
                 other_types = list(atom_types[other_atoms])
-                for identifier, bond_permutations in candidates:
+                for identifier, bond_permutations, bonds_spec in candidates:
                     if (
-                        bond_permutations is not None
-                        and other_types in bond_permutations
+                        bond_permutations is None
+                        or other_types not in bond_permutations
                     ):
-                        molecule_mask[identifier][atom] = True
-                        molecule_bond_atoms[identifier][atom] = other_atoms
+                        continue
+                    if bonds_spec is not None and not _matches_bond_spec(
+                        other_atoms,
+                        atom_types,
+                        bonds_spec,
+                        bond_topology,
+                        bond_enum,
+                        atom,
+                    ):
+                        continue
+                    molecule_mask[identifier][atom] = True
+                    molecule_bond_atoms[identifier][atom] = other_atoms
 
     def _identify_bonds(
         self, bond_mask, bond_count, bond_topology, atom_types, molecule_mask
@@ -1106,7 +1245,7 @@ class Sample:
             bond_modifier.source.load(self.bond_file)
             self.pipeline.modifiers.append(bond_modifier)
 
-        molecules_per_atom_type = self._group_molecules_by_atom_type()
+        self._molecules_per_atom_type = self._group_molecules_by_atom_type()
         molecule_mask, molecule_bond_atoms = self._init_molecule_arrays()
         bond_mask = {}
 
@@ -1120,7 +1259,6 @@ class Sample:
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
             self._identify_molecules(
-                molecules_per_atom_type,
                 molecule_mask,
                 molecule_bond_atoms,
                 atom_types,
