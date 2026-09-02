@@ -23,7 +23,7 @@ PoreReax is a Python package for analysing and setting up reactive molecular dyn
     * Radial distribution functions (RDFs)
 - Plot sampled results with built-in plotting functions
 - Build simulation-ready LAMMPS input files from equilibrated GROMACS structures (`.gro`)
-- Configure multi-stage ReaxFF workflows (for example NPT/NVT/NVE)
+- Configure multi-stage ReaxFF workflows (for example NpT/NVT/NVE)
 
 <!-- end elevator-pitch -->
 

@@ -536,7 +536,7 @@ class Simulate:
         temp : float
             Temperature in Kelvin for the simulation.
         pressure : float, optional
-            Pressure in atmospheres for NPT simulations. Default is 1 atm.
+            Pressure in atmospheres for NpT simulations. Default is 1 atm.
         dt : float, optional
             Time step in femtoseconds. Default is 0.5 fs.
         nodes : int, optional

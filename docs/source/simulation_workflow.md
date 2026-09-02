@@ -29,21 +29,26 @@ Depending on your setup, generated outputs include:
 ```python
 from porereax import Simulate
 
+# Set up a dictionary to translate GRO atom types to ReaxFF atom types as well as masses and charges
 gro_lib = {"OM": "O", "OW": "O", "Si": "Si", "HW": "H", "MW": ""}
 gro_charges = {"OM": -0.64, "OW": -1.1128, "Si": 1.28, "HW": 0.5564}
 atom_masses = {"Si": 28.086, "O": 15.9994, "H": 2.016}
+
+# Create a simulation object
 sim = Simulate(gro_lib, gro_charges, atom_masses, structure_file="system.gro")
 sim.add_sim(type="nvt", nsteps=10000, temp=300)
+
+# Generate the simulation files
 sim.generate()
 ```
 
 ## Additional configuration
 
-The simulation workflow can be integrated in an existing PoreSim setup. To do so, you can create a `reax` folder in your PoreSim project and run the script without the `structure_file` argument. The `Simulate` class will then look for a `nvt.gro` file and use it as the starting structure.
+The simulation workflow can be integrated in an existing [PoreSim](https://github.com/PoreMS/PoreSim) setup. To do so, you can create a `reax` folder in your PoreSim project and run the script without the `structure_file` argument. The `Simulate` class will then look for a `nvt.gro` file and use it as the starting structure.
 
 To set a custom ReaxFF force-field, use the `set_force_field()` method.
 
-Multiple simulation stages can be added with the `add_sim()` method. The following example shows a typical NVT + NPT workflow:
+Multiple simulation stages can be added with the `add_sim()` method. The following example shows a typical NVT + NpT workflow:
 
 ```python
 from porereax import Simulate
