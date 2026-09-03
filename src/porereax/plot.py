@@ -237,10 +237,10 @@ def _plot_2d(
     plt.colorbar(c, ax=axis, label="Density / Counts per frame")
     unit_x = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][0]]
     unit_y = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][1]]
-    x_label = ["x", "y", "z", "r", r"$\phi$", "z", "d"][
+    x_label = ["x", "y", "z", "r", "φ", "z", "d"][
         density_data["direction"][0]
     ] + f" / {unit_x}"
-    y_label = ["x", "y", "z", "r", r"$\phi$", "z", "d"][
+    y_label = ["x", "y", "z", "r", "φ", "z", "d"][
         density_data["direction"][1]
     ] + f" / {unit_y}"
     if transpose:

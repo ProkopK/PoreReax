@@ -206,6 +206,40 @@ def read_pore_yml(file_path: str) -> dict:
     return properties
 
 
+def _neighbor_atoms_excluding(atom_idx, exclude_atom, bond_topology, bond_enum):
+    """
+    Find the atoms bonded to `atom_idx`, excluding `atom_idx` itself and one
+    occurrence of `exclude_atom` (the edge leading back to the parent atom in
+    a nested bonding-environment match).
+
+    Parameters
+    ----------
+    atom_idx : int
+        Index of the atom whose bonded neighbours to look up.
+    exclude_atom : int or None
+        Index of the parent atom whose bond back to `atom_idx` should not
+        count as one of `atom_idx`'s "other" bonds, or None to exclude nothing.
+    bond_topology : np.ndarray
+        (num_bonds, 2) array of atom index pairs for the current frame.
+    bond_enum : ovito.data.BondsEnumerator
+        Enumerator used to look up the bonds of a given atom.
+
+    Returns
+    -------
+    other_atoms : np.ndarray
+        Indices of the bonded neighbours of `atom_idx`, excluding itself and
+        the single edge back to `exclude_atom`.
+    """
+    bond_ids = list(bond_enum.bonds_of_particle(atom_idx))
+    bonded_atoms = bond_topology[bond_ids].flatten()
+    other_atoms = bonded_atoms[bonded_atoms != atom_idx]
+    if exclude_atom is not None:
+        match = np.where(other_atoms == exclude_atom)[0]
+        if match.size:
+            other_atoms = np.delete(other_atoms, match[0])
+    return other_atoms
+
+
 _PLACEHOLDER_RE = re.compile(r"^([ \t]*)%\((\w+)\)s[ \t]*$", re.MULTILINE)
 
 

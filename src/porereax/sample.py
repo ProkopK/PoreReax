@@ -14,11 +14,11 @@ import multiprocessing as mp
 import os
 import sys
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
-import porereax.utils as utils
 from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
 from porereax.charge import ChargeSampler
@@ -26,42 +26,9 @@ from porereax.density import BondDensitySampler, DensitySampler, ReactionSampler
 from porereax.meta_sampler import Sampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
+from porereax.utils import _neighbor_atoms_excluding, read_pore_yml
 
 type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
-
-
-def _neighbor_atoms_excluding(atom_idx, exclude_atom, bond_topology, bond_enum):
-    """
-    Find the atoms bonded to `atom_idx`, excluding `atom_idx` itself and one
-    occurrence of `exclude_atom` (the edge leading back to the parent atom in
-    a nested bonding-environment match).
-
-    Parameters
-    ----------
-    atom_idx : int
-        Index of the atom whose bonded neighbours to look up.
-    exclude_atom : int or None
-        Index of the parent atom whose bond back to `atom_idx` should not
-        count as one of `atom_idx`'s "other" bonds, or None to exclude nothing.
-    bond_topology : np.ndarray
-        (num_bonds, 2) array of atom index pairs for the current frame.
-    bond_enum : ovito.data.BondsEnumerator
-        Enumerator used to look up the bonds of a given atom.
-
-    Returns
-    -------
-    other_atoms : np.ndarray
-        Indices of the bonded neighbours of `atom_idx`, excluding itself and
-        the single edge back to `exclude_atom`.
-    """
-    bond_ids = list(bond_enum.bonds_of_particle(atom_idx))
-    bonded_atoms = bond_topology[bond_ids].flatten()
-    other_atoms = bonded_atoms[bonded_atoms != atom_idx]
-    if exclude_atom is not None:
-        match = np.where(other_atoms == exclude_atom)[0]
-        if match.size:
-            other_atoms = np.delete(other_atoms, match[0])
-    return other_atoms
 
 
 def _matches_bond_spec(
@@ -310,7 +277,11 @@ class Sample:
                 "bond",
                 ["bonds", "num_bins", "range"],
             ),
-            "molecule_structure_samplers": (MoleculeStructureSampler, "atom", []),
+            "molecule_structure_samplers": (
+                MoleculeStructureSampler,
+                "atom",
+                ["steps"],
+            ),
             "rdf_samplers": (RdfSampler, "atom", ["pairs", "num_bins", "r_max"]),
             "reaction_samplers": (
                 ReactionSampler,
@@ -366,7 +337,7 @@ class Sample:
         self.frames = range(self.start_frame, self.end_frame + 1, self.nth_frame)
         self.num_frames = len(self.frames)
 
-        self.system_properties = utils.read_pore_yml(system) if system else None
+        self.system_properties = read_pore_yml(system) if system else None
 
     @staticmethod
     def get_trajectory_data(trajectory_file, bond_file, atom_lib):
@@ -436,7 +407,9 @@ class Sample:
         return num_particles, num_frames, box
 
     # --------------------------- Add Sampler Methods ---------------------------
-    def add_molecule_structure_sampling(self, name_out: str, region: Region = "Box"):
+    def add_molecule_structure_sampling(
+        self, name_out: str, region: Region = "Box", steps: int = 1
+    ):
         """
         Add sampling for molecule structures to analyse the bonding of atoms
         and identify substructures.
@@ -449,12 +422,18 @@ class Sample:
             Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
             "Wall", or a user-defined function that takes atom positions
             (N, 3) as input and returns a boolean mask (N,).
+        steps : int, optional
+            Number of bonding "steps" from the central atom to search for. Default
+            is 1 (only directly bonded neighbours, e.g. "O(Si+Si)"). Step 2 would
+            include information about the Si neighbours' in that example, e.g.
+            "O(Si(O+O+O)+Si(O+O+O))", and so on for larger values.
         """
         dimension = "MoleculeStructure"
         inputs = {
             "name_out": name_out,
             "dimension": dimension,
             "region": region,
+            "steps": steps,
         }
         self.sampler_inputs["molecule_structure_samplers"].append(inputs)
 
@@ -682,7 +661,7 @@ class Sample:
         self,
         name_out: str,
         bonds: list[dict],
-        dimension: str,
+        dimension: Literal["Bond Length", "Bond Order"] = "Bond Length",
         region: Region = "Box",
         num_bins=200,
         range=(0.0, 3.0),
