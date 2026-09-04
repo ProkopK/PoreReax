@@ -500,7 +500,7 @@ class Sampler(abc.ABC):
             which bonds belong to that identifier in the frame.
         frame : OVITO frame object
             Current frame object from OVITO containing atomic data.
-        bond_enum : OVITO BondsEnumerator
+        bond_enum : ovito.data.BondsEnumerator
             OVITO BondsEnumerator object for enumerating bonds in the frame.
         positions_transformed : np.ndarray
             Transformed positions of atoms in the current frame.

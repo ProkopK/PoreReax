@@ -508,12 +508,17 @@ class Sample:
             the dictionary does not contain the "bonds" key, every atom of
             type a will be sampled regardless of its bonding environment.
         dimension : str
-            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D",
+            "Pore1D", "Pore2D".
+
             - "Time": Samples the amount of atom structures over time.
             - "Cartesian1D": Samples the amount of atom structures along a
               specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of atom structures in a 2D
               plane (xy, xz, or yz) in the simulation box.
+            - "Pore1D"/"Pore2D": Same as "Cartesian1D"/"Cartesian2D", but in
+              pore-relative coordinates (r, phi, d). Requires `Sample(...,
+              system=...)` to be given a cylindrical pore YAML.
         region : Region, optional
             Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
             "Wall", or a user-defined function that takes atom positions
@@ -522,11 +527,16 @@ class Sample:
             Number of bins for position sampling. Not used for time sampling.
         direction : str, optional
             Direction along which to sample. Options depending on the dimension:
+
             - For "Cartesian1D": use ("x", "y", or "z").
             - For "Cartesian2D": use ("xy", "xz", or "yz").
+            - For "Pore1D": use ("r", "p", or "d") for radial distance,
+              azimuthal angle, or distance from the nearest pore mouth.
+            - For "Pore2D": use ("rp", "rz", or "pz").
         conditions : dict, optional
             Dictionary of conditions to filter atoms during sampling.
             Supported conditions:
+
             - "Charge": tuple (min_charge, max_charge) to filter atoms by
               charge.
             - "Angle": tuple (min_angle, max_angle) to filter atoms by angle
@@ -576,6 +586,7 @@ class Sample:
             Number of bins for the histogram. Default is 180.
         angle : str, optional
             Angle of interested atoms. Supported: "all", "a-b-c"
+
             - "all": Samples all angles formed by the central atom and all of
               its bonded atoms.
             - "a-b-c": Samples only the angle formed by the central atom (b)
@@ -625,12 +636,18 @@ class Sample:
             "bonds_A" or "bonds_B" keys, every bond of type a-b will be
             sampled regardless of its bonding environment.
         dimension : str
-            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D",
+            "Pore1D", "Pore2D".
+
             - "Time": Samples the amount of the specified bonds over time.
             - "Cartesian1D": Samples the amount of the specified bonds along
               a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified bonds in a
               2D plane (xy, xz, or yz) in the simulation box.
+            - "Pore1D"/"Pore2D": Same as "Cartesian1D"/"Cartesian2D", but in
+              pore-relative coordinates (r, phi, d), using the bond midpoint.
+              Requires `Sample(..., system=...)` to be given a cylindrical
+              pore YAML.
         region : Region, optional
             Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
             "Wall", or a user-defined function that takes atom positions
@@ -639,11 +656,16 @@ class Sample:
             Number of bins for position sampling. Not used for time sampling.
         direction : str, optional
             Direction along which to sample. Options depending on the dimension:
+
             - For "Cartesian1D": use ("x", "y", or "z").
             - For "Cartesian2D": use ("xy", "xz", or "yz").
+            - For "Pore1D": use ("r", "p", or "d") for radial distance,
+              azimuthal angle, or distance from the nearest pore mouth.
+            - For "Pore2D": use ("rp", "rz", or "pz").
         conditions : dict, optional
             Dictionary of conditions to filter bonds during sampling.
             Supported conditions:
+
             - "Bond Length": tuple (min_len, max_len) to filter bonds by bond length.
         """
         inputs = {
@@ -696,6 +718,7 @@ class Sample:
         range : tuple, optional
             Range (min, max) for which to compute the histogram. Default is
             (0.0, 3.0).
+
             - For "Bond Length": range is in Angstroms.
             - For "Bond Order": range is in bond order units defined by the
               ReaxFF force field.
@@ -780,12 +803,17 @@ class Sample:
             and b are bonded to, respectively. Each dictionary works the same
             way as other samplers, with `atoms` as a parameter.
         dimension : str
-            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D".
+            Sampling dimension. Supported: "Time", "Cartesian1D", "Cartesian2D",
+            "Pore1D", "Pore2D".
+
             - "Time": Samples the amount of the specified reactions over time.
             - "Cartesian1D": Samples the amount of the specified reactions
               along a specified direction (x, y, or z) in the simulation box.
             - "Cartesian2D": Samples the amount of the specified reactions in
               a 2D plane (xy, xz, or yz) in the simulation box.
+            - "Pore1D"/"Pore2D": Same as "Cartesian1D"/"Cartesian2D", but in
+              pore-relative coordinates (r, phi, d). Requires `Sample(...,
+              system=...)` to be given a cylindrical pore YAML.
         region : Region, optional
             Region of the box to sample. Supported: "Box", "Reservoir", "Pore",
             "Wall", or a user-defined function that takes atom positions
@@ -794,11 +822,16 @@ class Sample:
             Number of bins for position sampling. Default is 200.
         direction : str, optional
             Direction along which to sample. Options depending on the dimension:
+
             - For "Cartesian1D": use ("x", "y", or "z").
             - For "Cartesian2D": use ("xy", "xz", or "yz").
+            - For "Pore1D": use ("r", "p", or "d") for radial distance,
+              azimuthal angle, or distance from the nearest pore mouth.
+            - For "Pore2D": use ("rp", "rz", or "pz").
         position : str, optional
             Position of the reaction event to sample. Supported: "center",
             "reactant", "product"
+
             - "center": Samples the position of the reaction event at the
               center between the reactant and product atoms.
             - "reactant": Samples the position of the reaction event at the

@@ -17,12 +17,25 @@ def _build_structure_key(node, parent, remaining, atom_types, bond_topology, bon
     environment out to `remaining` steps from `node` (excluding the edge back
     to `parent`).
 
-    At the deepest expanded shell (`remaining <= 1`) the key is a flat tuple
-    of sorted neighbour type IDs, matching the original 1-hop behaviour.
-    Otherwise it is a tuple of sorted `(type_id, sub_key)` pairs, one per
-    neighbour, each further expanded one hop. Siblings produced by one call
-    are always homogeneous (either all bare ints or all `(type_id, sub_key)`
-    tuples), so `sorted()` never compares an int against a tuple.
+    With `remaining=1`, the key is a flat tuple of sorted neighbour type IDs.
+    With `remaining>1`, the key is a tuple of sorted `(type_id, sub_key)` pairs,
+    one per neighbour.
+
+    Parameters
+    ----------
+    node : int
+        The index of the atom to build the key for.
+    parent : int or None
+        The index of the atom that is the parent of `node` in the recursion. This
+        atom will be excluded from the neighbour search to avoid cycles.
+    remaining : int
+        The number of remaining steps to expand in the structure key.
+    atom_types : np.ndarray
+        Array of atom type IDs for all atoms in the system.
+    bond_topology : np.ndarray
+        Array of bond topology indices for all atoms in the system.
+    bond_enum : ovito.data.BondsEnumerator
+        The bond enumerator for the system, used to find neighbours.
     """
     neighbours = _neighbor_atoms_excluding(node, parent, bond_topology, bond_enum)
     if remaining <= 1:
@@ -43,7 +56,18 @@ def _build_structure_key(node, parent, remaining, atom_types, bond_topology, bon
 def _structure_key_to_string(key, type_to_name, remaining):
     """
     Convert a nested structure key (see :func:`_build_structure_key`) into
-    a human-readable identifier fragment, e.g. ``"Si(O+O)+H()"``.
+    a human-readable identifier, e.g. ``"Si(O+O)+H()"``.
+
+    Parameters
+    ----------
+    key : tuple
+        The structure key to convert.
+    type_to_name : dict
+        Mapping from atom type IDs to atom type names.
+    remaining : int
+        The number of remaining steps to expand in the structure key. Used to
+        determine whether to expand the key further or just return a flat list
+        of atom names.
     """
     if remaining <= 1:
         return "+".join(type_to_name[t] for t in key)
