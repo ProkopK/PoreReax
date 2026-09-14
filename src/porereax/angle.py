@@ -105,6 +105,7 @@ class AngleSampler(AtomSampler):
                 "num_frames": 0,
                 "num_angles": 0,
                 "mean_angle": 0.0,
+                "std": 0.0,
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
@@ -158,14 +159,12 @@ class AngleSampler(AtomSampler):
                     angle_deg = np.degrees(np.arccos(cos_angle))
                     angles.extend(angle_deg.tolist())
             if angles:
+                hist, _ = np.histogram(angles, bins=self._num_bins, range=self._range)
+                self._data[identifier]["hist"] += hist
                 self._data[identifier]["num_frames"] += 1
                 self._data[identifier]["num_angles"] += len(angles)
                 self._data[identifier]["mean_angle"] += np.sum(angles)
-                if self._dimension == "Histogram":
-                    hist, _ = np.histogram(
-                        angles, bins=self._num_bins, range=self._range
-                    )
-                    self._data[identifier]["hist"] += hist
+                self._data[identifier]["std"] += np.sum(np.array(angles) ** 2)
 
     def _combine_identifier(self, identifier: str, data: dict) -> dict:
         num_frames = np.sum(data["num_frames"])
@@ -176,6 +175,9 @@ class AngleSampler(AtomSampler):
             if num_frames > 0
             else np.zeros(self._num_bins)
         )  # TODO check normalization
+        std = np.sqrt(
+            np.sum(data["std"]) / num_angles - mean**2 if num_angles > 0 else np.nan
+        )
         hist_std = np.std(data["hist"])  # TODO: fix std calculation
         mean_std = 0  # TODO: fix std calculation
         bin_edges = data["bin_edges"][0]
@@ -184,7 +186,8 @@ class AngleSampler(AtomSampler):
             "num_angles": num_angles,
             "mean": mean,
             "hist": hist,
-            "hist_std": hist_std,
+            "std": std,
             "mean_std": mean_std,
+            "hist_std": hist_std,
             "bin_edges": bin_edges,
         }

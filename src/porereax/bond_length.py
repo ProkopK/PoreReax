@@ -87,6 +87,7 @@ class BondLengthSampler(BondSampler):
                 "num_frames": 0,
                 "num_bonds": 0,
                 "mean": 0.0,
+                "std": 0.0,
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
@@ -123,7 +124,8 @@ class BondLengthSampler(BondSampler):
                 hist, _ = np.histogram(
                     bond_lengths, bins=self._num_bins, range=self._range
                 )
-                self._data[identifier]["mean"] += np.sum(bond_lengths)
+                mean = np.sum(bond_lengths)
+                std = np.sum(bond_lengths**2)
             elif self._dimension == "Bond Order":
                 bond_orders = (
                     frame.particles.bonds.get("Bond Order").array
@@ -134,8 +136,11 @@ class BondLengthSampler(BondSampler):
                 hist, _ = np.histogram(
                     bond_order, bins=self._num_bins, range=self._range
                 )
-                self._data[identifier]["mean"] += np.sum(bond_order)
+                mean = np.sum(bond_order)
+                std = np.sum(bond_order**2)
             self._data[identifier]["hist"] += hist
+            self._data[identifier]["mean"] += mean
+            self._data[identifier]["std"] += std
             self._data[identifier]["num_frames"] += 1
             self._data[identifier]["num_bonds"] += bonds.shape[0]
 
@@ -148,6 +153,9 @@ class BondLengthSampler(BondSampler):
             if num_frames > 0
             else np.zeros(self._num_bins)
         )
+        std = np.sqrt(
+            np.sum(data["std"]) / num_bonds - mean**2 if num_bonds > 0 else np.nan
+        )
         hist_std = np.std(data["hist"], axis=0)  # TODO: fix std calculation
         mean_std = 0  # TODO: fix std calculation
         bin_edges = data["bin_edges"][0]
@@ -156,7 +164,8 @@ class BondLengthSampler(BondSampler):
             "num_bonds": num_bonds,
             "mean": mean,
             "hist": hist,
-            "hist_std": hist_std,
+            "std": std,
             "mean_std": mean_std,
+            "hist_std": hist_std,
             "bin_edges": bin_edges,
         }

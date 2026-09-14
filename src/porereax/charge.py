@@ -81,6 +81,7 @@ class ChargeSampler(AtomSampler):
                 "num_atoms": 0,
                 "mean_charge": 0.0,
                 "hist": hist,
+                "std": 0.0,
                 "bin_edges": bin_edges,
             }
 
@@ -107,9 +108,10 @@ class ChargeSampler(AtomSampler):
             atom_charges = charges[mol_mask]
             hist, _ = np.histogram(atom_charges, bins=self._num_bins, range=self._range)
             self._data[identifier]["hist"] += hist
+            self._data[identifier]["std"] += np.sum((atom_charges / 1000.0) ** 2)
             self._data[identifier]["num_frames"] += 1
             self._data[identifier]["num_atoms"] += atom_charges.shape[0]
-            self._data[identifier]["mean_charge"] += np.sum(atom_charges)
+            self._data[identifier]["mean_charge"] += np.sum(atom_charges) / 1000.0
 
     def _combine_identifier(self, identifier: str, data: dict) -> dict:
         num_frames = np.sum(data["num_frames"])
@@ -120,6 +122,9 @@ class ChargeSampler(AtomSampler):
             if num_frames > 0
             else np.zeros(self._num_bins)
         )  # TODO check normalization
+        std = np.sqrt(
+            np.sum(data["std"]) / num_atoms - mean**2 if num_atoms > 0 else np.nan
+        )
         mean_std = 0  # TODO: fix std calculation
         hist_std = np.std(data["hist"])  # TODO: fix std calculation
         bin_edges = data["bin_edges"][0] / 1000.0
@@ -128,6 +133,7 @@ class ChargeSampler(AtomSampler):
             "num_atoms": num_atoms,
             "mean": mean,
             "hist": hist,
+            "std": std,
             "mean_std": mean_std,
             "hist_std": hist_std,
             "bin_edges": bin_edges,
