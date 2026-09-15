@@ -100,9 +100,10 @@ class BondLengthSampler(BondSampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         bond_topology = frame.particles.bonds.topology.array
-        positions = frame.particles.positions.array
+        positions = frame.particles.positions.array - box_shift
         position_mask = self._region(positions)
         for identifier in self._bonds:
             b_mask = (

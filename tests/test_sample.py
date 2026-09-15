@@ -50,7 +50,7 @@ def test_sample_initialization_with_system_yaml():
         (
             {"atom_lib": {"Si": 1, "H": 3}},
             ValueError,
-            "do not match those in atom_lib",
+            "must be a subset of types given in atom_lib",
         ),
         (
             {"atom_lib": {"Si": 1, "O": 2, "H": 3, "O2": 2}},

@@ -122,13 +122,14 @@ class RdfSampler(AtomSampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         from ovito.data import CutoffNeighborFinder
 
         # Create CutoffNeighborFinder for efficient neighbor search
         finder = CutoffNeighborFinder(self._r_max, frame)
 
-        positions = frame.particles.positions.array
+        positions = frame.particles.positions.array - box_shift
         position_mask = self._region(positions)
 
         for pair_key, (identifier_A, identifier_B) in self._pairs.items():

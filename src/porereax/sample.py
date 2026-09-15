@@ -23,6 +23,7 @@ from porereax.angle import AngleSampler
 from porereax.bond_length import BondLengthSampler
 from porereax.charge import ChargeSampler
 from porereax.density import BondDensitySampler, DensitySampler, ReactionSampler
+from porereax.gromacs_topology import parse_gromacs_topology
 from porereax.meta_sampler import Sampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
@@ -138,6 +139,7 @@ class Sample:
         bond_file=None,
         system=None,
         start_end_nthframe=(0, -1, 1),
+        static_topology=None,
     ):
         """
         Initialize Sample instance.
@@ -160,20 +162,19 @@ class Sample:
             System object containing additional information.
         start_end_nthframe : tuple, optional
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
+        static_topology : tuple, optional
+            (atom_type_array, bond_pairs) pair describing a static, per-frame
+            constant bond topology (e.g. for a classical-force-field
+            trajectory with no reactive bonds). Mutually exclusive with
+            `bond_file`. Set this up via `Sample.from_gromacs` rather than
+            passing it directly.
         """
-        if "forkserver" in mp.get_all_start_methods():
-            ctx = mp.get_context("forkserver")
-        elif "spawn" in mp.get_all_start_methods():
-            ctx = mp.get_context("spawn")
-        else:
-            ctx = mp.get_context("fork")
-            if "ovito" in sys.modules:
-                raise RuntimeError(
-                    "The 'ovito' module is already imported. Please remove it from the "
-                    "loaded modules to avoid conflicts during parallel processing. "
-                    "This is necessary because the OS does not support the "
-                    "'spawn' start method."
-                )
+        if bond_file and static_topology is not None:
+            raise ValueError(
+                "bond_file and static_topology are mutually exclusive; use "
+                "Sample.from_gromacs to build a static bond topology."
+            )
+        ctx = self._get_mp_context()
         with ctx.Pool(1) as pool:
             num_particles, num_frames, box = pool.apply_async(
                 self.get_trajectory_data,
@@ -181,6 +182,7 @@ class Sample:
                     trajectory_file,
                     bond_file,
                     atom_lib,
+                    static_topology,
                 ),
             ).get()
 
@@ -200,7 +202,114 @@ class Sample:
             num_particles,
             num_frames,
             box,
+            static_topology,
         )
+
+    @classmethod
+    def from_gromacs(
+        cls,
+        gro_file,
+        top_file,
+        trajectory_file,
+        atom_lib,
+        gro_lib,
+        masses,
+        system=None,
+        start_end_nthframe=(0, -1, 1),
+    ):
+        """
+        Construct a Sample instance for a classical-force-field GROMACS
+        trajectory (`.trr`/`.xtc`) with a static, non-reactive bond topology.
+
+        Unlike ReaxFF, GROMACS trajectories carry no bond information; the
+        bond topology never changes and is instead parsed once from the
+        `.top`/`.itp` files (see `porereax.gromacs_topology`). After
+        construction, the workflow (`add_bond_length_sampling`,
+        `add_angle_sampling`, ..., `sample()`) is identical to the ReaxFF
+        path.
+
+        Parameters
+        ----------
+        gro_file : str
+            Path to the `.gro` structure file (fixes atom order/count).
+        top_file : str
+            Path to the GROMACS `.top` file. Its `#include xxx.itp` files
+            are resolved automatically.
+        trajectory_file : str
+            Path to the trajectory file (`.trr` or `.xtc`).
+        atom_lib : dict
+            Library mapping atom names to types, e.g. `{"Si": 1, "O": 2,
+            "H": 3}`.
+        gro_lib : dict
+            Maps raw `.gro` atom names (e.g. "OM", "SI", "OW", "HW", "MW")
+            to an `atom_lib` name, following the same convention already
+            used by `Simulate`. An empty-string value excludes the atom
+            from sampling (e.g. a TIP4P `MW` virtual site).
+        masses : dict
+            Dictionary mapping atom names to their masses.
+        system : object, optional
+            System object containing additional information.
+        start_end_nthframe : tuple, optional
+            Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
+
+        Returns
+        -------
+        Sample
+            A configured Sample instance.
+        """
+        static_topology = parse_gromacs_topology(gro_file, top_file, atom_lib, gro_lib)
+
+        instance = cls.__new__(cls)
+        ctx = cls._get_mp_context()
+        with ctx.Pool(1) as pool:
+            num_particles, num_frames, box = pool.apply_async(
+                cls.get_trajectory_data,
+                (trajectory_file, None, atom_lib, static_topology),
+            ).get()
+
+        print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
+
+        start_frame, end_frame, nth_frame = start_end_nthframe
+        instance.init_helper(
+            atom_lib,
+            masses,
+            trajectory_file,
+            None,
+            system,
+            start_frame,
+            end_frame,
+            nth_frame,
+            num_particles,
+            num_frames,
+            box,
+            static_topology,
+        )
+        return instance
+
+    @staticmethod
+    def _get_mp_context():
+        """
+        Pick the multiprocessing start method to use for trajectory-metadata
+        and (sub)process sampling, preferring 'forkserver' > 'spawn' > 'fork'.
+
+        Returns
+        -------
+        multiprocessing.context.BaseContext
+            The selected multiprocessing context.
+        """
+        if "forkserver" in mp.get_all_start_methods():
+            return mp.get_context("forkserver")
+        elif "spawn" in mp.get_all_start_methods():
+            return mp.get_context("spawn")
+        else:
+            if "ovito" in sys.modules:
+                raise RuntimeError(
+                    "The 'ovito' module is already imported. Please remove it from the "
+                    "loaded modules to avoid conflicts during parallel processing. "
+                    "This is necessary because the OS does not support the "
+                    "'spawn' start method."
+                )
+            return mp.get_context("fork")
 
     def init_helper(
         self,
@@ -215,6 +324,7 @@ class Sample:
         num_particles,
         num_frames,
         box,
+        static_topology=None,
     ):
         """
         Helper function to initialize Sample instance.
@@ -243,9 +353,13 @@ class Sample:
             Total number of frames in the trajectory.
         box : np.ndarray
             Simulation box dimensions.
+        static_topology : tuple, optional
+            (atom_type_array, bond_pairs) pair describing a static bond
+            topology, see `Sample.__init__`.
         """
         self.trajectory_file = os.path.abspath(trajectory_file)
         self.bond_file = os.path.abspath(bond_file) if bond_file else None
+        self.static_topology = static_topology
         self.system = system  # is only used to pass to the subprocesses
 
         self.sampler_inputs = {
@@ -340,7 +454,58 @@ class Sample:
         self.system_properties = read_pore_yml(system) if system else None
 
     @staticmethod
-    def get_trajectory_data(trajectory_file, bond_file, atom_lib):
+    def _build_pipeline(trajectory_file, bond_file, static_topology):
+        """
+        Build the Ovito pipeline used to read particle positions and bonds.
+
+        Parameters
+        ----------
+        trajectory_file : str
+            Path to the trajectory file.
+        bond_file : str, optional
+            Path to a (possibly per-frame, reactive) bond file, merged via
+            `ovito.modifiers.LoadTrajectoryModifier`. Mutually exclusive
+            with `static_topology`.
+        static_topology : tuple, optional
+            (atom_type_array, bond_pairs) pair. When given, a small custom
+            modifier assigns this fixed particle-type/bond topology to every
+            frame instead. No periodic-image bookkeeping is needed here:
+            `utils.min_image_convention` already handles that downstream,
+            using the actual per-frame positions and the (orthorhombic)
+            simulation box.
+
+        Returns
+        -------
+        ovito.pipeline.Pipeline
+            The constructed pipeline.
+        """
+        from ovito.io import import_file
+        from ovito.modifiers import LoadTrajectoryModifier
+
+        if not os.path.isfile(trajectory_file):
+            raise FileNotFoundError(f"Trajectory file '{trajectory_file}' not found.")
+        pipeline = import_file(trajectory_file)
+
+        if bond_file:
+            if not os.path.isfile(bond_file):
+                raise FileNotFoundError(f"Bond file '{bond_file}' not found.")
+            bond_modifier = LoadTrajectoryModifier()
+            bond_modifier.source.load(bond_file)
+            pipeline.modifiers.append(bond_modifier)
+        elif static_topology is not None:
+            atom_type_array, bond_pairs = static_topology
+
+            def _assign_static_topology(frame, data):
+                data.particles_.create_property("Particle Type", data=atom_type_array)
+                bonds = data.particles_.create_bonds(count=len(bond_pairs))
+                bonds.create_property("Topology", data=bond_pairs)
+
+            pipeline.modifiers.append(_assign_static_topology)
+
+        return pipeline
+
+    @staticmethod
+    def get_trajectory_data(trajectory_file, bond_file, atom_lib, static_topology=None):
         """
         Extract trajectory metadata using Ovito.
 
@@ -352,6 +517,8 @@ class Sample:
             Path to the bond file.
         atom_lib : dict
             Library mapping atom names to types.
+        static_topology : tuple, optional
+            (atom_type_array, bond_pairs) pair, see `Sample.__init__`.
 
         Returns
         -------
@@ -362,21 +529,9 @@ class Sample:
         box : np.ndarray
             Simulation box dimensions.
         """
-        from ovito.io import import_file
-        from ovito.modifiers import LoadTrajectoryModifier
-
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
-        # Load trajectory
-        if not os.path.isfile(trajectory_file):
-            raise FileNotFoundError(f"Trajectory file '{trajectory_file}' not found.")
-        pipeline = import_file(trajectory_file)
-        if bond_file:
-            if not os.path.isfile(bond_file):
-                raise FileNotFoundError(f"Bond file '{bond_file}' not found.")
-            bond_modifier = LoadTrajectoryModifier()
-            bond_modifier.source.load(bond_file)
-            pipeline.modifiers.append(bond_modifier)
+        pipeline = Sample._build_pipeline(trajectory_file, bond_file, static_topology)
 
         # Get and validate trajectory meta data
         first_frame = pipeline.compute()
@@ -387,12 +542,16 @@ class Sample:
                 "No bonds found. Ensure bond_file is provided or the "
                 "trajectory contains bond data."
             )
-        type_set = set(first_frame.particles.particle_types.array)
-        atom_type_set = set(atom_lib.values())
-        if type_set != atom_type_set:
+        trajectory_type_set = set(first_frame.particles.particle_types.array)
+        input_type_set = set(atom_lib.values())
+        if static_topology is not None:
+            # Type ID 0 is reserved for atoms excluded via an empty gro_lib
+            # mapping (e.g. TIP4P virtual sites) and is never in atom_lib.
+            input_type_set = input_type_set | {0}
+        if not trajectory_type_set <= input_type_set:
             raise ValueError(
-                f"Atom types in trajectory {type_set} do not match those in "
-                f"atom_lib {atom_type_set}."
+                f"Atom types in trajectory {trajectory_type_set} must be a subset "
+                f"of types given in atom_lib {input_type_set}."
             )
 
         num_particles = first_frame.particles.count
@@ -403,6 +562,8 @@ class Sample:
             )
         num_frames = pipeline.source.num_frames
         box = np.diagonal(first_frame.cell.matrix)
+        shift = np.array(first_frame.cell.matrix[:, -1])
+        print(f"Simulation box dimensions: {box}, shift: {shift}")
 
         return num_particles, num_frames, box
 
@@ -965,20 +1126,7 @@ class Sample:
             for i, (start_frame, end_frame, _) in enumerate(start_end_nthframe_list):
                 print(f"Process {i}: frames {start_frame} to {end_frame}")
             print(f"Starting parallel sampling with {num_cores} cores...")
-            if "forkserver" in mp.get_all_start_methods():
-                ctx = mp.get_context("forkserver")
-            elif "spawn" in mp.get_all_start_methods():
-                ctx = mp.get_context("spawn")
-            else:
-                ctx = mp.get_context("fork")
-                if "ovito" in sys.modules:
-                    raise RuntimeError(
-                        "The 'ovito' module is already imported. Please "
-                        "remove it from the loaded modules to avoid "
-                        "conflicts during parallel processing. This is "
-                        "necessary because the OS does not support the "
-                        "'spawn' start method."
-                    )
+            ctx = self._get_mp_context()
             with ctx.Pool(num_cores) as pool:
                 for process_id in range(num_cores):
                     pool.apply_async(
@@ -995,6 +1143,7 @@ class Sample:
                             self.num_particles,
                             np.inf,
                             self.box,
+                            self.static_topology,
                         ),
                     )
                 pool.close()
@@ -1021,6 +1170,7 @@ class Sample:
         num_particles,
         num_frames,
         box,
+        static_topology=None,
     ):
         """
         Initialize and run sampling in a subprocess.
@@ -1050,6 +1200,8 @@ class Sample:
             Number of particles in the trajectory.
         box : np.ndarray
             Simulation box dimensions.
+        static_topology : tuple, optional
+            (atom_type_array, bond_pairs) pair, see `Sample.__init__`.
 
         Returns
         -------
@@ -1070,6 +1222,7 @@ class Sample:
             num_particles,
             num_frames,
             box,
+            static_topology,
         )
         sample_instance.init_samplers(sampler_inputs, process_id)
         sample_instance.sample_helper()
@@ -1245,21 +1398,20 @@ class Sample:
         Helper function to perform the sampling process.
         """
         from ovito.data import BondsEnumerator
-        from ovito.io import import_file
-        from ovito.modifiers import LoadTrajectoryModifier
 
         os.environ["OVITO_THREAD_COUNT"] = "1"
 
-        # Load trajectory
-        self.pipeline = import_file(self.trajectory_file)
-        if self.bond_file:
-            bond_modifier = LoadTrajectoryModifier()
-            bond_modifier.source.load(self.bond_file)
-            self.pipeline.modifiers.append(bond_modifier)
+        self.pipeline = self._build_pipeline(
+            self.trajectory_file, self.bond_file, self.static_topology
+        )
 
         self._molecules_per_atom_type = self._group_molecules_by_atom_type()
         molecule_mask, molecule_bond_atoms = self._init_molecule_arrays()
         bond_mask = {}
+
+        # For a static (non-reactive) bond topology
+        static_bonds = self.static_topology is not None
+        identified = False
 
         # Loop over frames
         for frame_idx in self.frames:
@@ -1270,19 +1422,23 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
-            self._identify_molecules(
-                molecule_mask,
-                molecule_bond_atoms,
-                atom_types,
-                bond_topology,
-                bond_enum,
-            )
-            self._identify_bonds(
-                bond_mask, bond_count, bond_topology, atom_types, molecule_mask
-            )
+            if not (static_bonds and identified):
+                self._identify_molecules(
+                    molecule_mask,
+                    molecule_bond_atoms,
+                    atom_types,
+                    bond_topology,
+                    bond_enum,
+                )
+                self._identify_bonds(
+                    bond_mask, bond_count, bond_topology, atom_types, molecule_mask
+                )
+                identified = True
+
+            box_shift = frame.cell.matrix[:, -1]
 
             positions_transformed = self._transform_positions(
-                frame.particles.positions.array
+                frame.particles.positions.array - box_shift
             )
 
             # Sampling
@@ -1295,6 +1451,7 @@ class Sample:
                     frame=frame,
                     bond_enum=bond_enum,
                     positions_transformed=positions_transformed,
+                    box_shift=box_shift,
                 )
 
         for sampler in self.samplers:

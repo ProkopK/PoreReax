@@ -148,10 +148,11 @@ class MoleculeStructureSampler(Sampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         atom_types = frame.particles.particle_types.array
         bond_topology = frame.particles.bonds.topology.array
-        positions = frame.particles.positions.array
+        positions = frame.particles.positions.array - box_shift
         position_mask = self._region(positions)
         for atom_type in self._data["structure_counts"]:
             atoms = np.where(atom_types == atom_type)[0]

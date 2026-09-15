@@ -381,8 +381,9 @@ class DensitySampler(AtomSampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
-        positions = frame.particles.positions.array
+        positions = frame.particles.positions.array - box_shift
         position_mask = self._region(positions)
         for identifier in self._molecules:
             mol_mask = molecule_mask[identifier] & position_mask
@@ -551,9 +552,10 @@ class BondDensitySampler(BondSampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         bond_topology = frame.particles.bonds.topology.array
-        positions = frame.particles.positions.array
+        positions = frame.particles.positions.array - box_shift
 
         for identifier in self._bonds:
             bond_indices = bond_mask[identifier]
@@ -734,13 +736,14 @@ class ReactionSampler(AtomSampler):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         cur_topology = frame.particles.bonds.topology.array
 
         self._pre_positions = self._cur_positions
         self._pre_molecule_mask = self._cur_molecule_mask
         self._pre_bonds = self._cur_bonds
-        self._cur_positions = frame.particles.positions.array
+        self._cur_positions = frame.particles.positions.array - box_shift
         self._cur_molecule_mask = {
             key: np.copy(value) for key, value in molecule_mask.items()
         }

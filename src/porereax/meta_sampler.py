@@ -480,6 +480,7 @@ class Sampler(abc.ABC):
         frame: object,
         bond_enum: object,
         positions_transformed: np.ndarray,
+        box_shift: np.ndarray,
     ):
         """
         Sample data for the current frame.
@@ -504,6 +505,8 @@ class Sampler(abc.ABC):
             OVITO BondsEnumerator object for enumerating bonds in the frame.
         positions_transformed : np.ndarray
             Transformed positions of atoms in the current frame.
+        box_shift : np.ndarray
+            Box shift vector to move positions in [0, box] range.
         """
 
     def join_samplers(self, num_cores: int) -> None:
