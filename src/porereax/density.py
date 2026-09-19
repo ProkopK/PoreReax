@@ -250,6 +250,35 @@ def _record_density(
         data["hist"] += hist
 
 
+def _hist_std(data: dict) -> np.ndarray:
+    """
+    Compute the error on the frame-normalized histogram bins.
+
+    The error is the standard error of the mean over the workers' normalized
+    histograms. Workers without recorded frames are skipped.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing data for a single identifier from each process.
+
+    Returns
+    -------
+    np.ndarray
+        Error per histogram bin, NaN if fewer than two workers recorded frames.
+    """
+    hists = np.array(data["hist"])
+    worker_frames = np.array(data["num_frames"])
+    valid_workers = worker_frames > 0
+    worker_frames = worker_frames[valid_workers].reshape(
+        (-1,) + (1,) * (hists.ndim - 1)
+    )
+    worker_hists = hists[valid_workers] / worker_frames
+    if len(worker_hists) > 1:
+        return np.std(worker_hists, axis=0, ddof=1) / np.sqrt(len(worker_hists))
+    return np.full(hists.shape[1:], np.nan)
+
+
 def _combine_density_data(data: dict, dimension: Dimension, num_bins: int) -> dict:
     """
     Combine one identifier's density data collected from multiple processes.
@@ -280,7 +309,7 @@ def _combine_density_data(data: dict, dimension: Dimension, num_bins: int) -> di
             if num_frames > 0
             else np.zeros(num_bins)
         )
-        combined["hist_std"] = np.std(data["hist"], axis=0)
+        combined["hist_std"] = _hist_std(data)
         combined["bin_edges"] = data["bin_edges"][0]
         combined["direction"] = data["direction"][0]
     elif dimension == "Cartesian2D" or dimension == "Pore2D":
@@ -289,7 +318,7 @@ def _combine_density_data(data: dict, dimension: Dimension, num_bins: int) -> di
             if num_frames > 0
             else np.zeros((num_bins, num_bins))
         )
-        combined["hist_std"] = np.std(data["hist"], axis=0)
+        combined["hist_std"] = _hist_std(data)
         combined["x_edges"] = data["x_edges"][0]
         combined["y_edges"] = data["y_edges"][0]
         combined["direction"] = data["direction"][0]

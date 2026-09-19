@@ -147,18 +147,39 @@ class BondLengthSampler(BondSampler):
     def _combine_identifier(self, identifier: str, data: dict) -> dict:
         num_frames = np.sum(data["num_frames"])
         num_bonds = np.sum(data["num_bonds"])
+        bin_edges = data["bin_edges"][0]
+
+        # Compute mean and standard error of the mean (SEM)
         mean = np.sum(data["mean"]) / num_bonds if num_bonds > 0 else 0.0
+        worker_counts = np.array(data["num_bonds"])
+        worker_sums = np.array(data["mean"])
+        valid_workers = worker_counts > 0
+        worker_means = worker_sums[valid_workers] / worker_counts[valid_workers]
+        mean_std = (
+            np.std(worker_means, ddof=1) / np.sqrt(len(worker_means))
+            if len(worker_means) > 1
+            else np.nan
+        )
+
+        # Normalize histogram and compute error on histogram bins
         hist = (
             np.sum(data["hist"], axis=0) / num_frames
             if num_frames > 0
             else np.zeros(self._num_bins)
         )
+        worker_frames = np.array(data["num_frames"])
+        worker_hists = np.array(data["hist"]) / worker_frames[:, np.newaxis]
+        hist_std = (
+            np.std(worker_hists, axis=0, ddof=1) / np.sqrt(len(worker_hists))
+            if len(worker_hists) > 1
+            else np.full(self._num_bins, np.nan)
+        )
+
+        # Compute standard deviation of distribution
         std = np.sqrt(
             np.sum(data["std"]) / num_bonds - mean**2 if num_bonds > 0 else np.nan
         )
-        hist_std = np.std(data["hist"], axis=0)  # TODO: fix std calculation
-        mean_std = 0  # TODO: fix std calculation
-        bin_edges = data["bin_edges"][0]
+
         return {
             "num_frames": num_frames,
             "num_bonds": num_bonds,

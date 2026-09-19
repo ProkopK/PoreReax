@@ -195,6 +195,27 @@ class RdfSampler(AtomSampler):
         combined["hist_raw"] = (
             hist_sum / num_frames if num_frames > 0 else np.zeros(self._num_bins)
         )
-        combined["hist_std"] = np.std(data["hist"], axis=0)
+
+        # Compute error on g(r) as the standard error over the workers
+        worker_frames = np.array(data["num_frames"])
+        worker_atoms_A = np.array(data["num_atoms_A"])
+        worker_atoms_B = np.array(data["num_atoms_B"])
+        valid_workers = (
+            (worker_frames > 0) & (worker_atoms_A > 0) & (worker_atoms_B > 0)
+        )
+        worker_frames = worker_frames[valid_workers]
+        worker_avg_A = worker_atoms_A[valid_workers] / worker_frames
+        worker_avg_B = worker_atoms_B[valid_workers] / worker_frames
+        worker_hists = (
+            box_volume
+            * np.array(data["hist"])[valid_workers]
+            / (worker_frames * worker_avg_A * worker_avg_B)[:, np.newaxis]
+            / shell_volumes
+        )
+        combined["hist_std"] = (
+            np.std(worker_hists, axis=0, ddof=1) / np.sqrt(len(worker_hists))
+            if len(worker_hists) > 1
+            else np.full(self._num_bins, np.nan)
+        )
         combined["bin_edges"] = bin_edges
         return combined
