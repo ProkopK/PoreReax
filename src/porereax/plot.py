@@ -11,6 +11,58 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 import porereax.utils as utils
+from porereax.regions import entry
+
+
+def _dens_1d_to_n_per_nm3(input_params: dict, data: dict) -> float:
+    bin_edges = next(iter(data.values()))["bin_edges"]
+    if input_params["region"] == "Box" and input_params["direction"] in ["x", "y", "z"]:
+        dimension = {"x": 0, "y": 1, "z": 2}[input_params["direction"]]
+        slice_area = np.prod(input_params["box"]) / input_params["box"][dimension]
+        slice_thickness = bin_edges[1] - bin_edges[0]
+        slice_volume = slice_area * slice_thickness / 1000  # Convert to nm^3
+    elif input_params["region"] == "Reservoir" and input_params["direction"] == "d":
+        slice_area_whole = input_params["box"][0] * input_params["box"][1]
+        slice_area = (
+            slice_area_whole - input_params["system_properties"]["radius"] ** 2 * np.pi
+        )
+        slice_thickness = bin_edges[1] - bin_edges[0]
+        slice_volume = slice_area * slice_thickness * 2 / 1000  # Both sides + to nm^3
+    elif input_params["region"] == "Pore" and input_params["direction"] == "r":
+        slice_area = bin_edges[1] ** 2 * np.pi - bin_edges[0] ** 2 * np.pi
+        pore_length = input_params["system_properties"]["length"] - 2 * entry
+        slice_volume = slice_area * pore_length / 1000  # Convert to nm^3
+    else:
+        print(
+            f"Warning: Density normalization for region {input_params['region']} "
+            "and direction {input_params['direction']} is not supported"
+        )
+        slice_volume = 1
+    return 1 / slice_volume
+
+
+def _dens_2d_to_n_per_nm3(input_params: dict, data: dict) -> float:
+    x_edges = next(iter(data.values()))["x_edges"]
+    y_edges = next(iter(data.values()))["y_edges"]
+    if input_params["region"] == "Box" and input_params["direction"] in [
+        "xy",
+        "xz",
+        "yz",
+    ]:
+        slice_area = (x_edges[1] - x_edges[0]) * (y_edges[1] - y_edges[0])
+        slice_thickness = {
+            "xy": input_params["box"][2],
+            "xz": input_params["box"][1],
+            "yz": input_params["box"][0],
+        }[input_params["direction"]]
+        slice_volume = slice_area * slice_thickness / 1000  # Convert to nm^3
+    else:
+        print(
+            f"Warning: Density normalization for region {input_params['region']} "
+            "and direction {input_params['direction']} is not supported"
+        )
+        slice_volume = 1
+    return 1 / slice_volume
 
 
 def _plot_one_line(
@@ -68,7 +120,9 @@ def _plot_one_line(
         )
 
 
-def _plot_parameters(input_params: dict, mean: bool, density: bool):
+def _plot_parameters(
+    input_params: dict, data: dict, identifier: str, mean: bool, density: bool
+):
     """
     Determine the appropriate x and y labels, density normalization, and flags
     for mean and density based on the sampler type and dimension.
@@ -92,16 +146,18 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
         x_label = "Charge / e"
         if density:
             y_label = "Counts per Atom"
+            density_normalization = 1 / data[identifier]["num_atoms"]
         else:
             y_label = "Counts"
-        density_normalization = "num_atoms"
+            density_normalization = 1
     elif sampler_type == "AngleSampler":
         x_label = "Angle / degrees"
         if density:
             y_label = "Counts per Angle"
+            density_normalization = 1 / data[identifier]["num_angles"]
         else:
             y_label = "Counts"
-        density_normalization = "num_angles"
+            density_normalization = 1
     elif sampler_type == "BondLengthSampler":
         if input_params["dimension"] == "Bond Order":
             x_label = "Bond Order"
@@ -109,23 +165,37 @@ def _plot_parameters(input_params: dict, mean: bool, density: bool):
             x_label = "Bond Length / Angstrom"
         if density:
             y_label = "Counts per Bond"
+            density_normalization = 1 / data[identifier]["num_bonds"]
         else:
             y_label = "Counts"
-        density_normalization = "num_bonds"
+            density_normalization = 1
     elif (
-        sampler_type == "BondDensitySampler"
-        or sampler_type == "DensitySampler"
+        sampler_type == "DensitySampler"
+        or sampler_type == "BondDensitySampler"
         or sampler_type == "ReactionSampler"
     ):
-        x_label = f"{input_params['direction']} Position / nm"
-        y_label = "Density / atoms"
-        density_normalization = None
+        dens_name = {
+            "DensitySampler": "Density",
+            "BondDensitySampler": "Bond density",
+            "ReactionSampler": "Reactions",
+        }[sampler_type]
+        struct_name = {
+            "DensitySampler": "atom",
+            "BondDensitySampler": "bonds",
+            "ReactionSampler": "atom",
+        }[sampler_type]
+        x_label = f"{input_params['direction']} Position / Å"
+        if density:
+            y_label = dens_name + r" / $\frac{mol}{L}$"
+            density_normalization = _dens_1d_to_n_per_nm3(input_params, data)
+        else:
+            y_label = f"{dens_name} / {struct_name}"
+            density_normalization = 1
         mean = False
-        density = False
     elif sampler_type == "RdfSampler":
         x_label = "Distance r / Å"
         y_label = "g(r)"
-        density_normalization = None
+        density_normalization = 1
         mean = False
         density = False
     else:
@@ -172,18 +242,15 @@ def _plot_hist(
     plot_kwargs : dict
         Additional keyword arguments for the plot function.
     """
-    x_label, y_label, density_normalization, mean, density = _plot_parameters(
-        input_params, mean, density
-    )
-
     for i, identifier in enumerate(identifiers):
+        x_label, y_label, density_normalization, mean, density = _plot_parameters(
+            input_params, data, identifier, mean, density
+        )
         if identifier not in data:
             print(f"Warning: Identifier {identifier} not found in data.")
             continue
         bin_edges = data[identifier]["bin_edges"]
-        hist = data[identifier]["hist"]
-        if density:
-            hist = hist / data[identifier][density_normalization]
+        hist = data[identifier]["hist"] * density_normalization
         hist_std = data[identifier]["hist_std"] if std else None
         mean_value = data[identifier]["mean"] if mean else None
         mean_std = data[identifier]["mean_std"] if std and mean else None
@@ -203,7 +270,13 @@ def _plot_hist(
 
 
 def _plot_2d(
-    axis: Axes, data: dict, identifier: str, transpose: bool, plot_kwargs: dict
+    axis: Axes,
+    data: dict,
+    input_params: dict,
+    identifier: str,
+    transpose: bool,
+    density: bool,
+    plot_kwargs: dict,
 ):
     """
     Plot 2D density data for the given identifier on the provided axis.
@@ -214,10 +287,14 @@ def _plot_2d(
         Axis to plot on.
     data : dict
         Data dictionary containing 2D density data for each identifier.
+    input_params : dict
+        Input parameters from the data file.
     identifier : str
         Identifier for the data to plot.
     transpose : bool
         Whether to transpose the axes for the 2D density plot.
+    density : bool
+        Whether to normalize histograms to density.
     plot_kwargs : dict
         Additional keyword arguments for the pcolormesh function.
     """
@@ -226,7 +303,15 @@ def _plot_2d(
     density_data = data[identifier]
     x_edges = density_data["x_edges"] / 10  # Convert to nm
     y_edges = density_data["y_edges"] / 10  # Convert to nm
+    if density_data["direction"][0] == 4:
+        x_edges = np.degrees(x_edges * 10)  # Convert to degrees
+    if density_data["direction"][1] == 4:
+        y_edges = np.degrees(y_edges * 10)  # Convert to degrees
+
     hist = density_data["hist"]
+    if density:
+        density_normalization = _dens_2d_to_n_per_nm3(input_params, data)
+        hist = hist * density_normalization
 
     shading = plot_kwargs.pop("shading", "auto")
 
@@ -234,9 +319,12 @@ def _plot_2d(
     if transpose:
         X, Y = Y, X
     c = axis.pcolormesh(X, Y, hist.T, shading=shading, **plot_kwargs)
-    plt.colorbar(c, ax=axis, label="Density / Counts per frame")
-    unit_x = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][0]]
-    unit_y = ["nm", "nm", "nm", "nm", "rad", "nm", "nm"][density_data["direction"][1]]
+    if density:
+        plt.colorbar(c, ax=axis, label=r"Density / $\frac{mol}{L}$")
+    else:
+        plt.colorbar(c, ax=axis, label="Density / Counts per frame")
+    unit_x = ["nm", "nm", "nm", "nm", "deg", "nm", "nm"][density_data["direction"][0]]
+    unit_y = ["nm", "nm", "nm", "nm", "deg", "nm", "nm"][density_data["direction"][1]]
     x_label = ["x", "y", "z", "r", "φ", "z", "d"][
         density_data["direction"][0]
     ] + f" / {unit_x}"
@@ -252,7 +340,9 @@ def _plot_2d(
     axis.set_aspect("equal", adjustable="box")
 
 
-def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int):
+def _plot_time(
+    axis: Axes, data: dict, identifiers: list, colors: list, dt: int, plot_kwargs: dict
+):
     """
     Plot time series data for the given identifiers on the provided axis.
 
@@ -268,6 +358,8 @@ def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int)
         List of colors to use for plotting.
     dt : int
         Time step in femtoseconds for time series plots.
+    plot_kwargs : dict
+        Additional keyword arguments for the plot function.
     """
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
@@ -279,7 +371,9 @@ def _plot_time(axis: Axes, data: dict, identifiers: list, colors: list, dt: int)
         )  # Convert to ps
         density_data = time_data["densities"]
         color = colors[i % len(colors)] if colors else None
-        axis.plot(time_points, density_data, label=identifier, color=color)
+        plot_kwargs["color"] = color
+        plot_kwargs["label"] = identifier
+        axis.plot(time_points, density_data, **plot_kwargs)
     axis.set_xlabel("Time / ps")
     axis.set_ylabel("Counts per Frame")
 
@@ -312,7 +406,7 @@ def plot_data(
     link_data: str,
     axis: Axes | None = None,
     identifiers: list | None = None,
-    colors: list | None = None,
+    colors: list[str] | None = None,
     std: bool = False,
     mean: bool = False,
     density: bool = False,
@@ -372,7 +466,22 @@ def plot_data(
     else:
         fig = None
         ax = axis
-    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"] if not colors else colors
+    colors = (
+        [
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf",
+        ]
+        if not colors
+        else colors
+    )
     identifiers = identifiers if identifiers else list(data.keys())
 
     if sampler_type == "MoleculeStructureSampler":
@@ -380,7 +489,7 @@ def plot_data(
             ax, data, identifiers[0] if identifiers else next(iter(data.keys()))
         )
     elif input_params["dimension"] == "Time":
-        _plot_time(ax, data, identifiers, colors, dt)
+        _plot_time(ax, data, identifiers, colors, dt, plot_kwargs_1d)
     elif (
         input_params["dimension"] == "Cartesian2D"
         or input_params["dimension"] == "Pore2D"
@@ -388,8 +497,10 @@ def plot_data(
         _plot_2d(
             ax,
             data,
+            input_params,
             identifiers[0] if identifiers else next(iter(data.keys())),
             transpose,
+            density,
             plot_kwargs_2d,
         )
     else:
