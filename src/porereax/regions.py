@@ -100,17 +100,26 @@ def reservoir_region(
     np.ndarray
         Boolean mask indicating which coordinates are within the reservoir region.
     """
-    pore_range = system_properties["range"]
-    pore_center = system_properties["center"]
-    pore_radius = system_properties["radius"]
-    lower_bound = pore_range[0] + entry
-    upper_bound = pore_range[1] - entry
-    distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
+    if system_properties["type"] == "cylinder":
+        pore_range = system_properties["range"]
+        pore_center = system_properties["center"]
+        pore_radius = system_properties["radius"]
+        lower_bound = pore_range[0] + entry
+        upper_bound = pore_range[1] - entry
+        distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
 
-    return ((coords[:, 2] <= lower_bound) | (coords[:, 2] >= upper_bound)) & (
-        distance_from_center >= pore_radius
-    )
-
+        return ((coords[:, 2] <= lower_bound) | (coords[:, 2] >= upper_bound)) & (
+            distance_from_center >= pore_radius
+        )
+    elif system_properties["type"] == "slit":
+        pore_range = system_properties["range"]
+        pore_center = system_properties["center"]
+        pore_height = system_properties["height"]
+        lower_bound = pore_range[0] + entry
+        upper_bound = pore_range[1] - entry
+        return ((coords[:, 2] <= lower_bound) | (coords[:, 2] >= upper_bound)) & (
+            np.abs(coords[:, 1] - pore_center[1]) >= pore_height / 2
+        )
 
 def pore_region(
     coords: NDArray[np.float64], system_properties: dict
@@ -157,30 +166,79 @@ def wall_region(
     np.ndarray
         Boolean mask indicating which coordinates are within the wall region.
     """
-    pore_range = system_properties["range"]
-    pore_center = system_properties["center"]
-    pore_radius = system_properties["radius"]
-    lower_bound_left = pore_range[0] - layer_thickness
-    upper_bound_left = pore_range[0] + layer_thickness
-    lower_bound_right = pore_range[1] - layer_thickness
-    upper_bound_right = pore_range[1] + layer_thickness
-    distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
+    if system_properties["type"] == "cylinder":
+        pore_range = system_properties["range"]
+        pore_center = system_properties["center"]
+        pore_radius = system_properties["radius"]
+        lower_bound_left = pore_range[0] - layer_thickness
+        upper_bound_left = pore_range[0] + layer_thickness
+        lower_bound_right = pore_range[1] - layer_thickness
+        upper_bound_right = pore_range[1] + layer_thickness
+        distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
 
-    reservoir_wall_left = (
-        (coords[:, 2] >= lower_bound_left)
-        & (coords[:, 2] <= upper_bound_left)
-        & (distance_from_center >= pore_radius - layer_thickness)
-    )
-    reservoir_wall_right = (
-        (coords[:, 2] >= lower_bound_right)
-        & (coords[:, 2] <= upper_bound_right)
-        & (distance_from_center >= pore_radius - layer_thickness)
-    )
-    pore_wall = (
-        (coords[:, 2] >= lower_bound_left)
-        & (coords[:, 2] <= upper_bound_right)
-        & (distance_from_center >= pore_radius - layer_thickness)
-        & (distance_from_center <= pore_radius + layer_thickness)
-    )
+        reservoir_wall_left = (
+            (coords[:, 2] >= lower_bound_left)
+            & (coords[:, 2] <= upper_bound_left)
+            & (distance_from_center >= pore_radius - layer_thickness)
+        )
+        reservoir_wall_right = (
+            (coords[:, 2] >= lower_bound_right)
+            & (coords[:, 2] <= upper_bound_right)
+            & (distance_from_center >= pore_radius - layer_thickness)
+        )
+        pore_wall = (
+            (coords[:, 2] >= lower_bound_left)
+            & (coords[:, 2] <= upper_bound_right)
+            & (distance_from_center >= pore_radius - layer_thickness)
+            & (distance_from_center <= pore_radius + layer_thickness)
+        )
 
-    return reservoir_wall_left | reservoir_wall_right | pore_wall
+        return reservoir_wall_left | reservoir_wall_right | pore_wall
+    
+    elif system_properties["type"] == "slit":
+        pore_range = system_properties["range"]
+        pore_center = system_properties["center"]
+        pore_height = system_properties["height"]
+
+        lower_bound_left = pore_range[0] - layer_thickness
+        upper_bound_left = pore_range[0] + layer_thickness
+        lower_bound_right = pore_range[1] - layer_thickness
+        upper_bound_right = pore_range[1] + layer_thickness
+
+        lower_wall = pore_center[1] - pore_height / 2
+        upper_wall = pore_center[1] + pore_height / 2
+
+        lower_pore_wall = (
+            np.abs(coords[:, 1] - lower_wall) <= layer_thickness
+        )
+
+        upper_pore_wall = (
+            np.abs(coords[:, 1] - upper_wall) <= layer_thickness
+        )
+        
+
+        reservoir_wall_left = (
+            (coords[:, 2] >= lower_bound_left)
+            & (coords[:, 2] <= upper_bound_left)
+            & ((coords[:, 1] <= lower_wall + layer_thickness)
+                | (coords[:, 1] >= upper_wall - layer_thickness)
+            )
+        )
+        
+        reservoir_wall_right = (
+            (coords[:, 2] >= lower_bound_right)
+            & (coords[:, 2] <= upper_bound_right)
+            & (
+                (coords[:, 1] <= lower_wall + layer_thickness)
+                | (coords[:, 1] >= upper_wall - layer_thickness)
+            )
+        )
+
+        pore_wall = (
+            (coords[:, 2] >= lower_bound_left)
+            & (coords[:, 2] <= upper_bound_right)
+            & (lower_pore_wall | upper_pore_wall)
+        )
+
+        return reservoir_wall_left | reservoir_wall_right | pore_wall
+

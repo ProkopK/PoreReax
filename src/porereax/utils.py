@@ -200,8 +200,26 @@ def read_pore_yml(file_path: str) -> dict:
         properties["length"] = pore_length
         properties["center"] = center
         properties["range"] = pore_range
+    elif system_data["shape_00"]["shape"] == "SLIT":
+        if system_data["shape_00"]["parameter"]["central"] != [0, 0, 1]:
+            raise NotImplementedError(
+                "Only SLIT pores with central axis along z (0,0,1) are supported."
+            )
+        pore_length = 2 * system_data["system"]["centroid"][2] * 10
+        box_length = system_data["system"]["dimensions"][2] * 10
+        center = np.array(system_data["shape_00"]["parameter"]["centroid"]) * 10
+        center[2] = box_length / 2
+        gap = (box_length - pore_length - 2 * reservoir) / 2
+        pore_range = np.array([reservoir + gap, box_length - reservoir - gap])
+
+        properties["type"] = "slit"
+        properties["height"] = system_data["shape_00"]["diameter"] * 10
+        properties["length"] = pore_length
+        properties["center"] = center
+        properties["range"] = pore_range
+        properties["dimension"] = [i*10 for i in system_data["system"]["dimensions"]]
     else:
-        raise NotImplementedError("Currently, only CYLINDER pores are supported.")
+        raise NotImplementedError("Currently, only SLIT or Cylindrical pores are supported.")
 
     return properties
 

@@ -48,6 +48,7 @@ direction : str
     - ("x", "y", or "z") for "Cartesian1D".
     - ("xy", "xz", or "yz") for "Cartesian2D".
     - ("r", "p", or "d") for "Pore1D".
+    - ("x", "y", or "z") for "Pore1D".
     - ("rp", "rz", or "pz") for "Pore2D".
 """
 
@@ -197,7 +198,24 @@ def _setup_data_structure(
                     "'direction' parameter to be one of 'r', 'p', 'd' for "
                     "'Pore1D' or 'rp', 'rz', 'pz' for 'Pore2D'."
                 )
-
+        elif dimension.startswith("Pore"):
+            if system_properties is None:
+                raise ValueError(
+                    f"{sampler_name} with 'Pore' dimension requires a given system"
+                )
+            elif system_properties["type"] == "slit" and direction=="r": 
+                center = system_properties["center"]
+                height = system_properties["height"]
+                bin_edges = np.linspace(0, height / 2, num_bins + 1)
+                dir_index = {"r": 7}[direction]
+                hist, _ = np.histogram([], bins=num_bins)
+                return {
+                    "hist": hist,
+                    "bin_edges": bin_edges,
+                    "direction": dir_index,
+                    "num_frames": 0,
+                    "center_slit" : center
+                }
 
 def _record_density(
     data: dict, dimension: Dimension, positions: np.ndarray, frame: int
@@ -237,8 +255,13 @@ def _record_density(
         )
         data["hist"] += hist
     elif dimension == "Pore1D":
-        direction = data["direction"] - 3
-        hist, _ = np.histogram(positions[:, direction], bins=data["bin_edges"])
+        if data["direction"]==7:
+            direction = data["direction"] - 6 
+            y_position = abs(positions[:, direction]-data["center_slit"][1])
+            hist, _ = np.histogram(y_position, bins=data["bin_edges"])
+        else:
+            direction = data["direction"] - 3 
+            hist, _ = np.histogram(positions[:, direction], bins=data["bin_edges"])
         data["hist"] += hist
     elif dimension == "Pore2D":
         dir_x, dir_y = (data["direction"][0] - 3, data["direction"][1] - 3)

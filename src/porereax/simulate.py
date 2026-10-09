@@ -657,6 +657,40 @@ class Simulate:
                 )
 
             self.freeze_region(region)
+
+        elif pore_properties["type"] == "slit":
+            pore_height = pore_properties["height"]
+            pore_center = pore_properties["center"]
+            pore_range = pore_properties["range"]
+            box = pore_properties["dimension"]
+            
+            def region(x, y, z):
+                x_min = 0
+                x_max = pore_properties["dimension"][0]
+
+                y_min = pore_center[1] - pore_height / 2
+                y_max = pore_center[1] + pore_height / 2
+                print(x_min,x_max,y_min,y_max)
+                x_area = (
+                    (x > reactive_radius)
+                    and (x < x_max - reactive_radius)
+                )
+
+                y_area = (
+                    (y <  y_min - reactive_radius)
+                    or (y > y_max + reactive_radius)
+                )
+
+                z_area = (
+                    pore_range[0] + reactive_radius + 1
+                    < z
+                    < pore_range[1] - reactive_radius - 1
+                )
+                print(x_area)
+
+                return x_area & y_area & z_area
+
+            self.freeze_region(region)
         else:
             raise NotImplementedError(
                 "Only cylindrical pores are supported for auto_freeze."
