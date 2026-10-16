@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Install docs dependencies
-        run: uv sync --group docs --no-install-package ovito
+        run: uv sync --group docs
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build
       - name: Upload documentation
