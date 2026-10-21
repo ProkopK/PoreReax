@@ -483,9 +483,11 @@ class DensitySampler(AtomSampler):
                 vec_cb = utils.min_image_convention(
                     positions[atom_c] - positions[atom_b], self._box
                 )
-                cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (
-                    np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1)
-                )
+                # Zero-length vectors give NaN angles, which fail every condition
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cos_angle = np.sum(vec_ab * vec_cb, axis=1) / (
+                        np.linalg.norm(vec_ab, axis=1) * np.linalg.norm(vec_cb, axis=1)
+                    )
                 cos_angle = np.clip(cos_angle, -1.0, 1.0)
                 angle_deg = np.degrees(np.arccos(cos_angle))
                 angles[:, i * (bonded_atoms.shape[1] - 1) + j - (1 if j > i else 0)] = (
