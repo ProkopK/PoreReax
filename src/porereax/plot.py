@@ -5,13 +5,20 @@ The module provides functions to plot histograms, time series, and 2D density
 data from sampled data.
 """
 
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 import porereax.utils as utils
-from porereax.regions import entry
+from porereax.regions import PORE_ENTRY_LENGTH
+
+
+def _safe_inverse(count) -> float:
+    """Return 1 / count, or 1 if there is nothing to normalise (count is zero)."""
+    return 1 / count if count else 1
 
 
 def _dens_1d_to_n_per_nm3(input_params: dict, data: dict) -> float:
@@ -30,12 +37,15 @@ def _dens_1d_to_n_per_nm3(input_params: dict, data: dict) -> float:
         slice_volume = slice_area * slice_thickness * 2 / 1000  # Both sides + to nm^3
     elif input_params["region"] == "Pore" and input_params["direction"] == "r":
         slice_area = bin_edges[1] ** 2 * np.pi - bin_edges[0] ** 2 * np.pi
-        pore_length = input_params["system_properties"]["length"] - 2 * entry
+        pore_length = (
+            input_params["system_properties"]["length"] - 2 * PORE_ENTRY_LENGTH
+        )
         slice_volume = slice_area * pore_length / 1000  # Convert to nm^3
     else:
-        print(
-            f"Warning: Density normalization for region {input_params['region']} "
-            "and direction {input_params['direction']} is not supported"
+        warnings.warn(
+            f"Density normalisation for region {input_params['region']} "
+            f"and direction {input_params['direction']} is not supported",
+            stacklevel=2,
         )
         slice_volume = 1
     return 1 / slice_volume
@@ -57,9 +67,10 @@ def _dens_2d_to_n_per_nm3(input_params: dict, data: dict) -> float:
         }[input_params["direction"]]
         slice_volume = slice_area * slice_thickness / 1000  # Convert to nm^3
     else:
-        print(
-            f"Warning: Density normalization for region {input_params['region']} "
-            "and direction {input_params['direction']} is not supported"
+        warnings.warn(
+            f"Density normalisation for region {input_params['region']} "
+            f"and direction {input_params['direction']} is not supported",
+            stacklevel=2,
         )
         slice_volume = 1
     return 1 / slice_volume
@@ -146,7 +157,7 @@ def _plot_parameters(
         x_label = "Charge / e"
         if density:
             y_label = "Counts per Atom"
-            density_normalization = 1 / data[identifier]["num_atoms"]
+            density_normalization = _safe_inverse(data[identifier]["num_atoms"])
         else:
             y_label = "Counts"
             density_normalization = 1
@@ -154,7 +165,7 @@ def _plot_parameters(
         x_label = "Angle / degrees"
         if density:
             y_label = "Counts per Angle"
-            density_normalization = 1 / data[identifier]["num_angles"]
+            density_normalization = _safe_inverse(data[identifier]["num_angles"])
         else:
             y_label = "Counts"
             density_normalization = 1
@@ -165,7 +176,7 @@ def _plot_parameters(
             x_label = "Bond Length / Angstrom"
         if density:
             y_label = "Counts per Bond"
-            density_normalization = 1 / data[identifier]["num_bonds"]
+            density_normalization = _safe_inverse(data[identifier]["num_bonds"])
         else:
             y_label = "Counts"
             density_normalization = 1
@@ -247,7 +258,7 @@ def _plot_hist(
             input_params, data, identifier, mean, density
         )
         if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
+            warnings.warn(f"Identifier {identifier} not found in data.", stacklevel=2)
             continue
         bin_edges = data[identifier]["bin_edges"]
         hist = data[identifier]["hist"] * density_normalization
@@ -363,7 +374,7 @@ def _plot_time(
     """
     for i, identifier in enumerate(identifiers):
         if identifier not in data:
-            print(f"Warning: Identifier {identifier} not found in data.")
+            warnings.warn(f"Identifier {identifier} not found in data.", stacklevel=2)
             continue
         time_data = data[identifier]
         time_points = (

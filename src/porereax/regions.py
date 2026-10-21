@@ -7,7 +7,8 @@ from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-entry = 3
+# Length (in Angstrom) at both pore ends that is excluded from pore analyses.
+PORE_ENTRY_LENGTH = 3
 
 
 def get_region_function(
@@ -103,8 +104,8 @@ def reservoir_region(
     pore_range = system_properties["range"]
     pore_center = system_properties["center"]
     pore_radius = system_properties["radius"]
-    lower_bound = pore_range[0] + entry
-    upper_bound = pore_range[1] - entry
+    lower_bound = pore_range[0] + PORE_ENTRY_LENGTH
+    upper_bound = pore_range[1] - PORE_ENTRY_LENGTH
     distance_from_center = np.linalg.norm(coords[:, :2] - pore_center[:2], axis=1)
 
     return ((coords[:, 2] <= lower_bound) | (coords[:, 2] >= upper_bound)) & (
@@ -131,8 +132,8 @@ def pore_region(
         Boolean mask indicating which coordinates are within the pore region.
     """
     pore_range = system_properties["range"]
-    lower_bound = pore_range[0] + entry
-    upper_bound = pore_range[1] - entry
+    lower_bound = pore_range[0] + PORE_ENTRY_LENGTH
+    upper_bound = pore_range[1] - PORE_ENTRY_LENGTH
 
     return (coords[:, 2] > lower_bound) & (coords[:, 2] < upper_bound)
 
