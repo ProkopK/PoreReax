@@ -9,6 +9,9 @@ TEST_DATA_DIR = Path(__file__).parent / "data"
 
 def test_simulate_pore_native(simulate_pore, tmp_path):
     assert isinstance(simulate_pore, Simulate)
+    with pytest.raises(ValueError):
+        simulate_pore.generate()
+    simulate_pore.set_force_field(TEST_DATA_DIR / "test_reax.ffield")
     simulate_pore.generate()
     assert (tmp_path / "system.data").exists()
     assert (tmp_path / "reax.ffield").exists()
@@ -18,7 +21,9 @@ def test_simulate_pore_native(simulate_pore, tmp_path):
 def test_simulate_pore_with_setup(simulate_pore, tmp_path):
     with pytest.raises(FileNotFoundError):
         simulate_pore.set_job_file(
-            job_file="non_existent_file.txt", submit_command="s", lammps_command="s"
+            job_file="non_existent_file.txt",
+            submit_command="s",
+            lammps_command="s"
         )
     with pytest.raises(ValueError):
         simulate_pore.set_job_file(
@@ -34,6 +39,8 @@ def test_simulate_pore_with_setup(simulate_pore, tmp_path):
         )
     with pytest.raises(FileNotFoundError):
         simulate_pore.set_force_field("non_existent_file.txt")
+    with pytest.raises(ValueError):
+        simulate_pore.generate()
 
     job_file_path = TEST_DATA_DIR / "test_job.job"
     submit_command = "sbatch"

@@ -2,8 +2,8 @@
 Simulation setup and management for ReaxFF molecular dynamics simulations.
 
 This module provides functionality to convert GROMACS structure files (.gro) to
-LAMMPS data files and generate complete simulation workflows for ReaxFF force field
-calculations. It handles atom type mapping, charge assignment, and creates all
+LAMMPS data files and generate complete simulation workflows for ReaxFF
+simulations. It handles atom type mapping, charge assignment, and creates all
 necessary input files for running molecular dynamics simulations on HPC systems.
 
 The module automatically generates:
@@ -60,7 +60,7 @@ class Simulate:
         structure_file: str | None = None,
     ):
         """
-        Initialize the Simulate object with atom mappings and structure file.
+        Initialise the Simulate object with atom mappings and structure file.
 
         Parameters
         ----------
@@ -270,7 +270,7 @@ class Simulate:
         self._submit_cmd = s_command
         self._lammps_command = l_command
 
-    def set_force_field(self, force_field: str | None = None):
+    def set_force_field(self, force_field: str):
         """
         Specify a custom ReaxFF force field parameter file.
 
@@ -286,25 +286,11 @@ class Simulate:
         FileNotFoundError
             If the specified force field file does not exist.
 
-        Notes
-        -----
-        If this method is not called, a default Si/O/H force field from
-        https://doi.org/10.1063/1.3407433 will be used.
-
         Example
         -------
         >>> sim.set_force_field('/path/to/reax.ffield')
         """
-        if force_field is None:
-            ffield = os.path.abspath(
-                files("porereax").joinpath("templates", "reax.ffield")
-            )
-            print(
-                "Using force field from https://doi.org/10.1063/1.3407433 "
-                "for Si/O/H systems."
-            )
-        else:
-            ffield = os.path.abspath(force_field)
+        ffield = os.path.abspath(force_field)
 
         if not os.path.isfile(ffield):
             raise FileNotFoundError(f"Force field file {ffield} not found.")
@@ -326,7 +312,7 @@ class Simulate:
         Add an image rendering during LAMMPS simulations.
         It allows for the generation of image snapshots of the simulation at
         specified intervals, with customizable viewing planes, zoom levels,
-        and atom visualizations.
+        and atom visualisations.
         Multiple image dumps can be added to the simulation workflow with
         different settings.
 
@@ -671,7 +657,7 @@ class Simulate:
         It creates all necessary files for running ReaxFF simulations:
 
         - Converts GROMACS structure to LAMMPS data file (system.data)
-        - Copies or uses default ReaxFF force field file (reax.ffield)
+        - Copies ReaxFF force field file (reax.ffield)
         - Generates LAMMPS input scripts for initial equilibration and all
           simulation steps
         - Creates job submission scripts for each simulation stage
@@ -688,7 +674,6 @@ class Simulate:
 
         Notes
         -----
-        - If no force field is specified, uses default Si/O/H parameters
         - If no job template is specified, uses default SLURM template
         - Virtual sites and excluded atoms (mapped to "" in gro_lib) are filtered out
         - Prints detailed information about system composition and total charge
@@ -712,7 +697,10 @@ class Simulate:
 
         # Setup and copy force field file
         if self._force_field is None:
-            self.set_force_field(None)
+            raise ValueError(
+                "Force field file is not specified. Please call set_force_field() "
+                "before generating simulation files."
+            )
         target_force_field = os.path.join(self._path, "reax.ffield")
         if os.path.abspath(self._force_field) != os.path.abspath(target_force_field):
             shutil.copy2(self._force_field, target_force_field)
