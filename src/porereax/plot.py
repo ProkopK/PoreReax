@@ -180,13 +180,13 @@ def _plot_parameters(
             "ReactionSampler": "Reactions",
         }[sampler_type]
         struct_name = {
-            "DensitySampler": "atom",
-            "BondDensitySampler": "bonds",
-            "ReactionSampler": "atom",
+            "DensitySampler": "Number density",
+            "BondDensitySampler": "Bond number density",
+            "ReactionSampler": "Reaction number density",
         }[sampler_type]
         x_label = f"{input_params['direction']} Position / Å"
         if density:
-            y_label = dens_name + r" / $\frac{mol}{L}$"
+            y_label = dens_name + r" / nm$^{-3}$"
             density_normalization = _dens_1d_to_n_per_nm3(input_params, data)
         else:
             y_label = f"{dens_name} / {struct_name}"
@@ -320,7 +320,7 @@ def _plot_2d(
         X, Y = Y, X
     c = axis.pcolormesh(X, Y, hist.T, shading=shading, **plot_kwargs)
     if density:
-        plt.colorbar(c, ax=axis, label=r"Density / $\frac{mol}{L}$")
+        plt.colorbar(c, ax=axis, label=r"Number density / nm$^{-3}$")
     else:
         plt.colorbar(c, ax=axis, label="Density / Counts per frame")
     unit_x = ["nm", "nm", "nm", "nm", "deg", "nm", "nm"][density_data["direction"][0]]
