@@ -161,7 +161,7 @@ class BondLengthSampler(BondSampler):
             else np.nan
         )
 
-        # Normalize histogram and compute error on histogram bins
+        # Normalise histogram and compute error on histogram bins
         hist = (
             np.sum(data["hist"], axis=0) / num_frames
             if num_frames > 0

@@ -104,7 +104,7 @@ def _setup_data_structure(
     Returns
     -------
     dict
-        Data structure with initialized arrays and metadata.
+        Data structure with initialised arrays and metadata.
     """
     if dimension == "Time":
         return {"densities": np.zeros(num_frames), "num_frames": 0}
@@ -252,9 +252,9 @@ def _record_density(
 
 def _hist_std(data: dict) -> np.ndarray:
     """
-    Compute the error on the frame-normalized histogram bins.
+    Compute the error on the frame-normalised histogram bins.
 
-    The error is the standard error of the mean over the workers' normalized
+    The error is the standard error of the mean over the workers' normalised
     histograms. Workers without recorded frames are skipped.
 
     Parameters
@@ -426,7 +426,6 @@ class DensitySampler(AtomSampler):
                 charge_mask = (charges >= min_charge) & (charges <= max_charge)
                 mol_mask = mol_mask & charge_mask
             if "Angle" in self._conditions:
-                # atom_indices = np.where(mol_mask)[0]
                 atom_indices = np.arange(positions.shape[0])
                 angles = self._get_atom_angles(
                     atom_indices, positions, molecule_bond_atoms[identifier]

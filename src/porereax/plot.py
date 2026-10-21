@@ -124,7 +124,7 @@ def _plot_parameters(
     input_params: dict, data: dict, identifier: str, mean: bool, density: bool
 ):
     """
-    Determine the appropriate x and y labels, density normalization, and flags
+    Determine the appropriate x and y labels, density normalisation, and flags
     for mean and density based on the sampler type and dimension.
 
     Parameters
@@ -134,7 +134,7 @@ def _plot_parameters(
     mean : bool
         Whether to plot mean values as vertical lines.
     density : bool
-        Whether to normalize histograms to density.
+        Whether to normalise histograms to density.
 
     Returns
     -------
@@ -238,7 +238,7 @@ def _plot_hist(
     mean : bool
         Whether to plot mean values as vertical lines.
     density : bool
-        Whether to normalize histograms to density.
+        Whether to normalise histograms to density.
     plot_kwargs : dict
         Additional keyword arguments for the plot function.
     """
@@ -294,7 +294,7 @@ def _plot_2d(
     transpose : bool
         Whether to transpose the axes for the 2D density plot.
     density : bool
-        Whether to normalize histograms to density.
+        Whether to normalise histograms to density.
     plot_kwargs : dict
         Additional keyword arguments for the pcolormesh function.
     """
@@ -438,7 +438,7 @@ def plot_data(
     mean : bool, optional
         Whether to plot mean values as vertical lines (default is False).
     density : bool, optional
-        Whether to normalize histograms to density (default is False).
+        Whether to normalise histograms to density (default is False).
     dt : int, optional
         Time step in femtoseconds for time series plots (default is 50).
     transpose : bool, optional

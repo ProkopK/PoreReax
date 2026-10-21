@@ -10,6 +10,7 @@ serially.
 """
 
 import itertools
+import logging
 import multiprocessing as mp
 import os
 import sys
@@ -27,6 +28,8 @@ from porereax.meta_sampler import Sampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
 from porereax.utils import _neighbor_atoms_excluding, read_pore_yml
+
+logger = logging.getLogger(__name__)
 
 type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
 
@@ -140,7 +143,7 @@ class Sample:
         start_end_nthframe=(0, -1, 1),
     ):
         """
-        Initialize Sample instance.
+        Initialise Sample instance.
 
         To create a Sample instance, ensure that the 'ovito' module is not
         already imported in the current Python session, as it may lead to
@@ -217,7 +220,7 @@ class Sample:
         box,
     ):
         """
-        Helper function to initialize Sample instance.
+        Helper function to initialise Sample instance.
 
         Parameters
         ----------
@@ -888,7 +891,7 @@ class Sample:
 
     def init_samplers(self, sampler_inputs, process_id):
         """
-        Initialize samplers based on provided configurations.
+        Initialise samplers based on provided configurations.
 
         Parameters
         ----------
@@ -953,7 +956,7 @@ class Sample:
         )
         num_cores = num_cores if num_cores and num_cores <= max_cores else max_cores
 
-        # Run initialization of samplers in the main process to catch any
+        # Run initialisation of samplers in the main process to catch any
         # potential issues before spawning subprocesses
         self.init_samplers(self.sampler_inputs, process_id=-1)
 
@@ -1023,7 +1026,7 @@ class Sample:
         box,
     ):
         """
-        Initialize and run sampling in a subprocess.
+        Initialise and run sampling in a subprocess.
 
         This static method is designed to be called within a subprocess for
         parallel sampling.

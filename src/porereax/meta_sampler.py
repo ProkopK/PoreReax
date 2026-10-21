@@ -125,7 +125,7 @@ def _permutate_bonds(bonds, atom_lib, class_name):
 
 def _normalize_bond_entry(entry, class_name):
     """
-    Normalize one entry of a "bonds"/"bonds_A"/"bonds_B" list to a
+    Normalise one entry of a "bonds"/"bonds_A"/"bonds_B" list to a
     ``{"atom": str, "bonds": list or None}`` dictionary, validating its shape.
 
     A plain string entry (today's flat format) becomes an unconstrained

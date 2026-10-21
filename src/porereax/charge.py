@@ -130,12 +130,12 @@ class ChargeSampler(AtomSampler):
             else np.nan
         )
 
-        # Normalize histogram and compute error on histogram bins
+        # Normalise histogram and compute error on histogram bins
         hist = (
             np.sum(data["hist"], axis=0) / num_frames
             if num_frames > 0
             else np.zeros(self._num_bins)
-        )  # TODO check normalization
+        )  # mean counts per sampled frame
         worker_frames = np.array(data["num_frames"])
         worker_hists = np.array(data["hist"]) / worker_frames[:, np.newaxis]
         hist_std = (

@@ -106,8 +106,8 @@ class RdfSampler(AtomSampler):
             )
             self._data[pair_key] = {
                 "num_frames": 0,
-                "num_atoms_A": 0,  # needed for normalization
-                "num_atoms_B": 0,  # needed for normalization
+                "num_atoms_A": 0,  # needed for normalisation
+                "num_atoms_B": 0,  # needed for normalisation
                 "hist": hist,
                 "bin_edges": bin_edges,
             }
@@ -161,7 +161,7 @@ class RdfSampler(AtomSampler):
         combined["num_atoms_A"] = num_atoms_A
         combined["num_atoms_B"] = num_atoms_B
 
-        # Sum histograms and normalize
+        # Sum histograms and normalise
         hist_sum = np.sum(data["hist"], axis=0)
 
         bin_edges = data["bin_edges"][0]
@@ -181,7 +181,7 @@ class RdfSampler(AtomSampler):
         # Avoid division by zero
         shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1e-10)
 
-        # Normalize: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
+        # Normalise: g(r) = histogram / (N_frames * N_atoms_A * rho_B * V_shell)
         # This gives g(r) -> 1 for large r in a homogeneous system
         if num_frames > 0 and avg_atoms_A > 0 and avg_atoms_B > 0:
             combined["hist"] = (
