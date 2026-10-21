@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pytest
 from numpy.testing import assert_array_almost_equal
 
@@ -8,6 +9,14 @@ from porereax.simulate import Simulate
 from porereax.utils import load_object
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
+
+
+@pytest.fixture(autouse=True)
+def _close_figures():
+    yield
+    plt.close("all")
+
+
 gro_lib = {
     "OM": "O",
     "SI": "Si",

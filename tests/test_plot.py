@@ -23,6 +23,7 @@ def test_plot_not_implemented():
 def test_plot(list_of_sample_object_file_names):
     for file_name in list_of_sample_object_file_names:
         plot_data(TEST_DATA_DIR / file_name)
+        plt.close("all")
         _fig, ax = plt.subplots()
         plot_data(
             TEST_DATA_DIR / file_name,
