@@ -43,4 +43,4 @@ def test_angle_inputs(
             num_bins=num_bins,
             angle=angle,
         )
-        sampler.init_samplers(sampler.sampler_inputs, -1)
+        sampler._init_samplers(sampler.sampler_inputs, -1)

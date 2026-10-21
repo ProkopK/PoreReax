@@ -58,4 +58,4 @@ def test_bond_length_inputs(
             num_bins=num_bins,
             range=range,
         )
-        sampler.init_samplers(sampler.sampler_inputs, -1)
+        sampler._init_samplers(sampler.sampler_inputs, -1)

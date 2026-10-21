@@ -34,4 +34,4 @@ def test_charge_inputs(sampler, tmp_path, range, expected_exception, expected_me
             atoms=atoms,
             range=range,
         )
-        sampler.init_samplers(sampler.sampler_inputs, -1)
+        sampler._init_samplers(sampler.sampler_inputs, -1)

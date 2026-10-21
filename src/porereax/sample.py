@@ -192,7 +192,7 @@ class Sample:
                 )
         with ctx.Pool(1) as pool:
             num_particles, num_frames, box = pool.apply_async(
-                self.get_trajectory_data,
+                self._get_trajectory_data,
                 (
                     trajectory_file,
                     bond_file,
@@ -204,7 +204,7 @@ class Sample:
 
         start_frame, end_frame, nth_frame = start_end_nthframe
 
-        self.init_helper(
+        self._init_helper(
             atom_lib,
             masses,
             trajectory_file,
@@ -218,7 +218,7 @@ class Sample:
             box,
         )
 
-    def init_helper(
+    def _init_helper(
         self,
         atom_lib,
         masses,
@@ -356,7 +356,7 @@ class Sample:
         self.system_properties = read_pore_yml(system) if system else None
 
     @staticmethod
-    def get_trajectory_data(trajectory_file, bond_file, atom_lib):
+    def _get_trajectory_data(trajectory_file, bond_file, atom_lib):
         """
         Extract trajectory metadata using Ovito.
 
@@ -902,7 +902,7 @@ class Sample:
         else:
             return positions
 
-    def init_samplers(self, sampler_inputs, process_id):
+    def _init_samplers(self, sampler_inputs, process_id):
         """
         Initialise samplers based on provided configurations.
 
@@ -971,7 +971,7 @@ class Sample:
 
         # Run initialisation of samplers in the main process to catch any
         # potential issues before spawning subprocesses
-        self.init_samplers(self.sampler_inputs, process_id=-1)
+        self._init_samplers(self.sampler_inputs, process_id=-1)
 
         if is_parallel and num_cores > 1:
             frames_per_core = np.array_split(self.frames, num_cores)
@@ -998,7 +998,7 @@ class Sample:
             with ctx.Pool(num_cores) as pool:
                 for process_id in range(num_cores):
                     pool.apply_async(
-                        self.init_subprocess_sampler,
+                        self._init_subprocess_sampler,
                         (
                             self.name_to_type,
                             self.masses,
@@ -1015,17 +1015,17 @@ class Sample:
                     )
                 pool.close()
                 pool.join()
-            print("Parallel sampling completed.")
+            logger.info("Parallel sampling completed.")
         else:
-            print("Starting serial sampling...")
-            self.sample_helper()
-            print("Serial sampling completed.")
+            logger.info("Starting serial sampling...")
+            self._sample_helper()
+            logger.info("Serial sampling completed.")
 
         for sampler in self.samplers:
             sampler.join_samplers(num_cores=num_cores if is_parallel else 1)
 
     @staticmethod
-    def init_subprocess_sampler(
+    def _init_subprocess_sampler(
         atom_lib,
         masses,
         trajectory_file,
@@ -1074,7 +1074,7 @@ class Sample:
         """
         sample_instance = Sample.__new__(Sample)
         start_frame, end_frame, nth_frame = start_end_nthframe
-        sample_instance.init_helper(
+        sample_instance._init_helper(
             atom_lib,
             masses,
             trajectory_file,
@@ -1087,8 +1087,8 @@ class Sample:
             num_frames,
             box,
         )
-        sample_instance.init_samplers(sampler_inputs, process_id)
-        sample_instance.sample_helper()
+        sample_instance._init_samplers(sampler_inputs, process_id)
+        sample_instance._sample_helper()
         return f"Process {process_id} finished sampling."
 
     def _group_molecules_by_atom_type(self):
@@ -1256,7 +1256,7 @@ class Sample:
                 if molecule_mask[mol_A][atom_in_A] and molecule_mask[mol_B][atom_in_B]:
                     bond_mask[identifier][bond_id] = True
 
-    def sample_helper(self):
+    def _sample_helper(self):
         """
         Helper function to perform the sampling process.
         """

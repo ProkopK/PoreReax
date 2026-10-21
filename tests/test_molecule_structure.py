@@ -121,13 +121,13 @@ def test_molecule_structure_sampling_invalid_steps(sampler, tmp_path, steps):
         sampler.add_molecule_structure_sampling(
             name_out=path + "/test_molecule_structure", steps=steps
         )
-        sampler.init_samplers(sampler.sampler_inputs, -1)
+        sampler._init_samplers(sampler.sampler_inputs, -1)
 
 
 def test_molecule_structure_sampling_default_steps_is_one(sampler, tmp_path):
     path = tmp_path.as_posix()
     sampler.add_molecule_structure_sampling(name_out=path + "/test_molecule_structure")
-    sampler.init_samplers(sampler.sampler_inputs, -1)
+    sampler._init_samplers(sampler.sampler_inputs, -1)
     molecule_structure_sampler = next(
         s for s in sampler.samplers if type(s).__name__ == "MoleculeStructureSampler"
     )

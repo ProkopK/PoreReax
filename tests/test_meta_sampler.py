@@ -148,7 +148,7 @@ def test_bond_sampler_nested_bonds_a_identifier(sampler, tmp_path):
         num_bins=10,
         range=(0, 1),
     )
-    sampler.init_samplers(sampler.sampler_inputs, -1)
+    sampler._init_samplers(sampler.sampler_inputs, -1)
     # bonds_A identifiers are sorted without the auto-appended bond partner.
     assert "(O_O_O(H))Si-O()" in sampler.bonds
     bond_info = sampler.bonds["(O_O_O(H))Si-O()"]
