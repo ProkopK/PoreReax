@@ -131,6 +131,19 @@ def _matches_single_spec(
 class Sample:
     """
     Class to manage sampling of molecular trajectories.
+
+    A ``Sample`` object loads a LAMMPS trajectory (``.lammpstrj``) and the
+    matching bond file (``.bonds``), registers one or more samplers with the
+    ``add_*_sampling`` methods and runs them over all frames with
+    :meth:`sample`. Each sampler writes its result to ``<name_out>.obj``,
+    which can be loaded with :func:`porereax.get_data` or plotted with
+    :func:`porereax.plot_data`.
+
+    Example
+    -------
+    >>> sampler = Sample(atom_lib, atom_masses, "run_0.lammpstrj", "run_0.bonds")
+    >>> sampler.add_molecule_structure_sampling("molecule_structure")
+    >>> sampler.sample()
     """
 
     def __init__(

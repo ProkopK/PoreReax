@@ -258,6 +258,7 @@ class Substitution:
         self.params = kwargs
 
     def __call__(self, func):
+        """Substitute the placeholders in ``func.__doc__`` and return ``func``."""
         if func.__doc__:
 
             def _replace(match):
