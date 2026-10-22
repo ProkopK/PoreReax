@@ -1,30 +1,23 @@
 # Getting started
 
-## Requirements
-
-- Python 3.12 or newer
-- LAMMPS for running generated workflows
-- ReaxFF parameter file for your target chemistry (or the provided default Si/O/H file)
-
 ## Installation
 
-Direct installation from github:
-
-```bash
-python -m pip install git+https://github.com/ProkopK/PoreReax.git
+```{include} ../../README.md
+:start-after: <!-- start installation -->
+:end-before: <!-- end installation -->
 ```
 
-## Core concepts
+## Quickstart
 
-`Simulate` Builds simulation files from a GROMACS `.gro` structure.
+This is a minimal example to get started with PoreReax. It covers everything from creating a simulation to analysing the output. For a more detailed explanation of the workflow, see [Typical workflow](typical-workflow).
 
-`Sample` Loads trajectory/bond data and runs one or more analysis samplers.
+```{include} ../../README.md
+:start-after: <!-- start quickstart -->
+:end-before: <!-- end quickstart -->
+```
 
-`plot(...)` Visualizes sampled results.
+```{figure} images/quickstart_image.png
+:alt: Example plots of molecule structure (bar chart), angle distribution (line plot), and density (heatmap).
 
-## Typical workflow
-
-1. Create simulation files with `Simulate` and run LAMMPS.
-2. Load generated outputs with `Sample`.
-3. Add desired samplers (charge, density, angle, bond, reaction, RDF, etc.).
-4. Run sampling and visualize the results.
+Results of the quickstart example: molecule structure, angle distribution, and a 2D density.
+```

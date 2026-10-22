@@ -26,34 +26,25 @@ Depending on your setup, generated outputs include:
 
 ## Minimal setup
 
-```python
-from porereax import Simulate
-
-# Set up a dictionary to translate GRO atom types to ReaxFF atom types as well as masses and charges
-gro_lib = {"OM": "O", "OW": "O", "Si": "Si", "HW": "H", "MW": ""}
-gro_charges = {"OM": -0.64, "OW": -1.1128, "Si": 1.28, "HW": 0.5564}
-atom_masses = {"Si": 28.086, "O": 15.9994, "H": 2.016}
-
-# Create a simulation object
-sim = Simulate(gro_lib, gro_charges, atom_masses, structure_file="system.gro")
-sim.add_sim(type="nvt", nsteps=10000, temp=300)
-
-# Generate the simulation files
-sim.generate()
+```{include} ../../README.md
+:start-after: <!-- start minimal simulation workflow -->
+:end-before: <!-- end minimal simulation workflow -->
 ```
 
+(additional-configuration)=
 ## Additional configuration
 
-The simulation workflow can be integrated in an existing [PoreSim](https://github.com/PoreMS/PoreSim) setup. To do so, you can create a `reax` folder in your PoreSim project and run the script without the `structure_file` argument. The `Simulate` class will then look for a `nvt.gro` file and use it as the starting structure.
+The simulation workflow can be integrated in an existing [PoreSim](https://github.com/PoreMS/PoreSim) setup. To do so, you can create a `reax` folder in your PoreSim project and run the script without the `structure_file` argument. The `Simulate` class will then look for a `nvt.gro` and `pore.yml` file simulation directory and use it as the starting structure and pore geometry.
 
 To set a custom ReaxFF force-field, use the `set_force_field()` method.
 
-Multiple simulation stages can be added with the `add_sim()` method. The following example shows a typical NVT + NpT workflow:
+Multiple simulation stages can be added with multiple `add_sim()` methods. The following example shows a typical NVT + NpT workflow:
 
 ```python
 from porereax import Simulate
 
-# Set up a dictionary to translate GRO atom types to ReaxFF atom types as well as masses and charges
+# Set up a dictionary to translate GRO atom types to ReaxFF
+# atom types as well as masses and charges
 gro_lib = {
     "OM": "O",
     "SI": "Si",
@@ -82,7 +73,7 @@ sim = Simulate(
     atom_masses=atom_masses,
 )
 
-# Set the your own force field
+# Set the used force field
 sim.set_force_field(
     force_field="path_to/reax.ffield",
 )
@@ -111,12 +102,14 @@ sim.add_sim(
 sim.generate()
 ```
 
-LAMMPS can create image dumps of the simulation trajectory. To add this feature, use the `add_image_dump()` method. It is designed to visualize pore structures and will cut in the middle of the simulation box.
+## Adding image dumps
+
+LAMMPS can create image dumps of the simulation trajectory. To add this feature, use the `add_image_dump()` method. It is designed to visualise pore structures and will cut in the middle of the simulation box, in the given plane.
 
 ```python
 sim.add_image_dump(
-    plane="xy",
-    dump_freq=None,
+    plane="yz",
+    dump_freq=None,  # use the dump frequency of the simulation stage
     zoom=3.5,
     image_width=1200,
     image_height=1200,
@@ -126,6 +119,30 @@ sim.add_image_dump(
     kwargs="shiny 0.1 box no 0.01",
 )
 ```
+
+```{figure} images/lammps_img_dump_rotated.png
+:alt: Example LAMMPS-rendered image dump of a pore cross-section.
+
+Example rendered image dump, cutting through the yz plane of a cylindrical pore filled with water.
+```
+
+## Freezing atoms
+
+For pore/confinement systems it might be desirable to freeze certain atoms to prevent a drift of the solid wall. `freeze_region()` duplicates the atom types of a given region into "frozen" counterparts, fixed in LAMMPS with `fix setforce 0 0 0`. For systems created with [PoreMS](https://github.com/PoreMS/PoreMS) this region can be derived automatically from the `pore.yml` file with `auto_freeze()`.
+
+```python
+# Freeze everything outside a 10 Angstrom reactive shell around a cylindrical pore
+sim.auto_freeze(reactive_radius=10.0)
+
+# Or freeze a custom region directly
+sim.freeze_region(lambda x, y, z: z < 5.0)
+```
+
+```{note}
+`auto_freeze()` requires a `pore.yml` file (i.e. no `structure_file=` was given) and currently only supports cylindrical pores.
+```
+
+## HPC job setup
 
 Depending on your HPC environment, you may need to set a custom job submission template and command. Use the `set_job_file()` method to configure these options. Use the `lammps_command` argument to specify a custom LAMMPS execution command and use `{input_file}` and `{log_file}` placeholders to indicate where the input and log file names should be inserted. For example:
 
@@ -137,7 +154,7 @@ sim.set_job_file(
 )
 ```
 
-The `job_template.job` file should match the requirements of your HPC and can contain placeholders for further customization in the `add_sim()` method. If your using a `$TMPDIR` or similar temporary directory, make shure to copy all required files (`system.data`, `reax.ffield`, etc.) to the temporary directory before running LAMMPS and copy the generated outputs back to the working directory. To sync files like images or `.restart` files, use a background process. The following example shows a job template:
+The `job_template.job` file should match the requirements of your HPC and can contain placeholders for further customization in the `add_sim()` method. If your using a `$TMPDIR` or similar temporary directory, make sure to copy all required files (`system.data`, `reax.ffield`, etc.) to the temporary directory before running LAMMPS and copy the generated outputs back to the working directory. To sync files like images or `.restart` files, use a background process. The following example shows an example job template:
 
 ```bash
 #!/bin/bash

@@ -1,7 +1,7 @@
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath("../../src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from porereax import __version__
 
 project = "PoreReax"
@@ -34,14 +34,18 @@ autodoc_default_options = {
 }
 autodoc_member_order = "bysource"
 
+autodoc_mock_imports = ["ovito"]
+
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
 }
 
-templates_path = ["_templates"]
 exclude_patterns = []
 
 
