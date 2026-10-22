@@ -5,12 +5,16 @@ for setting up simulations, sampling various molecular properties, and
 visualising the results.
 """
 
+import logging
+
 from porereax.plot import plot_data
 from porereax.sample import Sample
 from porereax.simulate import Simulate
 from porereax.utils import get_data, get_identifiers, load_object
 
-__version__ = "0.0.1"
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+__version__ = "0.1.0"
 
 __all__ = [
     "Sample",
