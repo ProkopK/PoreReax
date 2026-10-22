@@ -21,9 +21,7 @@ def test_simulate_pore_native(simulate_pore, tmp_path):
 def test_simulate_pore_with_setup(simulate_pore, tmp_path):
     with pytest.raises(FileNotFoundError):
         simulate_pore.set_job_file(
-            job_file="non_existent_file.txt",
-            submit_command="s",
-            lammps_command="s"
+            job_file="non_existent_file.txt", submit_command="s", lammps_command="s"
         )
     with pytest.raises(ValueError):
         simulate_pore.set_job_file(

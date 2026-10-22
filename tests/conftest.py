@@ -66,6 +66,24 @@ def sampler():
     )
 
 
+@pytest.fixture
+def sampler_with_system_yaml():
+    atom_lib = {"Si": 1, "O": 2, "H": 3}
+    masses = {"Si": 28.085, "O": 15.999, "H": 1.008}
+    traj_file = TEST_DATA_DIR / "test_traj.lammpstrj"
+    bond_file = TEST_DATA_DIR / "test_bonds.bonds"
+    system_yaml = TEST_DATA_DIR / "test_pore.yml"
+
+    return Sample(
+        atom_lib=atom_lib,
+        masses=masses,
+        trajectory_file=traj_file,
+        bond_file=bond_file,
+        start_end_nthframe=(0, 2, 1),
+        system=system_yaml,
+    )
+
+
 def assert_input_params(obj_1, obj_2):
     assert obj_1["input_params"].keys() == obj_2["input_params"].keys(), (
         "Keys of 'input_params' do not match."
@@ -95,11 +113,6 @@ def assert_sampler_data(obj_1, obj_2, check_for_std):
     ignore_keys = ["hist_std", "mean_std"] if not check_for_std else []
     for identifier in obj_1.keys():
         if identifier == "input_params":
-            continue
-        elif identifier == "num_frames":
-            assert obj_1[identifier] == obj_2[identifier], (
-                "Values for 'num_frames' do not match."
-            )
             continue
         assert obj_1[identifier].keys() == obj_2[identifier].keys(), (
             f"Sampler data keys for identifier '{identifier}' do not match."

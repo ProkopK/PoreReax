@@ -151,6 +151,11 @@ def full_sampler_with_path(sampler, tmp_path):
         pairs=pairs,
         r_max=5.0,
     )
+    sampler.add_reaction_sampling(
+        name_out=path + "/test_reaction",
+        reactions=[(atoms[0], atoms[1])],
+        dimension="Cartesian1D",
+    )
 
     return sampler, path
 
