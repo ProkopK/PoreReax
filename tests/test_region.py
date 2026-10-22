@@ -11,13 +11,17 @@ def test_region_no_yaml(sampler, tmp_path):
         region="Box",
     )
     sampler._init_samplers(sampler.sampler_inputs, -1)
-    with pytest.raises(ValueError, match="System properties must be provided for regions other than 'Box'."):
+    with pytest.raises(
+        ValueError,
+        match="System properties must be provided for regions other than 'Box'",
+    ):
         sampler.add_angle_sampling(
             name_out=path + "/test_angle",
             atoms=atoms,
             region="Pore",
         )
         sampler._init_samplers(sampler.sampler_inputs, -1)
+
 
 def test_region_with_yaml(sampler_with_system_yaml, tmp_path):
     path = tmp_path.as_posix()
@@ -54,7 +58,10 @@ def test_region_with_yaml(sampler_with_system_yaml, tmp_path):
             atoms=atoms,
             region="Wall_invalid",
         )
-        sampler_with_system_yaml._init_samplers(sampler_with_system_yaml.sampler_inputs, -1)
+        sampler_with_system_yaml._init_samplers(
+            sampler_with_system_yaml.sampler_inputs, -1
+        )
+
 
 def test_region_with_yaml_invalid_region(sampler_with_system_yaml, tmp_path):
     path = tmp_path.as_posix()
@@ -64,4 +71,6 @@ def test_region_with_yaml_invalid_region(sampler_with_system_yaml, tmp_path):
             atoms=atoms,
             region="InvalidRegion",
         )
-        sampler_with_system_yaml._init_samplers(sampler_with_system_yaml.sampler_inputs, -1)
+        sampler_with_system_yaml._init_samplers(
+            sampler_with_system_yaml.sampler_inputs, -1
+        )

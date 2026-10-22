@@ -1,5 +1,3 @@
-import pytest
-
 atoms = [{"atom": "O", "bonds": ["H", "H"]}, {"atom": "O", "bonds": ["Si", "H"]}]
 
 
