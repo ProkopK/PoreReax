@@ -31,19 +31,15 @@ def get_region_function(
     callable
         A function that takes coordinates and returns a boolean mask.
     """
+    if region != "Box" and system_properties is None:
+        raise ValueError(
+            "System properties must be provided for regions other than 'Box'."
+        )
     if region == "Box":
         return box_region
     elif region == "Reservoir":
-        if system_properties is None:
-            raise ValueError(
-                "System properties must be provided for the 'Reservoir' region."
-            )
         return lambda coords: reservoir_region(coords, system_properties)
     elif region == "Pore":
-        if system_properties is None:
-            raise ValueError(
-                "System properties must be provided for the 'Pore' region."
-            )
         return lambda coords: pore_region(coords, system_properties)
     elif region.startswith("Wall"):
         if region == "Wall":
@@ -57,10 +53,6 @@ def get_region_function(
                 ) from e
         else:
             raise ValueError(f"Unknown region identifier: {region}")
-        if system_properties is None:
-            raise ValueError(
-                "System properties must be provided for the 'Wall' region."
-            )
         return lambda coords: wall_region(coords, system_properties, layer_thickness)
     else:
         raise ValueError(f"Unknown region identifier: {region}")
