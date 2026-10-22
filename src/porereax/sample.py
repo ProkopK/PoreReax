@@ -139,6 +139,9 @@ class Sample:
     which can be loaded with :func:`porereax.get_data` or plotted with
     :func:`porereax.plot_data`.
 
+    Progress is reported via the ``porereax.sample`` logger; call
+    ``logging.basicConfig(level=logging.INFO)`` to see it.
+
     Example
     -------
     >>> sampler = Sample(atom_lib, atom_masses, "run_0.lammpstrj", "run_0.bonds")
@@ -200,7 +203,9 @@ class Sample:
                 ),
             ).get()
 
-        print(f"Trajectory has {num_particles} particles and {num_frames} frames.")
+        logger.info(
+            f"Trajectory has {num_particles} particles and {num_frames} frames."
+        )
 
         start_frame, end_frame, nth_frame = start_end_nthframe
 
@@ -979,8 +984,8 @@ class Sample:
                 (frames[0], frames[-1], 1) for frames in frames_per_core
             ]
             for i, (start_frame, end_frame, _) in enumerate(start_end_nthframe_list):
-                print(f"Process {i}: frames {start_frame} to {end_frame}")
-            print(f"Starting parallel sampling with {num_cores} cores...")
+                logger.info(f"Process {i}: frames {start_frame} to {end_frame}")
+            logger.info(f"Starting parallel sampling with {num_cores} cores...")
             if "forkserver" in mp.get_all_start_methods():
                 ctx = mp.get_context("forkserver")
             elif "spawn" in mp.get_all_start_methods():
@@ -1279,7 +1284,7 @@ class Sample:
 
         # Loop over frames
         for frame_idx in self.frames:
-            print(f"Processing frame {frame_idx}...")
+            logger.debug(f"Processing frame {frame_idx}...")
             frame = self.pipeline.compute(frame_idx)
             atom_types = frame.particles.particle_types.array
             bond_count = frame.particles.bonds.count
