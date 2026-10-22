@@ -410,7 +410,7 @@ class Sample:
             )
         type_set = set(first_frame.particles.particle_types.array)
         atom_type_set = set(atom_lib.values())
-        if type_set != atom_type_set:
+        if type_set > atom_type_set:
             raise ValueError(
                 f"Atom types in trajectory {type_set} do not match those in "
                 f"atom_lib {atom_type_set}."
