@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -29,7 +27,7 @@ jobs:
       - name: Install docs dependencies
         run: uv sync --group docs
       - name: Build docs
-        run: uv run sphinx-build -b html docs/source docs/build
+        run: uv run sphinx-build -W --keep-going -b html docs/source docs/build
       - name: Upload documentation
         if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v5
@@ -40,6 +38,9 @@ jobs:
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

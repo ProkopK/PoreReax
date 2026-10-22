@@ -85,3 +85,15 @@ cython_debug/
 .pypirc
 
 .ruff_cache/
+
+# Simulation outputs
+*.lammpstrj
+!tests/data/*.lammpstrj
+*.bonds
+!tests/data/*.bonds
+*.restart
+figures/
+
+# Coverage
+.coverage*
+coverage.xml
