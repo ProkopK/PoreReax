@@ -1,63 +1,76 @@
+import logging
+import warnings
+
 from porereax import Sample
 
-import warnings
+logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings('ignore', message='.*OVITO.*PyPI')
 
 
-# TODO replace a, b, c, ... with your atom names from atom_lib
-
+atom_lib = {{ NAME_TO_TYPE }}
+masses = {{ ATOM_MASSES }}
 num_sims = {{ NUMSIMS }}
 
-for sim in range(num_sims):
+# NOTE: replace a, b, c, ... below with your atom names from atom_lib
+atoms = [
+    # {"atom": "a"},
+    # {"atom": "b"},
+    # {"atom": "c"},
+    # {"atom": "a", "bonds": ["b", "b", "c"]},
+]
+bonds = [
+    # {"bond": "a-b", "bonds_A": ["b", "b", "b"], "bonds_B": ["c"]},
+]
+pairs = [
+    # ({"atom": "a", "bonds": ["b"]}, {"atom": "c", "bonds": ["d"]}),
+]
+reactions = [
+    # ({"atom": "a", "bonds": ["b"]}, {"atom": "c", "bonds": ["d"]}),
+]
+
+def sample_simulation(sim_num):
     # Settings
-    bond_file = f"run_{sim}.bonds"
-    traj_file = f"run_{sim}.lammpstrj"
+    bond_file = f"run_{sim_num}.bonds"
+    traj_file = f"run_{sim_num}.lammpstrj"
 
-    atom_lib = {{ NAME_TO_TYPE }}
-    masses = {{ ATOM_MASSES }}
-
-    # Initalise Sampling
+    # Initialise Sampling
     sampler = Sample(atom_lib, masses, traj_file, bond_file, start_end_nthframe=(0,-1,1))
-    atoms = [
-        # {"atom": "a"},
-        # {"atom": "b"},
-        # {"atom": "c"},
-        # {"atom": "a", "bonds": ["b", "b", "c"]},
-    ]
-    bonds = [
-        # {"bond": "a-b", "bonds_A": ["b", "b", "b"], "bonds_B": ["c"]},
-    ]
-    pairs = [
-        # ({"atom": "a", "bonds": ["b"]}, {"atom": "c", "bonds": ["d"]}),
-    ]
 
-    # Molcule structure
-    sampler.add_molecule_structure_sampling(f"run_{sim}_molecule_structure")
+    # Molecule structure
+    sampler.add_molecule_structure_sampling(f"run_{sim_num}_molecule_structure")
 
     # Charge
-    sampler.add_charge_sampling(f"run_{sim}_charge", atoms=atoms)
+    sampler.add_charge_sampling(f"run_{sim_num}_charge", atoms=atoms)
 
     # Bond length or bond order
-    sampler.add_bond_length_sampling(f"run_{sim}_bond_length", bonds=bonds, dimension="Bond Length", num_bins=200)
+    sampler.add_bond_length_sampling(f"run_{sim_num}_bond_length", bonds=bonds, dimension="Bond Length", num_bins=200)
 
     # Angle
-    sampler.add_angle_sampling(f"run_{sim}_angle_all", atoms=atoms, num_bins=180, angle="all")
+    sampler.add_angle_sampling(f"run_{sim_num}_angle_all", atoms=atoms, num_bins=180, angle="all")
     # sampler.add_angle_sampling(f"run_{sim}_angle_b-a-c", atoms=atoms, num_bins=90, angle="b-a-c")
 
     # Density
-    sampler.add_density_sampling(f"run_{sim}_density_time", atoms=atoms, dimension="Time")
-    sampler.add_density_sampling(f"run_{sim}_density_cart_1d_z", atoms=atoms, dimension="Cartesian1D", num_bins=800)
-    sampler.add_density_sampling(f"run_{sim}_density_cart_2d_xy", atoms=atoms, dimension="Cartesian2D", num_bins=200, direction="xy")
-    sampler.add_density_sampling(f"run_{sim}_density_cart_1d_z_cond_ch", atoms=atoms, dimension="Cartesian1D", num_bins=200, direction="z", conditions={"Charge": (-0.7, -0.3)})
-    sampler.add_density_sampling(f"run_{sim}_density_cart_2d_xy_cond_ang", atoms=atoms, dimension="Cartesian2D", num_bins=200, direction="xy", conditions={"Angle": (75, 125)})
+    sampler.add_density_sampling(f"run_{sim_num}_density_time", atoms=atoms, dimension="Time")
+    sampler.add_density_sampling(f"run_{sim_num}_density_cart_1d_z", atoms=atoms, dimension="Cartesian1D", num_bins=800)
+    sampler.add_density_sampling(f"run_{sim_num}_density_cart_2d_xy", atoms=atoms, dimension="Cartesian2D", num_bins=200, direction="xy")
+    sampler.add_density_sampling(f"run_{sim_num}_density_cart_1d_z_cond_ch", atoms=atoms, dimension="Cartesian1D", num_bins=200, direction="z", conditions={"Charge": (-0.7, -0.3)})
+    sampler.add_density_sampling(f"run_{sim_num}_density_cart_2d_xy_cond_ang", atoms=atoms, dimension="Cartesian2D", num_bins=200, direction="xy", conditions={"Angle": (75, 125)})
 
     # Bond density
-    sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_1d", bonds, "Cartesian1D", num_bins=800)
-    sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_2d_xy", bonds, "Cartesian2D", num_bins=800, direction="xy")
-    sampler.add_bond_density_sampling(f"run_{sim}_bond_density_cart_2d_xy_cond_len", bonds, "Cartesian2D", num_bins=800, direction="xy", conditions={"Bond Length": (1.5, 2.0)})
+    sampler.add_bond_density_sampling(f"run_{sim_num}_bond_density_cart_1d", bonds, "Cartesian1D", num_bins=800)
+    sampler.add_bond_density_sampling(f"run_{sim_num}_bond_density_cart_2d_xy", bonds, "Cartesian2D", num_bins=800, direction="xy")
+    sampler.add_bond_density_sampling(f"run_{sim_num}_bond_density_cart_2d_xy_cond_len", bonds, "Cartesian2D", num_bins=800, direction="xy", conditions={"Bond Length": (1.5, 2.0)})
 
     # Radial distribution function
-    sampler.add_rdf_sampling(f"run_{sim}_rdf", pairs, r_max=10.0, num_bins=200)
+    sampler.add_rdf_sampling(f"run_{sim_num}_rdf", pairs, r_max=10.0, num_bins=200)
+
+    # Reaction sampling
+    sampler.add_reaction_sampling(f"run_{sim_num}_reaction", reactions, dimension="Cartesian1D")
 
     # Start sampling
     sampler.sample(is_parallel=True)
+
+
+if __name__ == "__main__":
+    for sim in range(num_sims):
+        sample_simulation(sim)
