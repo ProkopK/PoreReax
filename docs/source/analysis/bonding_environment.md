@@ -58,6 +58,20 @@ The identifier for a structure is generated automatically.
 | `{"bond": "O-H"}` | `O-H` | any O-H bond |
 | `{"bond": "O-H", "bonds_A": ["H"], "bonds_B": []}` | `(H)O-H()` | O-H bond where the oxygen has one other hydrogen neighbour and the hydrogen has no other neighbours |
 
+```{image} ../images/bond_env_plot_light.png
+:class: only-light
+:alt: Bonding environment plot
+
+Bonding environments with their corresponding identifiers. In white the central atom/bond is shown and dotted lines indicate that bonds are possible but not defined by the bonding environment.
+```
+
+```{image} ../images/bond_env_plot_dark.png
+:class: only-dark
+:alt: Bonding environment plot
+
+Bonding environments with their corresponding identifiers. In white the central atom/bond is shown and dotted lines indicate that bonds are possible but not defined by the bonding environment.
+```
+
 
 ## Wildcards and performance
 
