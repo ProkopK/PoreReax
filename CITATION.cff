@@ -13,6 +13,8 @@ keywords:
   - ReaxFF
   - LAMMPS
   - molecular dynamics
+  - simulation
+  - analysis
 authors:
   - family-names: Prokop
     given-names: Karl
