@@ -14,8 +14,8 @@ import numpy as np
 
 import porereax.regions as regions
 import porereax.utils as utils
-from porereax.utils import Substitution
 from porereax.regions import Region
+from porereax.utils import Substitution
 
 _SAMPLER_INIT_PARAMS = """
 dimension : str

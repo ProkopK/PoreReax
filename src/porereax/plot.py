@@ -22,6 +22,22 @@ def _safe_inverse(count) -> float:
 
 
 def _dens_1d_to_n_per_nm3(input_params: dict, data: dict) -> float:
+    """
+    Calculate the density normalisation factor for 1D density data from counts per bin
+    to number density per nm^3.
+
+    Parameters
+    ----------
+    input_params : dict
+        Input parameters from the data file.
+    data : dict
+        Data dictionary containing histogram data for each identifier.
+
+    Returns
+    -------
+    float
+        Density normalisation factor to convert counts to number density per nm^3.
+    """
     bin_edges = next(iter(data.values()))["bin_edges"]
     if input_params["region"] == "Box" and input_params["direction"] in ["x", "y", "z"]:
         dimension = {"x": 0, "y": 1, "z": 2}[input_params["direction"]]
@@ -52,6 +68,22 @@ def _dens_1d_to_n_per_nm3(input_params: dict, data: dict) -> float:
 
 
 def _dens_2d_to_n_per_nm3(input_params: dict, data: dict) -> float:
+    """
+    Calculate the density normalisation factor for 2D density data from counts per bin
+    to number density per nm^3.
+
+    Parameters
+    ----------
+    input_params : dict
+        Input parameters from the data file.
+    data : dict
+        Data dictionary containing histogram data for each identifier.
+
+    Returns
+    -------
+    float
+        Density normalisation factor to convert counts to number density per nm^3.
+    """
     x_edges = next(iter(data.values()))["x_edges"]
     y_edges = next(iter(data.values()))["y_edges"]
     if input_params["region"] == "Box" and input_params["direction"] in [

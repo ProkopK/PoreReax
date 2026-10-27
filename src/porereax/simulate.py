@@ -214,7 +214,7 @@ class Simulate:
             "qsub" for PBS/Torque). Must be a non-empty string. If None, a
             previously set command is kept, otherwise "sbatch" is used.
         lammps_command : str, optional
-            Custom command to run LAMMPS. If None 
+            Custom command to run LAMMPS. If None
             ``mpirun lmp -in {input_file} -log {log_file}`` is used.
             Use placeholders {input_file} and {log_file} for input and log file
             names. A KOKKOS-enabled LAMMPS build is driven with e.g.

@@ -124,6 +124,7 @@ class AngleSampler(AtomSampler):
         atom_types = frame.particles.particle_types.array
         positions = frame.particles.positions.array
         position_mask = self._region(positions)
+        # Iterate over each molecule
         for identifier in self._molecules:
             mol_mask = position_mask & molecule_mask[identifier]
             atom_indices = np.where(mol_mask)[0]
@@ -133,6 +134,7 @@ class AngleSampler(AtomSampler):
                 atom_c_type = self._angle[2]
                 bonded_types = atom_types[bonded_atoms]
             angles = []
+            # Iterate over each pair of atoms in that molecule
             for i in range(bonded_atoms.shape[1]):
                 for j in range(bonded_atoms.shape[1]):
                     if i == j:
@@ -140,6 +142,7 @@ class AngleSampler(AtomSampler):
                     atom_a = bonded_atoms[:, i]
                     atom_b = atom_indices
                     atom_c = bonded_atoms[:, j]
+                    # Filter for specific A-B-C triplet if specified
                     if self._angle:
                         mask_a = bonded_types[:, i] == atom_a_type
                         mask_c = bonded_types[:, j] == atom_c_type

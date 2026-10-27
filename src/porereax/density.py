@@ -39,8 +39,8 @@ from porereax.meta_sampler import (
     _build_mol_dictionary,
     _validate_double_atoms,
 )
-from porereax.utils import Substitution
 from porereax.regions import Region
+from porereax.utils import Substitution
 
 _DIRECTION_PARAM = """
 direction : str

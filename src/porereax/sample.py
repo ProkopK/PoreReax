@@ -1259,12 +1259,14 @@ class Sample:
             for identifier, bond_info in self.bonds.items():
                 type_A, type_B = bond_info["bond"]
                 mol_A, mol_B = bond_info["mol_A"], bond_info["mol_B"]
+                # Check if the bond matches the registered bond type (in either order)
                 if type_a == type_A and type_b == type_B:
                     atom_in_A, atom_in_B = atom_a, atom_b
                 elif type_a == type_B and type_b == type_A:
                     atom_in_A, atom_in_B = atom_b, atom_a
                 else:
                     continue
+                # Check if the atoms belong to the corresponding registered molecules
                 if molecule_mask[mol_A][atom_in_A] and molecule_mask[mol_B][atom_in_B]:
                     bond_mask[identifier][bond_id] = True
 
@@ -1285,6 +1287,7 @@ class Sample:
             bond_modifier.source.load(self.bond_file)
             self.pipeline.modifiers.append(bond_modifier)
 
+        # Initialize molecule and bond data structures
         self._molecules_per_atom_type = self._group_molecules_by_atom_type()
         molecule_mask, molecule_bond_atoms = self._init_molecule_arrays()
         bond_mask = {}
@@ -1298,6 +1301,8 @@ class Sample:
             bond_topology = frame.particles.bonds.topology.array
             bond_enum = BondsEnumerator(frame.particles.bonds)
 
+            # Identify molecules and bonds in the current frame
+            # Build molecule_mask and molecule_bond_atoms in place
             self._identify_molecules(
                 molecule_mask,
                 molecule_bond_atoms,
@@ -1305,6 +1310,7 @@ class Sample:
                 bond_topology,
                 bond_enum,
             )
+            # Build bond_mask in place
             self._identify_bonds(
                 bond_mask, bond_count, bond_topology, atom_types, molecule_mask
             )
