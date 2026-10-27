@@ -6,6 +6,7 @@
 [![Docs](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/docs.yml?branch=main&label=docs)](https://prokopk.github.io/PoreReax/)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/codeql.yml?branch=main&label=CodeQL)](https://github.com/ProkopK/PoreReax/actions/workflows/codeql.yml)
 [![codecov](https://img.shields.io/codecov/c/github/ProkopK/PoreReax?label=coverage)](https://codecov.io/gh/ProkopK/PoreReax)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23694253.svg)](https://doi.org/10.5281/zenodo.23694253)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
 [![License: GPLv3](https://img.shields.io/github/license/ProkopK/PoreReax)](LICENSE)
 
@@ -37,7 +38,11 @@ PoreReax can be used standalone for reactive analysis or integrated into the stu
 
 PoreReax targets Python 3.12+ and is tested on Linux (x86_64) and macOS (arm64). The supported platforms require to run [OVITO](https://www.ovito.org/python-docs/) in combination with [multiprocessing](https://docs.python.org/3/library/multiprocessing.html) for analysis. Running the generated simulations requires a separate [LAMMPS](https://www.lammps.org/) installation with the REAXFF package.
 
-Direct installation from github:
+```bash
+python -m pip install porereax
+```
+
+To install the current development version directly from GitHub instead:
 
 ```bash
 python -m pip install git+https://github.com/ProkopK/PoreReax.git

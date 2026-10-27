@@ -7,6 +7,7 @@ date-released: 2026-10-27
 license: GPL-3.0-only
 repository-code: "https://github.com/ProkopK/PoreReax"
 url: "https://prokopk.github.io/PoreReax/"
+doi: "10.5281/zenodo.23694252"
 abstract: "A tool for analysing and generating reactive simulations using ReaxFF and LAMMPS."
 keywords:
   - pore
