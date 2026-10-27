@@ -215,10 +215,6 @@ def _record_density(
         Positions to record (Nx3 array) or (Nx4 array) for Pore dimensions.
     frame : int
         Current frame number.
-    num_bins : int
-        Number of bins for histogramming.
-    box : np.ndarray
-        Simulation box dimensions.
     """
     data["num_frames"] += 1
 
