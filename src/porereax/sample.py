@@ -383,10 +383,10 @@ class Sample:
         box : np.ndarray
             Simulation box dimensions.
         """
+        os.environ["OVITO_THREAD_COUNT"] = "1"
+
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
-
-        os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
         if not os.path.isfile(trajectory_file):
@@ -408,12 +408,13 @@ class Sample:
                 "No bonds found. Ensure bond_file is provided or the "
                 "trajectory contains bond data."
             )
-        type_set = set(first_frame.particles.particle_types.array)
+        type_set = {int(t) for t in first_frame.particles.particle_types.array}
         atom_type_set = set(atom_lib.values())
         if type_set > atom_type_set:
             raise ValueError(
-                f"Atom types in trajectory {type_set} do not match those in "
-                f"atom_lib {atom_type_set}."
+                f"Atom types in trajectory {sorted(type_set)} do not match "
+                f"those in atom_lib {sorted(atom_type_set)}. Types missing "
+                f"from atom_lib: {sorted(type_set - atom_type_set)}."
             )
 
         num_particles = first_frame.particles.count
@@ -1001,7 +1002,7 @@ class Sample:
                         "'spawn' start method."
                     )
             with ctx.Pool(num_cores) as pool:
-                for process_id in range(num_cores):
+                results = [
                     pool.apply_async(
                         self._init_subprocess_sampler,
                         (
@@ -1018,7 +1019,12 @@ class Sample:
                             self.box,
                         ),
                     )
+                    for process_id in range(num_cores)
+                ]
                 pool.close()
+                # Re-raise any exception from a worker
+                for result in results:
+                    result.get()
                 pool.join()
             logger.info("Parallel sampling completed.")
         else:
@@ -1266,11 +1272,11 @@ class Sample:
         """
         Helper function to perform the sampling process.
         """
+        os.environ["OVITO_THREAD_COUNT"] = "1"
+
         from ovito.data import BondsEnumerator
         from ovito.io import import_file
         from ovito.modifiers import LoadTrajectoryModifier
-
-        os.environ["OVITO_THREAD_COUNT"] = "1"
 
         # Load trajectory
         self.pipeline = import_file(self.trajectory_file)
