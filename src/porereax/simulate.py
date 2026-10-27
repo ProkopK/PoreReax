@@ -193,7 +193,7 @@ class Simulate:
 
     def set_job_file(
         self,
-        job_file: str | None = None,
+        job_file: str | os.PathLike | None = None,
         submit_command: str | None = None,
         lammps_command: str | None = None,
     ):
@@ -206,15 +206,20 @@ class Simulate:
 
         Parameters
         ----------
-        job_file : str
+        job_file : str or os.PathLike, optional
             Path to the job submission template file. Must be a valid file that exists.
             The template should be compatible with the HPC scheduler (SLURM, PBS, etc.).
         submit_command : str
             Command to submit jobs to the scheduler (e.g., "sbatch" for SLURM,
-            "qsub" for PBS/Torque). Must be a non-empty string.
+            "qsub" for PBS/Torque). Must be a non-empty string. If None, a
+            previously set command is kept, otherwise "sbatch" is used.
         lammps_command : str, optional
-            Custom command to run LAMMPS. If None, a default MPI command will be used.
-            Use placeholders {input_file} and {log_file} for input and log file names.
+            Custom command to run LAMMPS. If None 
+            ``mpirun lmp -in {input_file} -log {log_file}`` is used.
+            Use placeholders {input_file} and {log_file} for input and log file
+            names. A KOKKOS-enabled LAMMPS build is driven with e.g.
+            ``mpirun lmp -in {input_file} -log {log_file} -k on -sf kk
+            -pk kokkos neigh half newton on comm host``.
 
         Raises
         ------
@@ -238,31 +243,36 @@ class Simulate:
         ... )
         """
         # Validate and set job file path
-        if job_file is None and self._job_file is None:
+        if job_file is not None:
+            if not isinstance(job_file, (str, os.PathLike)) or not os.fspath(job_file):
+                raise ValueError("job_file must be a non-empty path.")
+            f_path = os.path.abspath(job_file)
+        elif self._job_file is not None:
+            f_path = self._job_file
+        else:
             f_path = os.path.abspath(
                 files("porereax").joinpath("templates", "reax.job")
             )
-        else:
-            f_path = os.path.abspath(job_file)
 
         # Validate and set submit command
-        if submit_command is None and self._submit_cmd is None:
-            s_command = "sbatch"
-        else:
-            if not isinstance(submit_command, str) or submit_command == "":
+        if submit_command is not None:
+            if not isinstance(submit_command, str) or submit_command.strip() == "":
                 raise ValueError("submit_command must be a non-empty string.")
             s_command = submit_command.strip()
+        elif self._submit_cmd is not None:
+            s_command = self._submit_cmd
+        else:
+            s_command = "sbatch"
 
         # Validate and set LAMMPS command
-        if lammps_command is None and self._lammps_command is None:
-            l_command = (
-                "mpirun lmp -in {input_file} -log {log_file} -k on -sf kk "
-                "-pk kokkos neigh half newton on comm host"
-            )
-        else:
-            if not isinstance(lammps_command, str) or lammps_command == "":
+        if lammps_command is not None:
+            if not isinstance(lammps_command, str) or lammps_command.strip() == "":
                 raise ValueError("lammps_command must be a non-empty string.")
             l_command = lammps_command.strip()
+        elif self._lammps_command is not None:
+            l_command = self._lammps_command
+        else:
+            l_command = "mpirun lmp -in {input_file} -log {log_file}"
 
         if not os.path.isfile(f_path):
             raise FileNotFoundError(f"Job file {f_path} not found.")
@@ -270,13 +280,13 @@ class Simulate:
         self._submit_cmd = s_command
         self._lammps_command = l_command
 
-    def set_force_field(self, force_field: str):
+    def set_force_field(self, force_field: str | os.PathLike):
         """
         Specify a custom ReaxFF force field parameter file.
 
         Parameters
         ----------
-        force_field : str
+        force_field : str or os.PathLike
             Path to the ReaxFF force field parameter file (ffield). This file
             contains all the reactive force field parameters for the atom
             types in the system.
@@ -298,16 +308,16 @@ class Simulate:
 
     def add_image_dump(
         self,
-        plane="xy",
-        dump_freq=None,
-        zoom=1.5,
-        image_width=1200,
-        image_height=1200,
-        atom_colors=None,
-        atom_sizes=None,
-        map_by_charge=None,
-        kwargs=None,
-    ):
+        plane: str = "xy",
+        dump_freq: int | None = None,
+        zoom: float = 1.5,
+        image_width: int = 1200,
+        image_height: int = 1200,
+        atom_colors: dict | None = None,
+        atom_sizes: dict | None = None,
+        map_by_charge: str | None = None,
+        kwargs: str | None = None,
+    ) -> None:
         """
         Add an image rendering during LAMMPS simulations.
         It allows for the generation of image snapshots of the simulation at
@@ -601,7 +611,7 @@ class Simulate:
                 self._atom_masses[frozen_name] = self._atom_masses[a_name]
             self._num_atom_types *= 2
             self._name_to_type.update(dict(self._frozen_atoms.items()))
-            self._frozen_region = region
+        self._frozen_region = region
 
     def auto_freeze(self, reactive_radius: float = 10.0):
         """
@@ -773,7 +783,7 @@ class Simulate:
 
         # Create ana files
         ana_template_path = os.path.abspath(
-            files("porereax").joinpath("templates", "ana.py")
+            files("porereax").joinpath("templates", "ana.py.j2")
         )
         with open(ana_template_path) as f:
             ana_template = Template(f.read())

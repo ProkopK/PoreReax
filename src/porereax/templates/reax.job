@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --nodes={{ SIMULATIONNODES }}
+#SBATCH --ntasks-per-node={{ SIMULATIONTASKSPERNODE }}
+#SBATCH --time={{ SIMULATIONTIME }}
+#SBATCH --job-name={{ SIMULATIONLABEL }}
+#SBATCH --error=%x_%j.err
+#SBATCH --output=%x_%j.out
+#SBATCH --partition=cpu
+
+cd "${SLURM_SUBMIT_DIR}"
+
+# Adapt the module name to your cluster, or remove these lines entirely if
+# LAMMPS is already on your PATH.
+module purge
+module load lammps
+
+{{ LAMMPS_COMMAND }}
