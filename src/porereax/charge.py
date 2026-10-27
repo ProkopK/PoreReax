@@ -8,6 +8,7 @@ specified atom structures.
 import numpy as np
 
 from porereax.meta_sampler import _ATOM_SAMPLER_INIT_PARAMS, AtomSampler
+from porereax.regions import Region
 from porereax.utils import Substitution
 
 
@@ -28,13 +29,13 @@ class ChargeSampler(AtomSampler):
         name_out: str,
         atoms: list,
         dimension: str,
-        region,
+        region: Region,
         process_id: int,
         atom_lib: dict,
         masses: dict,
         num_frames: int,
         box: np.ndarray,
-        system_properties: dict,
+        system_properties: dict | None,
         range: tuple,
     ):
         valid_dimensions = ["Histogram"]

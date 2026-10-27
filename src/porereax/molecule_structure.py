@@ -8,6 +8,7 @@ environments of all atomtypes and reveal the atom structures.
 import numpy as np
 
 from porereax.meta_sampler import _NAME_OUT_PARAM, _SAMPLER_INIT_PARAMS, Sampler
+from porereax.regions import Region
 from porereax.utils import Substitution, _neighbor_atoms_excluding, save_object
 
 
@@ -100,13 +101,13 @@ class MoleculeStructureSampler(Sampler):
         self,
         name_out: str,
         dimension: str,
-        region,
+        region: Region,
         process_id: int,
         atom_lib: dict,
         masses: dict,
         num_frames: int,
         box: np.ndarray,
-        system_properties: dict,
+        system_properties: dict | None,
         steps: int = 1,
     ):
         valid_dimensions = ["MoleculeStructure"]

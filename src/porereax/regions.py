@@ -10,6 +10,10 @@ from numpy.typing import NDArray
 # Length (in Angstrom) at both pore ends that is excluded from pore analyses.
 PORE_ENTRY_LENGTH = 3
 
+# A region is either the name of a built-in region or a predicate mapping an
+# (N, 3) array of positions to an (N,) boolean mask.
+type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
+
 
 def get_region_function(
     region: str, box: NDArray[np.float64], system_properties: dict | None = None

@@ -14,7 +14,6 @@ import logging
 import multiprocessing as mp
 import os
 import sys
-from collections.abc import Callable
 from typing import Literal
 
 import numpy as np
@@ -27,11 +26,10 @@ from porereax.density import BondDensitySampler, DensitySampler, ReactionSampler
 from porereax.meta_sampler import Sampler
 from porereax.molecule_structure import MoleculeStructureSampler
 from porereax.rdf import RdfSampler
+from porereax.regions import Region
 from porereax.utils import _neighbor_atoms_excluding, read_pore_yml
 
 logger = logging.getLogger(__name__)
-
-type Region = str | Callable[[NDArray[np.float64]], NDArray[np.bool_]]
 
 
 def _matches_bond_spec(
@@ -151,12 +149,12 @@ class Sample:
 
     def __init__(
         self,
-        atom_lib,
-        masses,
-        trajectory_file,
-        bond_file=None,
-        system=None,
-        start_end_nthframe=(0, -1, 1),
+        atom_lib: dict,
+        masses: dict,
+        trajectory_file: str,
+        bond_file: str | None = None,
+        system: str | None = None,
+        start_end_nthframe: tuple[int, int, int] = (0, -1, 1),
     ):
         """
         Initialise Sample instance.
@@ -175,8 +173,9 @@ class Sample:
             Path to the trajectory file.
         bond_file : str, optional
             Path to the bond file.
-        system : object, optional
-            System object containing additional information.
+        system : str, optional
+            Path to a pore YAML file describing the system geometry. Required
+            for the 'Pore1D' and 'Pore2D' density dimensions.
         start_end_nthframe : tuple, optional
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         """
@@ -250,8 +249,9 @@ class Sample:
             Path to the trajectory file.
         bond_file : str, optional
             Path to the bond file.
-        system : object, optional
-            System object containing additional information.
+        system : str, optional
+            Path to a pore YAML file describing the system geometry. Required
+            for the 'Pore1D' and 'Pore2D' density dimensions.
         start_frame : int
             Starting frame for sampling.
         end_frame : int
@@ -947,7 +947,7 @@ class Sample:
                 self.molecules.update(instance.get_mols())
                 self._add_sampler(instance)
 
-    def sample(self, is_parallel=True, num_cores=0):
+    def sample(self, is_parallel: bool = True, num_cores: int = 0) -> None:
         """
         Execute the sampling process.
 
@@ -1059,8 +1059,9 @@ class Sample:
             Path to the trajectory file.
         bond_file : str, optional
             Path to the bond file.
-        system : object, optional
-            System object containing additional information.
+        system : str, optional
+            Path to a pore YAML file describing the system geometry. Required
+            for the 'Pore1D' and 'Pore2D' density dimensions.
         start_end_nthframe : tuple
             Tuple specifying (start_frame, end_frame, nth_frame) for sampling.
         sampler_inputs : dict

@@ -9,6 +9,7 @@ import numpy as np
 
 import porereax.utils as utils
 from porereax.meta_sampler import _BOND_SAMPLER_INIT_PARAMS, BondSampler
+from porereax.regions import Region
 from porereax.utils import Substitution
 
 
@@ -31,13 +32,13 @@ class BondLengthSampler(BondSampler):
         name_out: str,
         bonds: list,
         dimension: str,
-        region,
+        region: Region,
         process_id: int,
         atom_lib: dict,
         masses: dict,
         num_frames: int,
         box: np.ndarray,
-        system_properties: dict,
+        system_properties: dict | None,
         num_bins: int,
         range: tuple,
     ):

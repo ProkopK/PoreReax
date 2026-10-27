@@ -15,6 +15,7 @@ import numpy as np
 import porereax.regions as regions
 import porereax.utils as utils
 from porereax.utils import Substitution
+from porereax.regions import Region
 
 _SAMPLER_INIT_PARAMS = """
 dimension : str
@@ -382,15 +383,15 @@ class Sampler(abc.ABC):
 
     def __init__(
         self,
-        name_out,
-        dimension,
-        region,
-        process_id,
-        atom_lib,
-        masses,
-        num_frames,
-        box,
-        system_properties,
+        name_out: str,
+        dimension: str,
+        region: Region,
+        process_id: int,
+        atom_lib: dict,
+        masses: dict,
+        num_frames: int,
+        box: np.ndarray,
+        system_properties: dict | None,
     ):
         if not isinstance(name_out, str) or name_out == "":
             raise ValueError(
@@ -653,16 +654,16 @@ class AtomSampler(Sampler):
 
     def __init__(
         self,
-        name_out,
-        atoms,
-        dimension,
-        region,
-        process_id,
-        atom_lib,
-        masses,
-        num_frames,
-        box,
-        system_properties,
+        name_out: str,
+        atoms: list,
+        dimension: str,
+        region: Region,
+        process_id: int,
+        atom_lib: dict,
+        masses: dict,
+        num_frames: int,
+        box: np.ndarray,
+        system_properties: dict | None,
     ):
         super().__init__(
             name_out,
@@ -706,16 +707,16 @@ class BondSampler(Sampler):
 
     def __init__(
         self,
-        name_out,
-        bonds,
-        dimension,
-        region,
-        process_id,
-        atom_lib,
-        masses,
-        num_frames,
-        box,
-        system_properties,
+        name_out: str,
+        bonds: list,
+        dimension: str,
+        region: Region,
+        process_id: int,
+        atom_lib: dict,
+        masses: dict,
+        num_frames: int,
+        box: np.ndarray,
+        system_properties: dict | None,
     ):
         super().__init__(
             name_out,
