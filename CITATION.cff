@@ -3,7 +3,7 @@ message: "If you use PoreReax in your research, please cite it as below."
 title: "PoreReax"
 type: software
 version: 0.1.0
-date-released: 2026-10-22
+date-released: 2026-10-27
 license: GPL-3.0-only
 repository-code: "https://github.com/ProkopK/PoreReax"
 url: "https://prokopk.github.io/PoreReax/"
