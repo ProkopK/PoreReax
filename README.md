@@ -2,6 +2,7 @@
 
 ---
 
+[![PyPI](https://img.shields.io/pypi/v/porereax?label=PyPI)](https://pypi.org/project/porereax/)
 [![CI](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/ci.yml?branch=main&label=CI)](https://github.com/ProkopK/PoreReax/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/docs.yml?branch=main&label=docs)](https://prokopk.github.io/PoreReax/)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/ProkopK/PoreReax/codeql.yml?branch=main&label=CodeQL)](https://github.com/ProkopK/PoreReax/actions/workflows/codeql.yml)
@@ -45,7 +46,7 @@ python -m pip install porereax
 To install the current development version directly from GitHub instead:
 
 ```bash
-python -m pip install git+https://github.com/ProkopK/PoreReax.git
+python -m pip install git+https://github.com/ProkopK/PoreReax.git@develop
 ```
 
 <!-- end installation -->
