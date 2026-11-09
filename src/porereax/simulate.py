@@ -613,7 +613,7 @@ class Simulate:
             self._name_to_type.update(dict(self._frozen_atoms.items()))
         self._frozen_region = region
 
-    def auto_freeze(self, reactive_radius: float = 10.0):
+    def auto_freeze(self, reactive_radius: float = 10.0, reactive_z: float = 10.0):
         """
         Automatically freeze some atoms of the pore structure and leave a
         reactive layer between frozen and solvent.
@@ -624,6 +624,10 @@ class Simulate:
             The thickness of the reactive layer in Angstroms. Atoms within
             this distance from the pore wall will remain unfrozen. Default is
             10.0 Angstroms.
+        reactive_z : float, optional
+            The thickness of the reactive layer in z direction in Angstroms.
+            Atoms within this distance from the pore entrance (along z) will
+            remain unfrozen. Default is 10.0 Angstroms.
 
         Raises
         ------
@@ -647,9 +651,9 @@ class Simulate:
                 d = np.linalg.norm(np.array([x, y]) - np.array(pore_center[:2]))
                 return (
                     d > (pore_radius + reactive_radius)
-                    and pore_range[0] + reactive_radius + 1
+                    and pore_range[0] + reactive_z + 1
                     < z
-                    < pore_range[1] - reactive_radius - 1
+                    < pore_range[1] - reactive_z - 1
                 )
 
             self.freeze_region(region)
